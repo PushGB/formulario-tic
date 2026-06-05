@@ -19,6 +19,8 @@ let activeTab = 'dashboard';
 let activeFilterType = 'All';
 let chartDeptsInstance = null;
 let chartTypesInstance = null;
+const pendingDeletes = new Set();
+const pendingUpserts = new Set();
 
 // Estructuras de Firmas
 const drawingStates = {
@@ -127,6 +129,7 @@ async function loadSubmissionsBackground() {
                 }));
 
                 submissions = mappedSubmissions;
+                consolidateDuplicateSubmissions();
                 localStorage.setItem('tic_equip_submissions', JSON.stringify(submissions));
                 updateStats();
                 renderTable();
@@ -177,6 +180,177 @@ function updateThemeIcon() {
     lucide.createIcons();
 }
 
+// Consolidar de forma proactiva las solicitudes duplicadas (mismo RUT) en un solo registro
+function consolidateDuplicateSubmissions() {
+    if (submissions.length === 0) return;
+    
+    const consolidated = [];
+    const rutMap = new Map(); // rut -> submission
+    let hasChanges = false;
+    const deletedIds = [];
+    const updatedSubmissions = new Set();
+    
+    // Procesamos de más antiguo a más reciente para preservar el orden y datos actualizados
+    for (let i = submissions.length - 1; i >= 0; i--) {
+        const sub = submissions[i];
+        const rawRut = sub.funcionario && sub.funcionario.rut;
+        if (!rawRut) {
+            consolidated.push(sub);
+            continue;
+        }
+        
+        // Normalizar RUT
+        const rutKey = formatRut(rawRut);
+        
+        if (rutMap.has(rutKey)) {
+            const existing = rutMap.get(rutKey);
+            
+            // Fusionar equipamiento evitando duplicados
+            if (sub.equipamiento) {
+                sub.equipamiento.forEach(eq => {
+                    const isDup = existing.equipamiento.some(e => 
+                        (e.serie || '').trim().toUpperCase() === (eq.serie || '').trim().toUpperCase()
+                    );
+                    if (!isDup) {
+                        existing.equipamiento.push(eq);
+                        if (!pendingUpserts.has(existing.id)) {
+                            updatedSubmissions.add(existing);
+                        }
+                    }
+                });
+            }
+            
+            // Fusionar categorías
+            if (sub.equipamiento_categorias) {
+                sub.equipamiento_categorias.forEach(cat => {
+                    if (!existing.equipamiento_categorias.includes(cat)) {
+                        existing.equipamiento_categorias.push(cat);
+                        if (!pendingUpserts.has(existing.id)) {
+                            updatedSubmissions.add(existing);
+                        }
+                    }
+                });
+            }
+            
+            // Fusionar observaciones
+            if (sub.observaciones_generales && !existing.observaciones_generales.includes(sub.observaciones_generales)) {
+                existing.observaciones_generales += (existing.observaciones_generales ? ' | ' : '') + sub.observaciones_generales;
+                if (!pendingUpserts.has(existing.id)) {
+                    updatedSubmissions.add(existing);
+                }
+            }
+            if (sub.accesorios && !existing.accesorios.includes(sub.accesorios)) {
+                existing.accesorios += (existing.accesorios ? ' | ' : '') + sub.accesorios;
+                if (!pendingUpserts.has(existing.id)) {
+                    updatedSubmissions.add(existing);
+                }
+            }
+            
+            // Fusionar firmas
+            if (sub.firmas) {
+                if (!existing.firmas.tic && sub.firmas.tic) {
+                    existing.firmas.tic = sub.firmas.tic;
+                    existing.firmas.tic_mode = sub.firmas.tic_mode;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
+                }
+                if (!existing.firmas.emisor && sub.firmas.emisor) {
+                    existing.firmas.emisor = sub.firmas.emisor;
+                    existing.firmas.emisor_mode = sub.firmas.emisor_mode;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
+                }
+                if (!existing.firmas.receptor && sub.firmas.receptor) {
+                    existing.firmas.receptor = sub.firmas.receptor;
+                    existing.firmas.receptor_mode = sub.firmas.receptor_mode;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
+                }
+            }
+            
+            // Unificar nombre conservando el más largo/completo (evitar typos como Mors vs Mora)
+            if (sub.funcionario.nombre && existing.funcionario.nombre && sub.funcionario.nombre.length > existing.funcionario.nombre.length) {
+                existing.funcionario.nombre = sub.funcionario.nombre;
+                if (!pendingUpserts.has(existing.id)) {
+                    updatedSubmissions.add(existing);
+                }
+            }
+            
+            // Eliminar de Supabase el duplicado sobrante (evitando llamadas repetidas)
+            if (!pendingDeletes.has(sub.id)) {
+                deletedIds.push(sub.id);
+                hasChanges = true;
+            }
+        } else {
+            sub.funcionario.rut = rutKey;
+            rutMap.set(rutKey, sub);
+        }
+    }
+    
+    if (hasChanges) {
+        submissions = Array.from(rutMap.values()).reverse();
+        saveSubmissionsToStorage();
+        
+        // Sincronizar en Supabase de forma selectiva
+        if (supabase) {
+            // 1. Borrar registros duplicados obsoletos
+            deletedIds.forEach(id => {
+                pendingDeletes.add(id);
+                supabase
+                    .from('solicitudes_tic')
+                    .delete()
+                    .eq('id', id)
+                    .then(({ error }) => {
+                        pendingDeletes.delete(id);
+                        if (error) console.error(`Error al eliminar duplicado ${id} de Supabase:`, error.message);
+                    })
+                    .catch(() => pendingDeletes.delete(id));
+            });
+            
+            // 2. Upsertar registros consolidados que sufrieron cambios
+            updatedSubmissions.forEach(s => {
+                pendingUpserts.add(s.id);
+                const dbRow = {
+                    id: s.id,
+                    fecha: s.fecha,
+                    ticket: s.ticket,
+                    funcionario_nombre: s.funcionario.nombre,
+                    funcionario_rut: s.funcionario.rut,
+                    funcionario_cargo: s.funcionario.cargo,
+                    funcionario_depto: s.funcionario.depto,
+                    tipo_solicitud: s.tipo_solicitud,
+                    propiedad_equipamiento: s.propiedad_equipamiento,
+                    equipamiento_categorias: s.equipamiento_categorias,
+                    otros_detalles: s.otros_detalles,
+                    traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
+                    traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
+                    traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
+                    traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
+                    traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
+                    equipamiento: s.equipamiento,
+                    accesorios: s.accesorios,
+                    observaciones_generales: s.observaciones_generales,
+                    firmas_tic_mode: s.firmas.tic_mode,
+                    firmas_emisor_mode: s.firmas.emisor_mode,
+                    firmas_receptor_mode: s.firmas.receptor_mode,
+                    firma_tic: s.firmas.tic,
+                    firma_emisor: s.firmas.emisor,
+                    firma_receptor: s.firmas.receptor
+                };
+                supabase.from('solicitudes_tic').upsert(dbRow)
+                    .then(({ error }) => {
+                        pendingUpserts.delete(s.id);
+                        if (error) console.error(`Error al actualizar consolidado ${s.id} en Supabase:`, error.message);
+                    })
+                    .catch(() => pendingUpserts.delete(s.id));
+            });
+        }
+    }
+}
+
 // Cargar registros desde localStorage y sincronizar con Supabase
 async function loadSubmissions() {
     // 1. Cargar caché local para renderizado instantáneo (0ms)
@@ -190,6 +364,8 @@ async function loadSubmissions() {
                     sub.funcionario.rut = formatRut(sub.funcionario.rut);
                 }
             });
+            // Consolidar duplicados en caché
+            consolidateDuplicateSubmissions();
         } catch (e) {
             console.error("Error al cargar registros locales", e);
             submissions = [];
@@ -199,7 +375,7 @@ async function loadSubmissions() {
     }
     updateStats();
     renderTable();
-
+ 
     // 2. Sincronizar en segundo plano con Supabase si está disponible (SWR)
     if (supabase) {
         try {
@@ -207,9 +383,9 @@ async function loadSubmissions() {
                 .from('solicitudes_tic')
                 .select('*')
                 .order('created_at', { ascending: false });
-
+ 
             if (error) throw error;
-
+ 
             if (data) {
                 // Mapear los campos de la base de datos al formato local
                 const mappedSubmissions = data.map(dbRow => ({
@@ -245,8 +421,11 @@ async function loadSubmissions() {
                         receptor: dbRow.firma_receptor
                     }
                 }));
-
+ 
                 submissions = mappedSubmissions;
+                // Consolidar duplicados en base a datos frescos de la nube
+                consolidateDuplicateSubmissions();
+                
                 localStorage.setItem('tic_equip_submissions', JSON.stringify(submissions));
                 updateStats();
                 renderTable();
@@ -878,7 +1057,20 @@ function saveForm(event) {
     }
 
     saveSubmissionsToStorage();
-    activeSubmissionId = submissionData.id;
+    consolidateDuplicateSubmissions();
+    
+    // Si se consolidó con un registro existente (mismo RUT), usamos ese ID para que la UI/PDF coincida
+    const currentRut = submissionData.funcionario && submissionData.funcionario.rut ? formatRut(submissionData.funcionario.rut) : null;
+    if (currentRut) {
+        const consolidatedSub = submissions.find(s => s.funcionario && formatRut(s.funcionario.rut) === currentRut);
+        if (consolidatedSub) {
+            activeSubmissionId = consolidatedSub.id;
+        } else {
+            activeSubmissionId = submissionData.id;
+        }
+    } else {
+        activeSubmissionId = submissionData.id;
+    }
 
     // Sincronizar en caliente con Supabase
     if (supabase) {
@@ -1555,7 +1747,7 @@ function processWorkbookData() {
     if (equiposSheet) {
         const rawEquipos = XLSX.utils.sheet_to_json(equiposSheet);
         
-        // Agrupar filas de catastro por Funcionario
+        // Agrupar filas de catastro por RUT (o Nombre si no hay RUT)
         const grouped = {};
         rawEquipos.forEach(item => {
             const nombre = item['Nombre Funcionario'] || item['Nombre'];
@@ -1566,16 +1758,26 @@ function processWorkbookData() {
                 return;
             }
             
-            const key = String(nombre).trim().toLowerCase();
+            const rawRut = String(item['Rut'] || '').trim();
+            const rutKey = formatRut(rawRut);
+            const key = (rutKey && rutKey !== '-') ? rutKey : ('name_' + String(nombre).trim().toLowerCase());
+            
             if (!grouped[key]) {
                 grouped[key] = {
                     nombre: String(nombre).trim(),
-                    rut: formatRut(String(item['Rut'] || '').trim()),
+                    rut: (rutKey && rutKey !== '-') ? rutKey : '',
                     cargo: String(item['Cargo'] || '').trim(),
                     depto: String(item['Departamento'] || '').trim(),
                     propiedad: item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo',
                     equipos: []
                 };
+            } else {
+                // Si el nombre de esta fila es más largo/completo, lo preferimos para el grupo
+                const currentName = grouped[key].nombre;
+                const newName = String(nombre).trim();
+                if (newName.length > currentName.length) {
+                    grouped[key].nombre = newName;
+                }
             }
             
             const rawEq = {
@@ -1588,15 +1790,20 @@ function processWorkbookData() {
             };
             const splitEqs = splitEquipmentIfCombined(rawEq);
             splitEqs.forEach(eq => {
-                grouped[key].equipos.push(eq);
+                const isDup = grouped[key].equipos.some(e => 
+                    (e.serie || '').trim().toUpperCase() === (eq.serie || '').trim().toUpperCase()
+                );
+                if (!isDup) {
+                    grouped[key].equipos.push(eq);
+                }
             });
         });
         
         // Crear las solicitudes agrupadas en LocalStorage
         Object.keys(grouped).forEach(key => {
             const group = grouped[key];
-            // ID determinista basado en el nombre para evitar duplicar si se carga múltiples veces
-            const subId = 'sub_excel_' + key.replace(/[^a-z0-9]/g, '_');
+            // ID determinista basado en el RUT o clave para evitar duplicar
+            const subId = 'sub_excel_' + key.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             
             if (submissions.some(s => s.id === subId)) return;
             
@@ -1858,47 +2065,47 @@ function selectExcelSuggestion(item) {
         if (rad) rad.checked = true;
     }
     
-    // 3. Establecer Checkboxes Categoría
-    document.querySelectorAll('input[name="eq_cat"]').forEach(cb => cb.checked = false);
-    document.getElementById('eq_otros_detalles').value = '';
+    // 3. Buscar todos los equipos asignados a este funcionario en el catastro Excel
+    const targetFunc = (item.funcionario || '').trim().toLowerCase();
+    const relatedEquipments = loadedAllEquipments.filter(e => 
+        (e.funcionario || '').trim().toLowerCase() === targetFunc
+    );
     
-    const tipoLower = (item.tipo || '').toLowerCase();
-    if (tipoLower.includes('pc') || tipoLower === 'desktop') {
-        const cb = document.querySelector('input[name="eq_cat"][value="PC"]');
-        if (cb) cb.checked = true;
-    } else if (tipoLower.includes('notebook') || tipoLower.includes('laptop')) {
-        const cb = document.querySelector('input[name="eq_cat"][value="Notebook"]');
-        if (cb) cb.checked = true;
-    } else if (tipoLower.includes('aio') || tipoLower.includes('all in one')) {
-        const cb = document.querySelector('input[name="eq_cat"][value="All In One"]');
-        if (cb) cb.checked = true;
-    } else if (tipoLower.includes('pantalla') || tipoLower.includes('monitor')) {
-        const cb = document.querySelector('input[name="eq_cat"][value="Monitor"]');
-        if (cb) cb.checked = true;
-    } else {
-        document.getElementById('eq_otros_detalles').value = item.tipo;
-    }
-    
-    // 4. Agregar fila en Sección 4 (separando equipos combinados si corresponde)
+    // 4. Limpiar tabla de equipamiento
     const container = document.getElementById('equipment-rows');
     container.innerHTML = '';
-    const splitItems = splitEquipmentIfCombined({
-        tipo: item.tipo,
-        marca: item.marca,
-        modelo: item.modelo,
-        serie: item.serie,
-        inventario: item.inventario,
-        observacion: ''
+    
+    const finalEquipments = relatedEquipments.length > 0 ? relatedEquipments : [item];
+    const addedSeries = new Set();
+    
+    // 5. Agregar todos los equipos encontrados
+    finalEquipments.forEach(eqItem => {
+        const serialKey = (eqItem.serie || '').trim().toUpperCase();
+        if (serialKey && addedSeries.has(serialKey)) return;
+        if (serialKey) addedSeries.add(serialKey);
+        
+        const splitItems = splitEquipmentIfCombined({
+            tipo: eqItem.tipo,
+            marca: eqItem.marca,
+            modelo: eqItem.modelo,
+            serie: eqItem.serie,
+            inventario: eqItem.inventario,
+            observacion: ''
+        });
+        
+        splitItems.forEach(splitItem => {
+            addEquipmentRow(splitItem);
+        });
     });
-    splitItems.forEach(splitItem => {
-        addEquipmentRow(splitItem);
-    });
+    
+    // Sincronizar checkboxes de categoría
+    syncEquipmentCategoriesFromRows();
     
     // Limpiar barra de búsqueda y ocultar dropdown
     document.getElementById('excel-autocomplete-input').value = '';
     document.getElementById('excel-suggestions-dropdown').classList.add('hidden');
     
-    showToast("Datos de funcionario y equipo auto-rellenados.", "success");
+    showToast(`Se auto-rellenaron ${addedSeries.size} equipos para el funcionario.`, "success");
 }
 
 // Exportar la planilla Excel modificada y descargarla localmente

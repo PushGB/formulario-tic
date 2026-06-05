@@ -327,6 +327,38 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Control de Duplicados e Inconsistencias -->
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md space-y-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i> Control de Duplicados e Inconsistencias
+                        </h3>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Detección automática de números de serie repetidos y discrepancias de nombres/RUTs.</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Columna Izquierda: Conflictos de Usuarios -->
+                        <div class="space-y-3">
+                            <h4 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <i data-lucide="user-x" class="w-4 h-4 text-slate-400 dark:text-slate-500"></i> Inconsistencias de Usuarios
+                            </h4>
+                            <div id="duplicate-users-container" class="space-y-2 max-h-72 overflow-y-auto pr-1 text-slate-700 dark:text-slate-200">
+                                <div class="p-3 text-center text-slate-400 text-xs">Cargando inconsistencias de usuarios...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Columna Derecha: Conflictos de Equipos -->
+                        <div class="space-y-3">
+                            <h4 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <i data-lucide="smartphone-nfc" class="w-4 h-4 text-slate-400 dark:text-slate-500"></i> Conflictos de Equipamiento (N° Serie)
+                            </h4>
+                            <div id="duplicate-equip-container" class="space-y-2 max-h-72 overflow-y-auto pr-1 text-slate-700 dark:text-slate-200">
+                                <div class="p-3 text-center text-slate-400 text-xs">Cargando conflictos de equipamiento...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- ================= PANEL DE HISTORIAL Y TRAZABILIDAD ================= -->

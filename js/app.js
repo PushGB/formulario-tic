@@ -2585,6 +2585,273 @@ function renderMetrics() {
             });
         }
     }
+    
+    // Ejecutar detección de duplicados y discrepancias
+    detectDuplicatesAndInconsistencies();
+}
+
+// Algoritmo de distancia de Levenshtein para medir similitud de nombres
+function levenshteinDistance(s1, s2) {
+    s1 = (s1 || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    s2 = (s2 || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (s1 === s2) return 0;
+    if (s1.length === 0) return s2.length;
+    if (s2.length === 0) return s1.length;
+    
+    const matrix = [];
+    for (let i = 0; i <= s2.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= s1.length; j++) matrix[0][j] = j;
+    
+    for (let i = 1; i <= s2.length; i++) {
+        for (let j = 1; j <= s1.length; j++) {
+            if (s2[i-1] === s1[j-1]) {
+                matrix[i][j] = matrix[i-1][j-1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i-1][j-1] + 1, // sustitución
+                    matrix[i][j-1] + 1,   // inserción
+                    matrix[i-1][j] + 1    // eliminación
+                );
+            }
+        }
+    }
+    return matrix[s2.length][s1.length];
+}
+
+// Lógica de detección de inconsistencias de usuarios y duplicados de equipamiento
+function detectDuplicatesAndInconsistencies() {
+    const duplicateUsersContainer = document.getElementById('duplicate-users-container');
+    const duplicateEquipContainer = document.getElementById('duplicate-equip-container');
+    
+    if (!duplicateUsersContainer || !duplicateEquipContainer) return;
+    
+    duplicateUsersContainer.innerHTML = '';
+    duplicateEquipContainer.innerHTML = '';
+    
+    let userAlerts = [];
+    let equipAlerts = [];
+    
+    // --- 1. INCONSISTENCIAS DE USUARIOS ---
+    const rutToNames = new Map(); // rutKey -> { namesInSubmissions: Set, namesInExcel: Set }
+    
+    // Recolectar nombres asociados a RUTs desde submissions (formularios)
+    submissions.forEach(sub => {
+        const rawRut = sub.funcionario && sub.funcionario.rut;
+        if (!rawRut) return;
+        const rutKey = formatRut(rawRut);
+        if (!rutToNames.has(rutKey)) {
+            rutToNames.set(rutKey, { namesInSubmissions: new Set(), namesInExcel: new Set() });
+        }
+        if (sub.funcionario.nombre) {
+            rutToNames.get(rutKey).namesInSubmissions.add(sub.funcionario.nombre.trim());
+        }
+    });
+    
+    // Recolectar nombres asociados a RUTs desde Excel (si coinciden con RUTs conocidos)
+    const nameToRutMap = new Map();
+    submissions.forEach(sub => {
+        if (sub.funcionario && sub.funcionario.nombre && sub.funcionario.rut) {
+            nameToRutMap.set(sub.funcionario.nombre.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""), formatRut(sub.funcionario.rut));
+        }
+    });
+    
+    loadedAllEquipments.forEach(eq => {
+        if (!eq.funcionario) return;
+        const normExcelName = eq.funcionario.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const rutKey = nameToRutMap.get(normExcelName);
+        if (rutKey) {
+            if (!rutToNames.has(rutKey)) {
+                rutToNames.set(rutKey, { namesInSubmissions: new Set(), namesInExcel: new Set() });
+            }
+            rutToNames.get(rutKey).namesInExcel.add(eq.funcionario.trim());
+        }
+    });
+    
+    // A. Detectar discrepancias de nombre para el mismo RUT (Excel vs Formularios)
+    rutToNames.forEach((data, rut) => {
+        const subsNames = Array.from(data.namesInSubmissions);
+        const excelNames = Array.from(data.namesInExcel);
+        
+        if (subsNames.length > 0 && excelNames.length > 0) {
+            const subName = subsNames[0];
+            const excelName = excelNames[0];
+            
+            // Si el nombre no coincide exactamente (ignorando acentos y mayúsculas)
+            const normSub = subName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const normExcel = excelName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            if (normSub !== normExcel) {
+                userAlerts.push({
+                    type: 'discrepancy',
+                    title: `Discrepancia de Nombre (RUT ${rut})`,
+                    desc: `En Formularios: <strong>"${subName}"</strong> <br>En Excel Catastro: <strong>"${excelName}"</strong>`,
+                    severity: 'amber'
+                });
+            }
+        }
+    });
+    
+    // B. Detectar Nombres muy similares pero con RUTs diferentes (posibles errores de tipeo de RUT)
+    const uniqueFuncs = [];
+    const seenRuts = new Set();
+    
+    submissions.forEach(sub => {
+        if (sub.funcionario && sub.funcionario.rut && sub.funcionario.nombre) {
+            const normalizedRut = formatRut(sub.funcionario.rut);
+            if (!seenRuts.has(normalizedRut)) {
+                seenRuts.add(normalizedRut);
+                uniqueFuncs.push({
+                    nombre: sub.funcionario.nombre.trim(),
+                    rut: normalizedRut
+                });
+            }
+        }
+    });
+    
+    for (let i = 0; i < uniqueFuncs.length; i++) {
+        for (let j = i + 1; j < uniqueFuncs.length; j++) {
+            const f1 = uniqueFuncs[i];
+            const f2 = uniqueFuncs[j];
+            
+            const dist = levenshteinDistance(f1.nombre, f2.nombre);
+            if (dist > 0 && dist <= 2) {
+                userAlerts.push({
+                    type: 'similar_names',
+                    title: `Nombres similares con RUTs diferentes`,
+                    desc: `• <strong>"${f1.nombre}"</strong> con RUT: ${f1.rut}<br>• <strong>"${f2.nombre}"</strong> con RUT: ${f2.rut}`,
+                    severity: 'rose'
+                });
+            }
+        }
+    }
+    
+    // --- 2. CONFLICTOS DE EQUIPAMIENTO ---
+    const serieToAssignments = new Map(); // serie -> Array de { source, ownerName, detail }
+    
+    // Equipamiento en formularios activos
+    submissions.forEach(sub => {
+        if (sub.equipamiento) {
+            sub.equipamiento.forEach(eq => {
+                const sKey = (eq.serie || '').trim().toUpperCase();
+                if (!sKey || sKey === 'S/N' || sKey === 'SIN SERIE' || sKey === '-') return;
+                
+                if (!serieToAssignments.has(sKey)) {
+                    serieToAssignments.set(sKey, []);
+                }
+                serieToAssignments.get(sKey).push({
+                    source: 'Formulario',
+                    ownerName: sub.funcionario.nombre,
+                    detail: `Ticket: ${sub.ticket || 'S/N'} (${sub.tipo_solicitud})`
+                });
+            });
+        }
+    });
+    
+    // Equipamiento en Excel catastrado
+    loadedAllEquipments.forEach(eq => {
+        const sKey = (eq.serie || '').trim().toUpperCase();
+        if (!sKey || sKey === 'S/N' || sKey === 'SIN SERIE' || sKey === '-') return;
+        
+        if (eq.funcionario && eq.funcionario.trim().length > 0) {
+            if (!serieToAssignments.has(sKey)) {
+                serieToAssignments.set(sKey, []);
+            }
+            serieToAssignments.get(sKey).push({
+                source: 'Excel',
+                ownerName: eq.funcionario,
+                detail: `Inventario Excel (${eq.tipo || 'Equipo'})`
+            });
+        }
+    });
+    
+    // Detectar conflictos por número de serie
+    serieToAssignments.forEach((assigns, serie) => {
+        const uniqueOwners = [];
+        assigns.forEach(a => {
+            const normName = a.ownerName.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            if (!uniqueOwners.some(o => o.normName === normName)) {
+                uniqueOwners.push({ normName, name: a.ownerName, detail: a.detail, source: a.source });
+            }
+        });
+        
+        if (uniqueOwners.length > 1) {
+            const formAssigns = assigns.filter(a => a.source === 'Formulario');
+            
+            // Si hay más de un propietario único en formularios diferentes
+            if (formAssigns.length > 1 && formAssigns.some((val, index, array) => val.ownerName !== array[0].ownerName)) {
+                const descDetails = assigns.map(a => `• <strong>${a.ownerName}</strong> en ${a.detail}`).join('<br>');
+                equipAlerts.push({
+                    type: 'duplicate_form',
+                    title: `Serie duplicada en múltiples Formularios`,
+                    desc: `N° Serie: <strong>${serie}</strong> asignada a:<br>${descDetails}`,
+                    severity: 'rose'
+                });
+            } else {
+                // Si la discrepancia es entre Excel y Formularios
+                const descDetails = assigns.map(a => `• <strong>${a.ownerName}</strong> en ${a.detail}`).join('<br>');
+                equipAlerts.push({
+                    type: 'excel_discrepancy',
+                    title: `Discrepancia Catastro vs Formularios`,
+                    desc: `N° Serie: <strong>${serie}</strong> asignada a:<br>${descDetails}`,
+                    severity: 'amber'
+                });
+            }
+        }
+    });
+    
+    // --- 3. RENDERIZAR INCONSISTENCIAS DE USUARIOS ---
+    if (userAlerts.length === 0) {
+        duplicateUsersContainer.innerHTML = `
+            <div class="flex items-center gap-2 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-450 border border-emerald-100 dark:border-emerald-900/50 text-xs font-semibold">
+                <i data-lucide="check-circle-2" class="w-4.5 h-4.5 text-emerald-500"></i>
+                Sin inconsistencias de usuarios detectadas.
+            </div>
+        `;
+    } else {
+        userAlerts.forEach(alert => {
+            const div = document.createElement('div');
+            const bgClass = alert.severity === 'rose' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-350' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-350';
+            const icon = alert.severity === 'rose' ? 'alert-octagon' : 'alert-circle';
+            
+            div.className = `p-3 rounded-2xl border text-xs leading-relaxed ${bgClass}`;
+            div.innerHTML = `
+                <div class="font-bold flex items-center gap-1.5 mb-1 text-[13px]">
+                    <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
+                    ${alert.title}
+                </div>
+                <div>${alert.desc}</div>
+            `;
+            duplicateUsersContainer.appendChild(div);
+        });
+    }
+    
+    // --- 4. RENDERIZAR ALERTAS DE EQUIPOS ---
+    if (equipAlerts.length === 0) {
+        duplicateEquipContainer.innerHTML = `
+            <div class="flex items-center gap-2 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-450 border border-emerald-100 dark:border-emerald-900/50 text-xs font-semibold">
+                <i data-lucide="check-circle-2" class="w-4.5 h-4.5 text-emerald-500"></i>
+                Sin conflictos de números de serie detectados.
+            </div>
+        `;
+    } else {
+        equipAlerts.forEach(alert => {
+            const div = document.createElement('div');
+            const bgClass = alert.severity === 'rose' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-350' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-350';
+            const icon = alert.severity === 'rose' ? 'alert-octagon' : 'alert-circle';
+            
+            div.className = `p-3 rounded-2xl border text-xs leading-relaxed ${bgClass}`;
+            div.innerHTML = `
+                <div class="font-bold flex items-center gap-1.5 mb-1 text-[13px]">
+                    <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
+                    ${alert.title}
+                </div>
+                <div>${alert.desc}</div>
+            `;
+            duplicateEquipContainer.appendChild(div);
+        });
+    }
+    
+    lucide.createIcons();
 }
 
 // =======================================================================

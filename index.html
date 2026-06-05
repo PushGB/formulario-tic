@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Equipamiento TIC - ISP</title>
-    <!-- Tailwind CSS with custom configuration -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons for modern iconography -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Localized Tailwind CSS, Lucide Icons & html2pdf.js for 100% Offline PWA capability -->
+    <script src="/js/tailwind.min.js"></script>
+    <script src="/js/lucide.min.js"></script>
+    <script src="/js/html2pdf.bundle.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -31,6 +31,8 @@
             }
         }
     </script>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
     <!-- External Custom Stylesheet -->
     <link rel="stylesheet" href="/css/styles.css">
 </head>
@@ -66,6 +68,9 @@
                             </button>
                             <button onclick="switchTab('metrics')" id="nav-metrics" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
                                 <span class="flex items-center gap-2"><i data-lucide="bar-chart-2" class="w-4 h-4"></i> Métricas</span>
+                            </button>
+                            <button onclick="switchTab('history')" id="nav-history" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
+                                <span class="flex items-center gap-2"><i data-lucide="history" class="w-4 h-4"></i> Historial</span>
                             </button>
                             <button onclick="openNewForm()" id="nav-form" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
                                 <span class="flex items-center gap-2"><i data-lucide="file-plus" class="w-4 h-4"></i> Nueva Solicitud</span>
@@ -291,29 +296,80 @@
                 <!-- Two columns for charts/lists -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Left: Progress by Department -->
-                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md flex flex-col justify-between">
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md flex flex-col space-y-4">
                         <div>
                             <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
                                 <i data-lucide="building-2" class="w-5 h-5 text-indigo-500"></i> Avance por Unidad / Departamento
                             </h3>
-                            <p class="text-xs text-slate-400 dark:text-slate-500 mb-4">Top departamentos con mayor cantidad de equipos registrados en el catastro.</p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500">Top departamentos con mayor cantidad de equipos registrados en el catastro.</p>
                         </div>
                         <div id="metric-dept-list" class="space-y-4">
                             <div class="p-3 text-center text-slate-400">Cargando datos de departamentos...</div>
                         </div>
+                        <div class="relative h-64 w-full">
+                            <canvas id="chart-depts"></canvas>
+                        </div>
                     </div>
 
                     <!-- Right: Equipment Types Breakdown -->
-                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md flex flex-col justify-between">
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md flex flex-col space-y-4">
                         <div>
                             <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
                                 <i data-lucide="devices" class="w-5 h-5 text-indigo-500"></i> Distribución de Equipos Catastrados
                             </h3>
-                            <p class="text-xs text-slate-400 dark:text-slate-500 mb-4">Cantidad de equipamientos por tipo y propiedad (Arriendo vs ISP).</p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500">Cantidad de equipamientos por tipo y propiedad (Arriendo vs ISP).</p>
                         </div>
                         <div id="metric-types-list" class="space-y-4">
                             <div class="p-3 text-center text-slate-400">Cargando distribución de tipos...</div>
                         </div>
+                        <div class="relative h-64 w-full flex justify-center">
+                            <canvas id="chart-types"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= PANEL DE HISTORIAL Y TRAZABILIDAD ================= -->
+            <section id="tab-history" class="hidden space-y-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <i data-lucide="history" class="w-6 h-6 text-indigo-500"></i> Historial y Trazabilidad de Equipamiento
+                    </h1>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Busca un número de serie para rastrear su historial de asignaciones, traspasos y devoluciones.</p>
+                </div>
+                
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-6">
+                    <div class="max-w-md relative">
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">Buscar por Número de Serie:</label>
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-3.5 h-4 w-4 text-slate-400 dark:text-slate-500"></i>
+                            <input type="text" id="history-search-input" oninput="showHistorySuggestions(this.value)" placeholder="Escriba el número de serie (ej: SPF0349A)..." class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-955 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all" autocomplete="off">
+                            <div id="history-suggestions-dropdown" class="hidden absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-50 divide-y divide-slate-100 dark:divide-slate-800 text-xs text-slate-700 dark:text-slate-200"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Contenedor de Resultados -->
+                    <div id="history-results" class="hidden space-y-6">
+                        <!-- Tarjeta Informativa del Equipo -->
+                        <div id="history-eq-info" class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <!-- Se rellenará dinámicamente -->
+                        </div>
+                        
+                        <!-- Línea de Tiempo -->
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
+                                <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i> Línea de Tiempo de Movimientos:
+                            </h3>
+                            <div class="relative border-l-2 border-indigo-100 dark:border-indigo-900/50 pl-6 ml-3 space-y-6" id="history-timeline">
+                                <!-- Se rellenará dinámicamente -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Estado Vacío -->
+                    <div id="history-empty-state" class="py-12 text-center text-slate-400 dark:text-slate-500 text-sm">
+                        <i data-lucide="search" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700"></i>
+                        <span>Ingrese un número de serie para comenzar el rastreo.</span>
                     </div>
                 </div>
             </section>
@@ -675,8 +731,14 @@
                                 Cancelar
                             </button>
                             <div class="flex gap-2">
+                                <button type="button" onclick="openPreviewModal()" id="preview-btn-form" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                                    <i data-lucide="eye" class="w-4 h-4"></i> Previsualizar
+                                </button>
+                                <button type="button" onclick="exportActiveSubmissionToPDF()" id="pdf-btn-form" class="hidden bg-violet-600 hover:bg-violet-750 text-white px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i> Descargar PDF
+                                </button>
                                 <button type="button" onclick="triggerPrintMode()" id="print-btn-form" class="hidden bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
-                                    <i data-lucide="printer" class="w-4 h-4"></i> Imprimir / Guardar PDF
+                                    <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
                                 </button>
                                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
                                     <i data-lucide="save" class="w-4 h-4"></i> Guardar Registro
@@ -697,6 +759,42 @@
                 <p class="mt-1 font-mono">Formulario de Control Integrado - RG-02-IT-140.03-004_Asignacion_Traspaso_Devolucion_EQ_V5</p>
             </div>
         </footer>
+
+        <!-- ================= MODAL DE PREVISUALIZACIÓN DE IMPRESIÓN ================= -->
+        <div id="preview-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-800">
+                <!-- Header -->
+                <div class="px-6 py-4 bg-slate-50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Previsualización del Formulario Oficial</h3>
+                        <p class="text-xs text-slate-450 dark:text-slate-500">Muestra el documento tal como se exportará a las 2 páginas Oficio.</p>
+                    </div>
+                    <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <!-- Document Viewport -->
+                <div class="flex-1 overflow-y-auto p-6 bg-slate-100 dark:bg-slate-950/80 flex justify-center">
+                    <div id="preview-frame-container" class="w-full flex flex-col items-center gap-6 overflow-y-auto">
+                        <!-- El contenido clonado del print container se inyectará aquí -->
+                    </div>
+                </div>
+                
+                <!-- Footer Actions -->
+                <div class="px-6 py-4 bg-slate-50 dark:bg-slate-950/40 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-3">
+                    <button onclick="closePreviewModal()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition-all">
+                        Cerrar
+                    </button>
+                    <button onclick="triggerPDFExportFromPreview()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                        <i data-lucide="download" class="w-4 h-4"></i> Descargar PDF Directo
+                    </button>
+                    <button onclick="triggerPrintFromPreview()" class="bg-indigo-650 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                        <i data-lucide="printer" class="w-4 h-4"></i> Imprimir (Navegador)
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
 

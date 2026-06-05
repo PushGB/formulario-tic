@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import Chart from 'chart.js/auto';
 
 // Inicializar Supabase Client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -11,11 +12,13 @@ if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('tu-proyecto-nuevo')
     console.warn("Supabase no configurado o tiene valores por defecto. Trabajando en modo local/offline.");
 }
 
-// Inicialización de Variables Globales
+// Inicialización de Variables Globales y Gráficos
 let submissions = [];
 let activeSubmissionId = null;
 let activeTab = 'dashboard';
 let activeFilterType = 'All';
+let chartDeptsInstance = null;
+let chartTypesInstance = null;
 
 // Estructuras de Firmas
 const drawingStates = {
@@ -41,12 +44,101 @@ window.addEventListener('load', () => {
     // Configurar Listeners para las Firmas
     initSignaturePads();
 
+    // Configurar listeners de validación de campos obligatorios
+    setupInputValidationListeners();
+
     // Sincronizar dimensiones de Canvas si cambia el tamaño de pantalla
     window.addEventListener('resize', resizeAllCanvases);
 
     // Intentar precargar el catastro Excel desde el servidor local automáticamente
     preloadExcelData();
+
+    // Inicializar canal de tiempo real con Supabase
+    initRealtime();
+
+    // Registrar Service Worker para PWA (offline local)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[PWA] Service Worker registrado con éxito en el ámbito:', reg.scope))
+            .catch(err => console.error('[PWA] Error al registrar el Service Worker:', err));
+    }
 });
+
+// Inicializar la sincronización en tiempo real de Supabase
+function initRealtime() {
+    if (supabase) {
+        supabase
+            .channel('realtime-solicitudes-tic')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_tic' }, payload => {
+                console.log('[Realtime] Cambio detectado en solicitudes_tic:', payload);
+                // Recargar solicitudes en segundo plano silenciosamente
+                loadSubmissionsBackground();
+            })
+            .subscribe(status => {
+                console.log(`[Realtime] Estado de suscripción Realtime: ${status}`);
+            });
+    }
+}
+
+// Función auxiliar para cargar solicitudes en segundo plano sin interrumpir la UX
+async function loadSubmissionsBackground() {
+    if (supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('solicitudes_tic')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (data) {
+                const mappedSubmissions = data.map(dbRow => ({
+                    id: dbRow.id,
+                    fecha: dbRow.fecha,
+                    ticket: dbRow.ticket,
+                    funcionario: {
+                        nombre: dbRow.funcionario_nombre,
+                        rut: dbRow.funcionario_rut,
+                        cargo: dbRow.funcionario_cargo,
+                        depto: dbRow.funcionario_depto
+                    },
+                    tipo_solicitud: dbRow.tipo_solicitud,
+                    propiedad_equipamiento: dbRow.propiedad_equipamiento,
+                    equipamiento_categorias: dbRow.equipamiento_categorias,
+                    otros_detalles: dbRow.otros_detalles || '',
+                    traspaso: dbRow.tipo_solicitud === 'Traspaso' ? {
+                        emisor_nombre: dbRow.traspaso_emisor_nombre,
+                        emisor_depto: dbRow.traspaso_emisor_depto,
+                        receptor_nombre: dbRow.traspaso_receptor_nombre,
+                        receptor_depto: dbRow.traspaso_receptor_depto,
+                        observacion: dbRow.traspaso_observacion
+                    } : null,
+                    equipamiento: dbRow.equipamiento,
+                    accesorios: dbRow.accesorios || '',
+                    observaciones_generales: dbRow.observaciones_generales || '',
+                    firmas: {
+                        tic_mode: dbRow.firmas_tic_mode,
+                        emisor_mode: dbRow.firmas_emisor_mode,
+                        receptor_mode: dbRow.firmas_receptor_mode,
+                        tic: dbRow.firma_tic,
+                        emisor: dbRow.firma_emisor,
+                        receptor: dbRow.firma_receptor
+                    }
+                }));
+
+                submissions = mappedSubmissions;
+                localStorage.setItem('tic_equip_submissions', JSON.stringify(submissions));
+                updateStats();
+                renderTable();
+                if (activeTab === 'metrics') {
+                    renderMetrics();
+                }
+            }
+        } catch (e) {
+            console.error("Error al actualizar solicitudes de fondo:", e.message);
+        }
+    }
+}
 
 // Inicializar Tema (Oscuro / Claro)
 function initTheme() {
@@ -195,25 +287,27 @@ function switchTab(tabId) {
     document.getElementById('tab-dashboard').classList.add('hidden');
     document.getElementById('tab-form-view').classList.add('hidden');
     document.getElementById('tab-metrics').classList.add('hidden');
+    const tabHistory = document.getElementById('tab-history');
+    if (tabHistory) tabHistory.classList.add('hidden');
     
     // Estilos de botones de navegación
     const btnDash = document.getElementById('nav-dashboard');
     const btnForm = document.getElementById('nav-form');
     const btnMetrics = document.getElementById('nav-metrics');
+    const btnHistory = document.getElementById('nav-history');
     
-    btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnMetrics) {
-        btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    }
+    if (btnDash) btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
+    if (btnForm) btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
+    if (btnMetrics) btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
+    if (btnHistory) btnHistory.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
 
     if (tabId === 'dashboard') {
         document.getElementById('tab-dashboard').classList.remove('hidden');
-        btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white";
+        if (btnDash) btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
         renderTable();
     } else if (tabId === 'form-view') {
         document.getElementById('tab-form-view').classList.remove('hidden');
-        btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+        if (btnForm) btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
         // Redimensionar canvases de firma al visualizar
         setTimeout(resizeAllCanvases, 50);
     } else if (tabId === 'metrics') {
@@ -222,6 +316,12 @@ function switchTab(tabId) {
             btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
         }
         renderMetrics();
+    } else if (tabId === 'history') {
+        if (tabHistory) tabHistory.classList.remove('hidden');
+        if (btnHistory) {
+            btnHistory.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+        }
+        resetHistoryTab();
     }
 }
 
@@ -236,6 +336,9 @@ function openNewForm() {
     rutElement.classList.add('border-slate-200', 'dark:border-slate-700');
     document.getElementById('rut-validation-icon').classList.add('hidden');
     document.getElementById('rut-validation-msg').classList.add('hidden');
+
+    // Restablecer estilos de validación de campos obligatorios
+    clearValidationStyles();
 
     // Fecha por defecto hoy
     const hoy = new Date().toISOString().split('T')[0];
@@ -260,8 +363,10 @@ function openNewForm() {
     // Seccion traspaso oculta por defecto
     document.getElementById('section-traspaso').classList.add('hidden');
     
-    // Ocultar botón imprimir para nuevos registros hasta que se guarden
+    // Ocultar botones de impresión/pdf/previsualización para nuevos registros hasta que se guarden
     document.getElementById('print-btn-form').classList.add('hidden');
+    document.getElementById('pdf-btn-form').classList.add('hidden');
+    document.getElementById('preview-btn-form').classList.add('hidden');
     
     switchTab('form-view');
 }
@@ -639,10 +744,25 @@ function saveForm(event) {
     const tipo_solicitud = document.querySelector('input[name="solicitud_tipo"]:checked').value;
     const propiedad_tipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
     
+    // Validar campos obligatorios de la Sección 1
+    const nombreVal = validateField(document.getElementById('func-nombre'), 3);
+    const cargoVal = validateField(document.getElementById('func-cargo'), 2);
+    const deptoVal = validateField(document.getElementById('func-depto'), 3);
+    
+    if (!nombreVal || !cargoVal || !deptoVal) {
+        showToast("Por favor, complete correctamente los datos del Funcionario.", "error");
+        // Desplazarse al primer error
+        const firstError = document.querySelector('.border-rose-500');
+        if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
     // Validar RUT chileno antes de guardar
     const rut = document.getElementById('func-rut').value.trim();
     if (!validateRut(rut)) {
         showToast("Por favor, ingrese un RUT chileno válido.", "error");
+        const rutField = document.getElementById('func-rut');
+        rutField.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
 
@@ -683,14 +803,17 @@ function saveForm(event) {
     // Validar firmas digitales requeridas
     if (sigModeTic === 'digital' && !drawingStates.tic.hasSigned) {
         showToast("Falta la firma digital del Profesional de la Oficina TIC.", "error");
+        highlightUnsignedCanvas('tic');
         return;
     }
     if (sigModeReceptor === 'digital' && !drawingStates.receptor.hasSigned) {
         showToast("Falta la firma digital del Funcionario Responsable Receptor.", "error");
+        highlightUnsignedCanvas('receptor');
         return;
     }
     if (tipo_solicitud === 'Traspaso' && sigModeEmisor === 'digital' && !drawingStates.emisor.hasSigned) {
         showToast("Para traspasos es obligatoria la firma del Funcionario Emisor.", "error");
+        highlightUnsignedCanvas('emisor');
         return;
     }
 
@@ -797,8 +920,10 @@ function saveForm(event) {
             });
     }
     
-    // Habilitar impresión tras guardar exitosamente
+    // Habilitar impresión, PDF y previsualización tras guardar exitosamente
     document.getElementById('print-btn-form').classList.remove('hidden');
+    document.getElementById('pdf-btn-form').classList.remove('hidden');
+    document.getElementById('preview-btn-form').classList.remove('hidden');
     
     // Regresar al dashboard después de un corto retardo para visualización
     setTimeout(() => {
@@ -1011,6 +1136,9 @@ function renderTable() {
                         <button onclick="viewAndEditForm('${s.id}')" class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors" title="Ver / Editar">
                             <i data-lucide="edit" class="w-4.5 h-4.5"></i>
                         </button>
+                        <button onclick="exportSubmissionToPDF('${s.id}')" class="p-2 text-emerald-600 dark:text-emerald-450 hover:text-emerald-850 dark:hover:text-emerald-300 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors" title="Descargar PDF">
+                            <i data-lucide="file-text" class="w-4.5 h-4.5"></i>
+                        </button>
                         <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-755 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
                             <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
                         </button>
@@ -1086,8 +1214,10 @@ function viewAndEditForm(id) {
     toggleSigMode('emisor');
     toggleSigMode('receptor');
 
-    // Habilitar impresión porque ya existe registro guardado
+    // Habilitar botones de acción porque ya existe registro guardado
     document.getElementById('print-btn-form').classList.remove('hidden');
+    document.getElementById('pdf-btn-form').classList.remove('hidden');
+    document.getElementById('preview-btn-form').classList.remove('hidden');
 
     // Renderizar firmas guardadas en canvas
     switchTab('form-view');
@@ -1573,8 +1703,8 @@ function processWorkbookData() {
     if (exportBtn) exportBtn.classList.remove('hidden');
 }
 
-// Mostrar sugerencias de auto-completado en base a la consulta de búsqueda
-function showExcelSuggestions(query) {
+// Mostrar sugerencias de auto-completado en base a la consulta de búsqueda (Local + Supabase Cloud)
+async function showExcelSuggestions(query) {
     const dropdown = document.getElementById('excel-suggestions-dropdown');
     dropdown.innerHTML = '';
     
@@ -1584,8 +1714,9 @@ function showExcelSuggestions(query) {
     }
     
     const term = query.toLowerCase().trim();
-    const matches = [];
+    const localMatches = [];
     
+    // 1. Búsqueda local en caché (Excel)
     for (let i = 0; i < loadedAllEquipments.length; i++) {
         const item = loadedAllEquipments[i];
         const matchFunc = (item.funcionario || '').toLowerCase().includes(term);
@@ -1594,30 +1725,97 @@ function showExcelSuggestions(query) {
         const matchMail = (item.mail || '').toLowerCase().includes(term);
         
         if (matchFunc || matchSerie || matchInv || matchMail) {
-            matches.push({ index: i, item: item });
+            localMatches.push({ ...item, isLocal: true, index: i });
         }
-        if (matches.length >= 10) break; // Límite de 10 sugerencias
+        if (localMatches.length >= 10) break;
+    }
+
+    let combinedMatches = [...localMatches];
+
+    // 2. Búsqueda remota en Supabase catastro_equipos (si está disponible)
+    if (supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('catastro_equipos')
+                .select('*')
+                .or(`funcionario.ilike.%${term}%,serie.ilike.%${term}%,inventario.ilike.%${term}%,mail.ilike.%${term}%`)
+                .limit(10);
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                // Mapear los datos de Supabase al formato esperado
+                const remoteMatches = data.map(row => ({
+                    n: row.n,
+                    inventario: row.inventario,
+                    serie: row.serie,
+                    tipo: row.tipo,
+                    marca: row.marca,
+                    modelo: row.modelo,
+                    propiedad: row.propiedad,
+                    funcionario: row.funcionario,
+                    mail: row.mail,
+                    depto: row.depto,
+                    estado: row.estado,
+                    observaciones: row.observaciones,
+                    sheet: row.sheet,
+                    isLocal: false
+                }));
+
+                // Combinar y eliminar duplicados por Número de Serie (dando prioridad al registro de Supabase)
+                const merged = [];
+                const seenSeries = new Set();
+
+                // Primero añadir remotos
+                remoteMatches.forEach(item => {
+                    if (item.serie) {
+                        seenSeries.add(item.serie.toLowerCase().trim());
+                        merged.push(item);
+                    }
+                });
+
+                // Luego añadir locales si no están en vistos
+                localMatches.forEach(item => {
+                    if (item.serie && !seenSeries.has(item.serie.toLowerCase().trim())) {
+                        merged.push(item);
+                    }
+                });
+
+                combinedMatches = merged.slice(0, 10);
+            }
+        } catch (e) {
+            console.error("Error al buscar en Supabase catastro_equipos:", e.message);
+        }
     }
     
-    if (matches.length === 0) {
+    if (combinedMatches.length === 0) {
         dropdown.innerHTML = '<div class="p-3 text-center text-slate-450">No se encontraron coincidencias en el catastro.</div>';
         dropdown.classList.remove('hidden');
         return;
     }
     
-    matches.forEach(match => {
-        const item = match.item;
+    combinedMatches.forEach(item => {
         const div = document.createElement('div');
         div.className = "p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors flex justify-between items-center";
-        div.onclick = () => selectExcelSuggestion(match.index);
+        
+        // Adjuntar el item al elemento DOM mediante una propiedad custom para que selectExcelSuggestion pueda leerlo
+        div.dataset.itemJson = JSON.stringify(item);
+        div.onclick = () => selectExcelSuggestion(JSON.parse(div.dataset.itemJson));
         
         const badgeClass = item.sheet === 'Computadores' 
             ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' 
             : 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400';
+        
+        const sourceBadge = item.isLocal 
+            ? '<span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded ml-1">Excel</span>' 
+            : '<span class="text-[9px] bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-450 px-1 py-0.5 rounded ml-1 font-bold">Nube</span>';
             
         div.innerHTML = `
             <div>
-                <div class="font-bold text-slate-800 dark:text-slate-200">${item.funcionario || 'Sin Funcionario asignado'}</div>
+                <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    ${item.funcionario || 'Sin Funcionario asignado'}
+                    ${sourceBadge}
+                </div>
                 <div class="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">S/N: ${item.serie} | Inv: ${item.inventario || 'S/N'}</div>
             </div>
             <div class="text-right text-[10px]">
@@ -1631,9 +1829,8 @@ function showExcelSuggestions(query) {
     dropdown.classList.remove('hidden');
 }
 
-// Rellenar automáticamente los datos del formulario al seleccionar una sugerencia
-function selectExcelSuggestion(index) {
-    const item = loadedAllEquipments[index];
+// Rellenar automáticamente los datos del formulario al seleccionar una sugerencia (recibe el objeto item directamente)
+function selectExcelSuggestion(item) {
     if (!item) return;
     
     // 1. Rellenar datos funcionario
@@ -2075,8 +2272,601 @@ function renderMetrics() {
                 typesContainer.appendChild(div);
             });
         }
+
+        // =======================================================================
+        // RENDERIZAR GRÁFICOS INTERACTIVOS (CHART.JS)
+        // =======================================================================
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#94a3b8' : '#475569';
+        const gridColor = isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(71, 85, 105, 0.08)';
+
+        // A. Gráfico de Barras - Departamentos (Horizontal)
+        if (chartDeptsInstance) chartDeptsInstance.destroy();
+        
+        const canvasDepts = document.getElementById('chart-depts');
+        if (canvasDepts && topDepts.length > 0) {
+            chartDeptsInstance = new Chart(canvasDepts.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topDepts.map(d => d.name),
+                    datasets: [
+                        {
+                            label: 'Catastrados',
+                            data: topDepts.map(d => d.catastrado),
+                            backgroundColor: 'rgba(79, 70, 229, 0.85)',
+                            borderColor: '#4f46e5',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Pendientes',
+                            data: topDepts.map(d => d.total - d.catastrado),
+                            backgroundColor: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(241, 245, 249, 0.9)',
+                            borderColor: isDark ? '#475569' : '#cbd5e1',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: textColor, boxWidth: 12, font: { family: 'Inter', size: 11 } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { family: 'monospace', size: 10 } }
+                        },
+                        y: {
+                            stacked: true,
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { family: 'Inter', size: 9, weight: '500' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // B. Gráfico de Dona - Distribución de Tipos
+        if (chartTypesInstance) chartTypesInstance.destroy();
+        
+        const canvasTypes = document.getElementById('chart-types');
+        if (canvasTypes && sortedTypes.length > 0) {
+            chartTypesInstance = new Chart(canvasTypes.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: sortedTypes.map(t => t.name),
+                    datasets: [{
+                        data: sortedTypes.map(t => t.total),
+                        backgroundColor: [
+                            'rgba(79, 70, 229, 0.85)',  // Indigo
+                            'rgba(59, 130, 246, 0.85)',  // Blue
+                            'rgba(139, 92, 246, 0.85)',  // Violet
+                            'rgba(16, 185, 129, 0.85)',  // Emerald
+                            'rgba(245, 158, 11, 0.85)',  // Amber
+                            'rgba(244, 63, 94, 0.85)'    // Rose
+                        ],
+                        borderColor: isDark ? '#0f172a' : '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: textColor, boxWidth: 12, font: { family: 'Inter', size: 11 } }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
     }
 }
+
+// =======================================================================
+// NUEVAS FUNCIONES DE HISTORIAL, PREVISUALIZACIÓN, PDF Y VALIDACIONES
+// =======================================================================
+
+// Exportar un registro a PDF usando html2pdf.js local
+function exportSubmissionToPDF(id) {
+    const s = submissions.find(sub => sub.id === id);
+    if (!s) {
+        showToast("Registro no encontrado.", "error");
+        return;
+    }
+    
+    // Cargar datos en el formulario y sincronizar la plantilla de impresión
+    viewAndEditForm(id);
+    syncPrintTemplate();
+    
+    const element = document.getElementById('print-only-container');
+    if (!element) {
+        showToast("Error: No se encontró el contenedor de impresión.", "error");
+        return;
+    }
+    
+    // Hacer visible temporalmente el print-only-container eliminando hidden y forzando block
+    element.classList.remove('hidden');
+    element.classList.add('block');
+    
+    // Opciones de configuración de html2pdf.js
+    const opt = {
+        margin:       0,
+        filename:     `RG-02-IT-140.03-004_V5_Ticket-${s.ticket || 'SN'}_${s.funcionario.nombre.replace(/\s+/g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            letterRendering: true,
+            scrollX: 0,
+            scrollY: 0
+        },
+        jsPDF:        { 
+            unit: 'mm', 
+            format: [216, 330], // Tamaño Oficio Chileno (216mm x 330mm)
+            orientation: 'portrait' 
+        }
+    };
+    
+    showToast("Generando documento PDF...", "success");
+    
+    // Renderizar y guardar PDF
+    html2pdf().set(opt).from(element).save().then(() => {
+        // Restaurar estado de oculto
+        element.classList.add('hidden');
+        element.classList.remove('block');
+        showToast("PDF descargado correctamente.", "success");
+    }).catch(err => {
+        console.error("Error al generar PDF con html2pdf.js:", err);
+        element.classList.add('hidden');
+        element.classList.remove('block');
+        showToast("Error al exportar a PDF.", "error");
+    });
+}
+
+function exportActiveSubmissionToPDF() {
+    if (activeSubmissionId) {
+        exportSubmissionToPDF(activeSubmissionId);
+    } else {
+        showToast("Primero guarde el registro para poder exportarlo a PDF.", "error");
+    }
+}
+
+// Modal de Previsualización
+function openPreviewModal() {
+    // Sincronizar datos del formulario a la plantilla de impresión
+    syncPrintTemplate();
+    
+    const printContainer = document.getElementById('print-only-container');
+    const previewContainer = document.getElementById('preview-frame-container');
+    const modal = document.getElementById('preview-modal');
+    
+    if (!printContainer || !previewContainer || !modal) return;
+    
+    // Limpiar el frame anterior
+    previewContainer.innerHTML = '';
+    
+    // Clonar el contenido del contenedor de impresión
+    const clone = printContainer.cloneNode(true);
+    
+    // Quitar la clase hidden y print:block del contenedor clonado para que se muestre en pantalla
+    clone.id = 'preview-cloned-container';
+    clone.classList.remove('hidden', 'print:block');
+    clone.classList.add('block', 'w-full', 'flex', 'flex-col', 'items-center', 'gap-6');
+    
+    // Copiar las firmas dibujadas en los canvases clonados
+    const originalImgIds = ['print-sig-tic-img', 'print-sig-emisor-img', 'print-sig-receptor-img'];
+    originalImgIds.forEach(id => {
+        const originalImg = printContainer.querySelector(`#${id}`);
+        const clonedImg = clone.querySelector(`#${id}`);
+        if (originalImg && clonedImg) {
+            clonedImg.src = originalImg.src;
+            if (originalImg.classList.contains('hidden')) {
+                clonedImg.classList.add('hidden');
+            } else {
+                clonedImg.classList.remove('hidden');
+            }
+        }
+    });
+    
+    // Inyectar el clon en el viewport del modal
+    previewContainer.appendChild(clone);
+    
+    // Mostrar el modal
+    modal.classList.remove('hidden');
+    
+    // Re-inicializar iconos Lucide en el modal
+    lucide.createIcons();
+}
+
+function closePreviewModal() {
+    const modal = document.getElementById('preview-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+function triggerPDFExportFromPreview() {
+    closePreviewModal();
+    if (activeSubmissionId) {
+        exportSubmissionToPDF(activeSubmissionId);
+    } else {
+        showToast("Guarde el formulario antes de exportarlo como PDF.", "error");
+    }
+}
+
+function triggerPrintFromPreview() {
+    closePreviewModal();
+    triggerPrintMode();
+}
+
+// Historial y Sugerencias de Trazabilidad
+function showHistorySuggestions(query) {
+    const dropdown = document.getElementById('history-suggestions-dropdown');
+    if (!dropdown) return;
+    dropdown.innerHTML = '';
+    
+    if (!query || query.trim().length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    const term = query.toLowerCase().trim();
+    
+    // Recopilar números de serie únicos
+    const matches = new Map(); // serie -> info
+    
+    // 1. Buscar en registros locales (submissions)
+    submissions.forEach(sub => {
+        if (sub.equipamiento) {
+            sub.equipamiento.forEach(eq => {
+                if (eq.serie && eq.serie.toLowerCase().includes(term)) {
+                    matches.set(eq.serie.toUpperCase(), {
+                        serie: eq.serie.toUpperCase(),
+                        tipo: eq.tipo,
+                        marca: eq.marca,
+                        modelo: eq.modelo,
+                        funcionario: sub.funcionario.nombre,
+                        origen: 'Historial'
+                    });
+                }
+            });
+        }
+    });
+    
+    // 2. Buscar en planilla Excel catastrada
+    loadedAllEquipments.forEach(item => {
+        if (item.serie && item.serie.toLowerCase().includes(term)) {
+            if (!matches.has(item.serie.toUpperCase())) {
+                matches.set(item.serie.toUpperCase(), {
+                    serie: item.serie.toUpperCase(),
+                    tipo: item.tipo,
+                    marca: item.marca,
+                    modelo: item.modelo,
+                    funcionario: item.funcionario,
+                    origen: 'Catastro Excel'
+                });
+            }
+        }
+    });
+    
+    const matchesArr = Array.from(matches.values()).slice(0, 8);
+    
+    if (matchesArr.length === 0) {
+        dropdown.innerHTML = '<div class="p-3 text-center text-slate-450">No se encontraron números de serie.</div>';
+        dropdown.classList.remove('hidden');
+        return;
+    }
+    
+    matchesArr.forEach(item => {
+        const div = document.createElement('div');
+        div.className = "p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors flex justify-between items-center";
+        div.onclick = () => selectHistoryEquipment(item.serie);
+        
+        div.innerHTML = `
+            <div>
+                <div class="font-bold text-slate-850 dark:text-slate-200 font-mono">S/N: ${item.serie}</div>
+                <div class="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">${item.marca} ${item.modelo}</div>
+            </div>
+            <div class="text-right text-[10px]">
+                <span class="px-2 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">${item.tipo}</span>
+                <div class="text-slate-450 dark:text-slate-500 mt-1">Ref: ${item.origen}</div>
+            </div>
+        `;
+        dropdown.appendChild(div);
+    });
+    dropdown.classList.remove('hidden');
+}
+
+function selectHistoryEquipment(serie) {
+    const input = document.getElementById('history-search-input');
+    if (input) input.value = serie;
+    
+    const dropdown = document.getElementById('history-suggestions-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+    
+    renderHistoryTimeline(serie);
+}
+
+function resetHistoryTab() {
+    const input = document.getElementById('history-search-input');
+    if (input) input.value = '';
+    
+    const dropdown = document.getElementById('history-suggestions-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+    
+    document.getElementById('history-results').classList.add('hidden');
+    document.getElementById('history-empty-state').classList.remove('hidden');
+}
+
+function renderHistoryTimeline(serie) {
+    const term = serie.trim().toUpperCase();
+    const timeline = document.getElementById('history-timeline');
+    const eqInfo = document.getElementById('history-eq-info');
+    const results = document.getElementById('history-results');
+    const emptyState = document.getElementById('history-empty-state');
+    
+    if (!timeline || !eqInfo || !results || !emptyState) return;
+    
+    // Encontrar todas las transacciones locales para este N° de Serie
+    const moves = [];
+    submissions.forEach(sub => {
+        if (sub.equipamiento) {
+            sub.equipamiento.forEach(eq => {
+                if (eq.serie && eq.serie.trim().toUpperCase() === term) {
+                    moves.push({
+                        subId: sub.id,
+                        fecha: sub.fecha,
+                        ticket: sub.ticket,
+                        tipo_solicitud: sub.tipo_solicitud,
+                        propiedad: sub.propiedad_equipamiento,
+                        funcionario: sub.funcionario.nombre,
+                        depto: sub.funcionario.depto,
+                        cargo: sub.funcionario.cargo,
+                        traspaso: sub.traspaso,
+                        observacion: eq.observacion,
+                        eqInfo: eq
+                    });
+                }
+            });
+        }
+    });
+    
+    // Ordenar movimientos por fecha (más reciente arriba)
+    moves.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    // Intentar buscar en la base del Excel catastrado para rellenar la ficha general
+    const excelMatch = loadedAllEquipments.find(e => e.serie && e.serie.trim().toUpperCase() === term);
+    
+    let eqMarca = 'Desconocida';
+    let eqModelo = 'Desconocido';
+    let eqTipo = 'Equipo';
+    let eqInventario = 'S/N';
+    let eqPropiedad = 'En Arriendo';
+    let eqUbicacionExcel = '';
+    let eqFuncionarioExcel = '';
+    
+    if (moves.length > 0) {
+        const lastMove = moves[0];
+        eqMarca = lastMove.eqInfo.marca || eqMarca;
+        eqModelo = lastMove.eqInfo.modelo || eqModelo;
+        eqTipo = lastMove.eqInfo.tipo || eqTipo;
+        eqInventario = lastMove.eqInfo.inventario || eqInventario;
+        eqPropiedad = lastMove.propiedad || eqPropiedad;
+    }
+    
+    if (excelMatch) {
+        eqMarca = excelMatch.marca || eqMarca;
+        eqModelo = excelMatch.modelo || eqModelo;
+        eqTipo = excelMatch.tipo || eqTipo;
+        eqInventario = excelMatch.inventario || eqInventario;
+        eqPropiedad = excelMatch.propiedad || eqPropiedad;
+        eqUbicacionExcel = excelMatch.depto || '';
+        eqFuncionarioExcel = excelMatch.funcionario || '';
+    }
+    
+    if (moves.length === 0 && !excelMatch) {
+        showToast("No se encontraron registros ni catastro para el número de serie ingresado.", "error");
+        resetHistoryTab();
+        return;
+    }
+    
+    emptyState.classList.add('hidden');
+    results.classList.remove('hidden');
+    
+    const badgeClass = eqPropiedad.includes('Arriendo') 
+        ? 'bg-amber-50 dark:bg-amber-955/40 text-amber-700 dark:text-amber-400' 
+        : 'bg-emerald-50 dark:bg-emerald-955/40 text-emerald-700 dark:text-emerald-450';
+        
+    let excelBadgeText = '';
+    if (excelMatch) {
+        const estLower = String(excelMatch.estado || '').toLowerCase();
+        if (estLower.includes('catastrado')) {
+            excelBadgeText = `<span class="px-2 py-0.5 rounded bg-emerald-500 text-white font-bold text-[9px] uppercase tracking-wide shadow-sm flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>Catastrado en Planilla</span>`;
+        } else {
+            excelBadgeText = `<span class="px-2 py-0.5 rounded bg-slate-400 text-white font-bold text-[9px] uppercase tracking-wide">Disponible en Planilla</span>`;
+        }
+    }
+    
+    eqInfo.innerHTML = `
+        <div class="space-y-2">
+            <div class="flex items-center gap-3">
+                <span class="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-650 dark:text-indigo-400 flex items-center gap-1.5"><i data-lucide="laptop" class="w-4 h-4"></i> ${eqTipo}</span>
+                <span class="px-2.5 py-1 rounded-xl text-xs font-bold ${badgeClass}">${eqPropiedad}</span>
+                ${excelBadgeText}
+            </div>
+            <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mt-1">${eqMarca} ${eqModelo}</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-500 dark:text-slate-455 font-medium">
+                <div><strong>N° Serie:</strong> <span class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">${term}</span></div>
+                <div><strong>N° Inventario:</strong> <span class="font-mono">${eqInventario || 'Sin Inventario'}</span></div>
+                ${eqFuncionarioExcel ? `<div><strong>Titular Catastral:</strong> ${eqFuncionarioExcel}</div>` : ''}
+                ${eqUbicacionExcel ? `<div><strong>Ubicación Catastral:</strong> ${eqUbicacionExcel}</div>` : ''}
+            </div>
+        </div>
+        <div class="bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30 text-center max-w-xs w-full">
+            <span class="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider block">Movimientos Registrados</span>
+            <span class="text-3xl font-extrabold text-indigo-650 dark:text-indigo-400 block mt-1">${moves.length}</span>
+        </div>
+    `;
+    
+    timeline.innerHTML = '';
+    
+    if (moves.length === 0) {
+        timeline.innerHTML = `
+            <div class="text-slate-450 dark:text-slate-500 text-xs py-4">
+                El equipo se encuentra registrado en el Catastro Excel, pero no ha tenido transacciones de Asignación, Traspaso o Devolución firmadas en el sistema.
+            </div>
+        `;
+    } else {
+        moves.forEach(m => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = "timeline-item pl-4";
+            
+            let colorMarker = 'asignacion';
+            let title = '';
+            let contentHtml = '';
+            
+            if (m.tipo_solicitud === 'Asignacion') {
+                colorMarker = 'asignacion';
+                title = `Asignación de Equipo (Entrega)`;
+                contentHtml = `
+                    <p class="text-slate-650 dark:text-slate-350 text-xs">Asignado al funcionario <strong>${m.funcionario}</strong> (${m.cargo}) del departamento <strong>${m.depto}</strong>.</p>
+                `;
+            } else if (m.tipo_solicitud === 'Traspaso') {
+                colorMarker = 'traspaso';
+                const emisor = m.traspaso ? m.traspaso.emisor_nombre : 'Emisor no registrado';
+                const receptor = m.traspaso ? m.traspaso.receptor_nombre : 'Receptor no registrado';
+                const obs = m.traspaso && m.traspaso.observacion ? `<div class="mt-2 p-2 bg-amber-500/5 rounded border border-amber-500/10 text-amber-800 dark:text-amber-350 italic text-[11px]">Obs: "${m.traspaso.observacion}"</div>` : '';
+                title = `Traspaso de Equipamiento`;
+                contentHtml = `
+                    <p class="text-slate-650 dark:text-slate-350 text-xs">
+                        Traspaso de <strong>${emisor}</strong> a <strong>${receptor}</strong>.<br>
+                        Firmante del traspaso: <strong>${m.funcionario}</strong>.
+                    </p>
+                    ${obs}
+                `;
+            } else {
+                colorMarker = 'devolucion';
+                title = `Devolución de Equipo`;
+                contentHtml = `
+                    <p class="text-slate-650 dark:text-slate-350 text-xs">Devuelto por el funcionario <strong>${m.funcionario}</strong> del departamento <strong>${m.depto}</strong>.</p>
+                `;
+            }
+            
+            itemDiv.innerHTML = `
+                <div class="timeline-marker ${colorMarker}"></div>
+                <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <span class="text-xs font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500"></i> ${m.fecha}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-[10px] text-indigo-650 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">Ticket: ${m.ticket}</span>
+                            <button onclick="viewAndEditForm('${m.subId}')" class="text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold underline transition-colors">Ver Documento</button>
+                        </div>
+                    </div>
+                    <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">${title}</h4>
+                    <div class="mt-1">${contentHtml}</div>
+                    ${m.observacion ? `<p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Nota: "${m.observacion}"</p>` : ''}
+                </div>
+            `;
+            timeline.appendChild(itemDiv);
+        });
+    }
+    
+    lucide.createIcons();
+}
+
+// Validaciones en Formulario
+function setupInputValidationListeners() {
+    const fields = [
+        { id: 'func-nombre', minLength: 3 },
+        { id: 'func-cargo', minLength: 2 },
+        { id: 'func-depto', minLength: 3 }
+    ];
+
+    fields.forEach(field => {
+        const el = document.getElementById(field.id);
+        if (el) {
+            el.addEventListener('blur', () => validateField(el, field.minLength));
+            el.addEventListener('input', () => {
+                if (el.value.trim().length >= field.minLength) {
+                    validateField(el, field.minLength);
+                }
+            });
+        }
+    });
+}
+
+function validateField(el, minLength) {
+    const val = el.value.trim();
+    if (val.length < minLength) {
+        el.classList.remove('border-slate-200', 'dark:border-slate-700', 'border-emerald-500', 'dark:border-emerald-500', 'focus:ring-emerald-500');
+        el.classList.add('border-rose-500', 'dark:border-rose-500', 'focus:ring-rose-500');
+        return false;
+    } else {
+        el.classList.remove('border-slate-200', 'dark:border-slate-700', 'border-rose-500', 'dark:border-rose-500', 'focus:ring-rose-500');
+        el.classList.add('border-emerald-500', 'dark:border-emerald-500', 'focus:ring-emerald-500');
+        return true;
+    }
+}
+
+function clearValidationStyles() {
+    const fields = ['func-nombre', 'func-cargo', 'func-depto'];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.remove('border-emerald-500', 'dark:border-emerald-500', 'border-rose-500', 'dark:border-rose-500', 'focus:ring-emerald-500', 'focus:ring-rose-500');
+            el.classList.add('border-slate-200', 'dark:border-slate-700');
+        }
+    });
+    
+    ['tic', 'emisor', 'receptor'].forEach(id => {
+        const canvas = document.getElementById(`canvas-${id}`);
+        if (canvas) {
+            const container = canvas.parentElement;
+            container.classList.remove('animate-pulse-error', 'border-rose-500', 'dark:border-rose-500');
+        }
+    });
+}
+
+function highlightUnsignedCanvas(id) {
+    const canvas = document.getElementById(`canvas-${id}`);
+    if (canvas) {
+        const container = canvas.parentElement;
+        container.classList.remove('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
+        container.classList.add('border-rose-500', 'dark:border-rose-500', 'animate-pulse-error');
+        
+        const stopHighlight = () => {
+            container.classList.remove('animate-pulse-error', 'border-rose-500', 'dark:border-rose-500');
+            container.classList.add('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
+            canvas.removeEventListener('mousedown', stopHighlight);
+            canvas.removeEventListener('touchstart', stopHighlight);
+        };
+        canvas.addEventListener('mousedown', stopHighlight);
+        canvas.addEventListener('touchstart', stopHighlight);
+        
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+// Ocultar dropdown de autocompletado si se hace clic fuera
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('history-suggestions-dropdown');
+    const input = document.getElementById('history-search-input');
+    if (dropdown && !dropdown.contains(e.target) && e.target !== input) {
+        dropdown.classList.add('hidden');
+    }
+});
 
 // =======================================================================
 // EXPOSICIÓN DE FUNCIONES A ÁMBITO GLOBAL (VITE ES MODULE COMPATIBILITY)
@@ -2102,3 +2892,12 @@ window.clearCanvas = clearCanvas;
 window.addEquipmentRow = addEquipmentRow;
 window.syncEquipmentCategoriesFromRows = syncEquipmentCategoriesFromRows;
 window.toggleSigMode = toggleSigMode;
+
+window.exportSubmissionToPDF = exportSubmissionToPDF;
+window.exportActiveSubmissionToPDF = exportActiveSubmissionToPDF;
+window.openPreviewModal = openPreviewModal;
+window.closePreviewModal = closePreviewModal;
+window.triggerPDFExportFromPreview = triggerPDFExportFromPreview;
+window.triggerPrintFromPreview = triggerPrintFromPreview;
+window.showHistorySuggestions = showHistorySuggestions;
+window.selectHistoryEquipment = selectHistoryEquipment;

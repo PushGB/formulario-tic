@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.8"
+    "@supabase/supabase-js": "^2.39.8",
+    "chart.js": "^4.4.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "vite": "^5.1.4"

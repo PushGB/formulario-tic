@@ -67,3 +67,84 @@ body {
         font-weight: normal !important;
     }
 }
+
+/* =======================================================================
+   ESTILOS ADICIONALES PARA PREVISUALIZACIÓN, TRAZABILIDAD Y VALIDACIONES
+   ======================================================================= */
+
+/* Estilos de la Línea de Tiempo de Trazabilidad */
+#history-timeline {
+    position: relative;
+}
+.timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+}
+.timeline-marker {
+    position: absolute;
+    left: -33px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px rgb(99, 102, 241);
+}
+.dark .timeline-marker {
+    border-color: #0f172a;
+}
+.timeline-marker.asignacion {
+    background-color: #3b82f6; /* Azul */
+    box-shadow: 0 0 0 2px #3b82f6;
+}
+.timeline-marker.traspaso {
+    background-color: #f59e0b; /* Ámbar */
+    box-shadow: 0 0 0 2px #f59e0b;
+}
+.timeline-marker.devolucion {
+    background-color: #f43f5e; /* Rosa */
+    box-shadow: 0 0 0 2px #f43f5e;
+}
+
+/* Modificaciones del Contenedor de Previsualización */
+#preview-frame-container .print-page {
+    transform-origin: top center;
+    background-color: white !important;
+    color: black !important;
+    font-family: Arial, sans-serif !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    border: 1px solid #cbd5e1;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+}
+
+#preview-frame-container table {
+    border-color: black !important;
+}
+
+#preview-frame-container td, #preview-frame-container th {
+    color: black !important;
+    border-color: black !important;
+}
+
+/* Forzar que los estilos del template de impresión se vean en pantalla dentro del modal */
+#preview-frame-container .bg-\[\#9cc2e5\] {
+    background-color: #9cc2e5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+#preview-frame-container img {
+    filter: none !important;
+}
+
+/* Efectos y Animaciones */
+@keyframes pulse-ring {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(244, 63, 94, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+.animate-pulse-error {
+    animation: pulse-ring 2s infinite;
+}

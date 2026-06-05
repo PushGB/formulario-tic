@@ -16,6 +16,69 @@ body {
     margin: 0;         /* Sin márgenes por defecto del navegador para evitar descuadres */
 }
 
+/* Estilos comunes de impresión utilizables en pantalla por html2pdf y previsualización */
+.page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+}
+
+.print-page {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box;
+    width: 216mm;
+    height: 330mm;
+    padding: 15mm 15mm !important; /* Añadimos márgenes internos fijos */
+    margin: 0 auto !important;
+    background-color: white !important;
+    color: black !important;
+}
+
+/* Forzar fondos e imágenes a imprimirse exactamente */
+.print-exact {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+/* Reglas de fuentes oficiales 1:1 con Word */
+.print-tnr-10 {
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 10pt !important;
+}
+
+.print-tnr-8 {
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 8pt !important;
+}
+
+.print-calibri-12 {
+    font-family: 'Calibri', 'Candara', 'Segoe', 'Segoe UI', Arial, sans-serif !important;
+    font-size: 12pt !important;
+    font-weight: normal !important;
+}
+
+/* Forzar color de texto y borde en el contenedor de impresión */
+#print-only-container {
+    background-color: white !important;
+    color: black !important;
+}
+
+#print-only-container,
+#print-only-container * {
+    color: black !important;
+    border-color: black !important;
+}
+
+#print-only-container .bg-\[\#9cc2e5\],
+.bg-\[\#9cc2e5\] {
+    background-color: #9cc2e5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
 @media print {
     body {
         background-color: white !important;
@@ -29,42 +92,6 @@ body {
     }
     .print-only {
         display: block !important;
-    }
-    .page-break {
-        page-break-before: always !important;
-        break-before: page !important;
-    }
-    .print-page {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: space-between !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        box-sizing: border-box;
-        width: 216mm;
-        height: 330mm;
-        padding: 15mm 15mm !important; /* Añadimos márgenes internos fijos */
-        margin: 0 auto !important;
-        background-color: white !important;
-    }
-    /* Forzar fondos e imágenes a imprimirse exactamente */
-    .print-exact {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-    /* Reglas de fuentes oficiales 1:1 con Word */
-    .print-tnr-10 {
-        font-family: 'Times New Roman', Times, serif !important;
-        font-size: 10pt !important;
-    }
-    .print-tnr-8 {
-        font-family: 'Times New Roman', Times, serif !important;
-        font-size: 8pt !important;
-    }
-    .print-calibri-12 {
-        font-family: 'Calibri', 'Candara', 'Segoe', 'Segoe UI', Arial, sans-serif !important;
-        font-size: 12pt !important;
-        font-weight: normal !important;
     }
 }
 

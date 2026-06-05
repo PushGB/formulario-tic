@@ -2897,7 +2897,8 @@ function exportSubmissionToPDF(id) {
             unit: 'mm', 
             format: [216, 330], // Tamaño Oficio Chileno (216mm x 330mm)
             orientation: 'portrait' 
-        }
+        },
+        pagebreak:    { mode: ['css', 'legacy'] }
     };
     
     showToast("Generando documento PDF...", "success");

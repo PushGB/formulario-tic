@@ -98,7 +98,7 @@ async function loadSubmissionsBackground() {
                     ticket: dbRow.ticket,
                     funcionario: {
                         nombre: dbRow.funcionario_nombre,
-                        rut: dbRow.funcionario_rut,
+                        rut: formatRut(dbRow.funcionario_rut),
                         cargo: dbRow.funcionario_cargo,
                         depto: dbRow.funcionario_depto
                     },
@@ -184,6 +184,12 @@ async function loadSubmissions() {
     if (localData) {
         try {
             submissions = JSON.parse(localData);
+            // Normalizar RUTs locales para asegurar mismo formato
+            submissions.forEach(sub => {
+                if (sub.funcionario && sub.funcionario.rut) {
+                    sub.funcionario.rut = formatRut(sub.funcionario.rut);
+                }
+            });
         } catch (e) {
             console.error("Error al cargar registros locales", e);
             submissions = [];
@@ -212,7 +218,7 @@ async function loadSubmissions() {
                     ticket: dbRow.ticket,
                     funcionario: {
                         nombre: dbRow.funcionario_nombre,
-                        rut: dbRow.funcionario_rut,
+                        rut: formatRut(dbRow.funcionario_rut),
                         cargo: dbRow.funcionario_cargo,
                         depto: dbRow.funcionario_depto
                     },
@@ -758,13 +764,14 @@ function saveForm(event) {
     }
 
     // Validar RUT chileno antes de guardar
-    const rut = document.getElementById('func-rut').value.trim();
-    if (!validateRut(rut)) {
+    const rutInput = document.getElementById('func-rut').value.trim();
+    if (!validateRut(rutInput)) {
         showToast("Por favor, ingrese un RUT chileno válido.", "error");
         const rutField = document.getElementById('func-rut');
         rutField.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
+    const rut = formatRut(rutInput);
 
     // Validar que se haya marcado al menos una categoría o llenado "Otros"
     const eqCategorias = Array.from(document.querySelectorAll('input[name="eq_cat"]:checked')).map(cb => cb.value);
@@ -1563,7 +1570,7 @@ function processWorkbookData() {
             if (!grouped[key]) {
                 grouped[key] = {
                     nombre: String(nombre).trim(),
-                    rut: String(item['Rut'] || '').trim(),
+                    rut: formatRut(String(item['Rut'] || '').trim()),
                     cargo: String(item['Cargo'] || '').trim(),
                     depto: String(item['Departamento'] || '').trim(),
                     propiedad: item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo',

@@ -56,19 +56,22 @@ DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.
 DROP POLICY IF EXISTS "Permitir inserción pública de solicitudes" ON public.solicitudes_tic;
 DROP POLICY IF EXISTS "Permitir actualización solo a usuarios autenticados" ON public.solicitudes_tic;
 DROP POLICY IF EXISTS "Permitir borrado solo a usuarios autenticados" ON public.solicitudes_tic;
+DROP POLICY IF EXISTS "Permitir lectura pública de solicitudes" ON public.solicitudes_tic;
+DROP POLICY IF EXISTS "Permitir actualización pública de solicitudes" ON public.solicitudes_tic;
+DROP POLICY IF EXISTS "Permitir borrado público de solicitudes" ON public.solicitudes_tic;
 
 -- Crear políticas de acceso para solicitudes_tic
-CREATE POLICY "Permitir lectura solo a usuarios autenticados" 
-ON public.solicitudes_tic FOR SELECT TO authenticated USING (public.is_admin() OR public.is_tecnico());
+CREATE POLICY "Permitir lectura pública de solicitudes" 
+ON public.solicitudes_tic FOR SELECT TO public USING (true);
 
 CREATE POLICY "Permitir inserción pública de solicitudes" 
 ON public.solicitudes_tic FOR INSERT TO public WITH CHECK (true);
 
-CREATE POLICY "Permitir actualización solo a usuarios autenticados" 
-ON public.solicitudes_tic FOR UPDATE TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY "Permitir actualización pública de solicitudes" 
+ON public.solicitudes_tic FOR UPDATE TO public USING (true) WITH CHECK (true);
 
-CREATE POLICY "Permitir borrado solo a usuarios autenticados" 
-ON public.solicitudes_tic FOR DELETE TO authenticated USING (public.is_admin());
+CREATE POLICY "Permitir borrado público de solicitudes" 
+ON public.solicitudes_tic FOR DELETE TO public USING (true);
 
 
 -- 2. Crear la tabla de catálogo de equipamiento (catastro_equipos)
@@ -98,19 +101,23 @@ DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.
 DROP POLICY IF EXISTS "Permitir inserción solo a usuarios autenticados" ON public.catastro_equipos;
 DROP POLICY IF EXISTS "Permitir actualización solo a usuarios autenticados" ON public.catastro_equipos;
 DROP POLICY IF EXISTS "Permitir borrado solo a usuarios autenticados" ON public.catastro_equipos;
+DROP POLICY IF EXISTS "Permitir lectura pública de catastro" ON public.catastro_equipos;
+DROP POLICY IF EXISTS "Permitir inserción pública de catastro" ON public.catastro_equipos;
+DROP POLICY IF EXISTS "Permitir actualización pública de catastro" ON public.catastro_equipos;
+DROP POLICY IF EXISTS "Permitir borrado público de catastro" ON public.catastro_equipos;
 
 -- Crear políticas de acceso para catastro_equipos
-CREATE POLICY "Permitir lectura solo a usuarios autenticados" 
-ON public.catastro_equipos FOR SELECT TO authenticated USING (public.is_admin() OR public.is_tecnico());
+CREATE POLICY "Permitir lectura pública de catastro" 
+ON public.catastro_equipos FOR SELECT TO public USING (true);
 
-CREATE POLICY "Permitir inserción solo a usuarios autenticados" 
-ON public.catastro_equipos FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "Permitir inserción pública de catastro" 
+ON public.catastro_equipos FOR INSERT TO public WITH CHECK (true);
 
-CREATE POLICY "Permitir actualización solo a usuarios autenticados" 
-ON public.catastro_equipos FOR UPDATE TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY "Permitir actualización pública de catastro" 
+ON public.catastro_equipos FOR UPDATE TO public USING (true) WITH CHECK (true);
 
-CREATE POLICY "Permitir borrado solo a usuarios autenticados" 
-ON public.catastro_equipos FOR DELETE TO authenticated USING (public.is_admin());
+CREATE POLICY "Permitir borrado público de catastro" 
+ON public.catastro_equipos FOR DELETE TO public USING (true);
 
 
 -- 3. Habilitar Realtime para las tablas en Supabase
@@ -296,10 +303,11 @@ SELECT
     created_at
 FROM public.solicitudes_tic;
 
--- Permisos explícitos sobre la vista
+-- Permisos explícitos sobre la vista para acceso público sin login
 REVOKE ALL ON public.solicitudes_tic_secure FROM public;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO public;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO authenticated;
-GRANT INSERT ON public.solicitudes_tic_secure TO anon;
 
 
 -- 6. Tabla de Auditoría e Historial de Cambios
@@ -350,22 +358,25 @@ FOR EACH ROW EXECUTE FUNCTION public.trg_auditar_solicitudes();
 
 
 -- 7. Configuración de Supabase Storage para Firmas Digitales
--- Crear el bucket privado de firmas
+-- Crear el bucket de firmas (Público)
 INSERT INTO storage.buckets (id, name, public) 
-VALUES ('firmas', 'firmas', false) 
-ON CONFLICT (id) DO NOTHING;
+VALUES ('firmas', 'firmas', true) 
+ON CONFLICT (id) DO UPDATE SET public = true;
 
--- Políticas de Storage para firmas
+-- Políticas de Storage para firmas (Públicas)
 DROP POLICY IF EXISTS "Permitir subida de firmas a autenticados" ON storage.objects;
 DROP POLICY IF EXISTS "Permitir lectura de firmas a autenticados" ON storage.objects;
 DROP POLICY IF EXISTS "Permitir borrado de firmas a autenticados" ON storage.objects;
+DROP POLICY IF EXISTS "Permitir subida de firmas a todos" ON storage.objects;
+DROP POLICY IF EXISTS "Permitir lectura de firmas a todos" ON storage.objects;
+DROP POLICY IF EXISTS "Permitir borrado de firmas a todos" ON storage.objects;
 
-CREATE POLICY "Permitir subida de firmas a autenticados" ON storage.objects 
-FOR INSERT TO authenticated WITH CHECK (bucket_id = 'firmas');
+CREATE POLICY "Permitir subida de firmas a todos" ON storage.objects 
+FOR INSERT TO public WITH CHECK (bucket_id = 'firmas');
 
-CREATE POLICY "Permitir lectura de firmas a autenticados" ON storage.objects 
-FOR SELECT TO authenticated USING (bucket_id = 'firmas');
+CREATE POLICY "Permitir lectura de firmas a todos" ON storage.objects 
+FOR SELECT TO public USING (bucket_id = 'firmas');
 
-CREATE POLICY "Permitir borrado de firmas a autenticados" ON storage.objects 
-FOR DELETE TO authenticated USING (bucket_id = 'firmas');
+CREATE POLICY "Permitir borrado de firmas a todos" ON storage.objects 
+FOR DELETE TO public USING (bucket_id = 'firmas');
 

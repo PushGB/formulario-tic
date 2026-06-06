@@ -363,15 +363,10 @@ window.addEventListener('load', () => {
     // Intentar precargar el catastro Excel desde el servidor local automáticamente
     preloadExcelData();
 
-    // Si Supabase está configurado, iniciar flujo de autenticación
-    if (supabase) {
-        checkAuthSession();
-    } else {
-        // En modo local/offline, cargar caché local inmediatamente
-        currentUserRole = 'admin';
-        applyRolePermissions();
-        loadSubmissions();
-    }
+    // Cargar caché local e iniciar sincronización de datos
+    currentUserRole = 'admin';
+    applyRolePermissions();
+    loadSubmissions();
 
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {

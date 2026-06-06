@@ -2000,6 +2000,14 @@ async function loadCatastroFromSupabase() {
             if (exportBtn) exportBtn.classList.remove('hidden');
             
             console.log(`Catastro cargado con éxito desde Supabase: ${loadedAllEquipments.length} equipos.`);
+            
+            // Forzar actualización de UI con los nuevos datos cargados
+            renderTable();
+            updateStats();
+            if (activeTab === 'metrics') {
+                renderMetrics();
+            }
+            
             return true;
         }
     } catch (e) {
@@ -2344,6 +2352,13 @@ function processWorkbookData(isManualUpload = false) {
     
     const exportBtn = document.getElementById('excel-export-btn');
     if (exportBtn) exportBtn.classList.remove('hidden');
+    
+    // Forzar actualización de UI con los nuevos datos cargados
+    renderTable();
+    updateStats();
+    if (activeTab === 'metrics') {
+        renderMetrics();
+    }
 }
 
 // Mostrar sugerencias de auto-completado en base a la consulta de búsqueda (Local + Supabase Cloud)

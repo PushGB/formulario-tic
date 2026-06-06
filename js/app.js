@@ -12,6 +12,20 @@ if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('tu-proyecto-nuevo')
     console.warn("Supabase no configurado o tiene valores por defecto. Trabajando en modo local/offline.");
 }
 
+// Función auxiliar para escapar caracteres HTML y prevenir XSS
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, function(m) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        }[m];
+    });
+}
+
 // Inicialización de Variables Globales y Gráficos
 let submissions = [];
 let activeSubmissionId = null;
@@ -21,6 +35,7 @@ let chartDeptsInstance = null;
 let chartTypesInstance = null;
 const pendingDeletes = new Set();
 const pendingUpserts = new Set();
+let currentUserRole = 'admin'; // 'admin' o 'tecnico' (por defecto 'admin' en modo local)
 
 // Estructuras de Firmas
 const drawingStates = {
@@ -29,6 +44,305 @@ const drawingStates = {
     receptor: { isDrawing: false, lastX: 0, lastY: 0, hasSigned: false }
 };
 
+// --- SISTEMA DE AUTENTICACIÓN (SUPABASE AUTH) ---
+function showLoginOverlay() {
+    const overlay = document.getElementById('auth-login-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+    const logoutBtn = document.getElementById('auth-logout-btn');
+    if (logoutBtn) logoutBtn.classList.add('hidden');
+    const divider = document.getElementById('auth-divider');
+    if (divider) divider.classList.add('hidden');
+    
+    // Deshabilitar botones de navegación
+    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-form'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = true;
+    });
+}
+
+function hideLoginOverlay() {
+    const overlay = document.getElementById('auth-login-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    const logoutBtn = document.getElementById('auth-logout-btn');
+    if (logoutBtn) logoutBtn.classList.remove('hidden');
+    const divider = document.getElementById('auth-divider');
+    if (divider) divider.classList.remove('hidden');
+    
+    // Habilitar botones de navegación
+    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-form'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = false;
+    });
+}
+
+async function checkAuthSession() {
+    if (!supabase) return;
+    try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (session) {
+            onUserAuthenticated(session.user);
+        } else {
+            showLoginOverlay();
+        }
+    } catch (err) {
+        console.error("Error al obtener sesión de Supabase:", err.message);
+        showLoginOverlay();
+    }
+    
+    // Escuchar cambios de estado en auth
+    supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            onUserAuthenticated(session.user);
+        } else if (event === 'SIGNED_OUT') {
+            showLoginOverlay();
+        }
+    });
+}
+
+async function onUserAuthenticated(user) {
+    hideLoginOverlay();
+    showToast(`Sesión iniciada: ${user.email}`, "success");
+    await fetchUserRole(user);
+    applyRolePermissions();
+    await loadSubmissions();
+    lucide.createIcons();
+}
+
+async function fetchUserRole(user) {
+    if (!supabase) {
+        currentUserRole = 'admin';
+        return;
+    }
+    try {
+        const { data, error } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+        if (error) {
+            console.error("Error al obtener rol del usuario:", error.message);
+            currentUserRole = 'tecnico'; // Rol por defecto seguro si hay error
+        } else if (data) {
+            currentUserRole = data.role;
+            console.log(`Rol cargado para ${user.email}: ${currentUserRole}`);
+        } else {
+            currentUserRole = 'tecnico';
+        }
+    } catch (err) {
+        console.error("Error al consultar rol:", err);
+        currentUserRole = 'tecnico';
+    }
+}
+
+function applyRolePermissions() {
+    const uploadLabel = document.getElementById('excel-upload-label');
+    const exportBtn = document.getElementById('excel-export-btn');
+    
+    if (currentUserRole === 'tecnico') {
+        if (uploadLabel) uploadLabel.classList.add('hidden');
+        if (exportBtn) exportBtn.classList.add('hidden');
+    } else {
+        if (uploadLabel) uploadLabel.classList.remove('hidden');
+    }
+}
+
+function setFormReadOnly(readOnly) {
+    const form = document.getElementById('equip-form');
+    if (!form) return;
+    
+    // Deshabilitar/Habilitar inputs, textareas, select, etc.
+    form.querySelectorAll('input, textarea, select, button[type="button"]').forEach(el => {
+        // Excluir botones de control general del pie de página que no afectan al registro
+        if (el.id === 'print-btn-form' || el.id === 'pdf-btn-form' || el.id === 'preview-btn-form' || el.id === 'cancel-btn-form') {
+            return;
+        }
+        
+        // Botones de firma y selección de modo
+        if (el.classList.contains('clear-sig-btn') || el.classList.contains('mode-sig-btn')) {
+            el.disabled = readOnly;
+            el.style.opacity = readOnly ? '0.5' : '1';
+            el.style.pointerEvents = readOnly ? 'none' : 'auto';
+            return;
+        }
+        
+        // Ocultar botones de fila de equipos si es solo lectura
+        if (el.tagName === 'BUTTON') {
+            const isAddBtn = el.getAttribute('onclick') && el.getAttribute('onclick').includes('addEquipmentRow');
+            const isRemoveBtn = el.getAttribute('onclick') && el.getAttribute('onclick').includes('removeEquipmentRow');
+            if (isAddBtn || isRemoveBtn) {
+                el.style.display = readOnly ? 'none' : '';
+            }
+        } else {
+            el.disabled = readOnly;
+        }
+    });
+
+    // Ocultar el botón de Guardar si es solo lectura
+    const saveBtn = document.getElementById('save-btn-form');
+    if (saveBtn) {
+        saveBtn.style.display = readOnly ? 'none' : '';
+    }
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorMsg = document.getElementById('login-error-msg');
+    
+    if (errorMsg) errorMsg.classList.add('hidden');
+    
+    if (!supabase) return;
+    
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+    } catch (err) {
+        console.error("Error de autenticación:", err.message);
+        if (errorMsg) {
+            errorMsg.innerText = "Credenciales inválidas. Intente de nuevo.";
+            errorMsg.classList.remove('hidden');
+        }
+    }
+}
+
+async function handleLogout() {
+    if (supabase) {
+        try {
+            await supabase.auth.signOut();
+            currentUserRole = null;
+            showToast("Sesión cerrada.", "success");
+        } catch (err) {
+            console.error("Error al cerrar sesión:", err.message);
+        }
+    }
+}
+
+// --- RESOLUCIÓN Y SUBIDA DE FIRMAS (SUPABASE STORAGE) ---
+function dataURLtoBlob(dataurl) {
+    if (!dataurl) return null;
+    const arr = dataurl.split(',');
+    if (arr.length < 2) return null;
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function resolveSignature(submissionId, role, dbPath) {
+    if (!dbPath) return null;
+    if (dbPath.startsWith('data:image')) return dbPath;
+    
+    // Buscar en el cache local
+    const localSub = submissions.find(s => s.id === submissionId);
+    if (localSub && localSub.firmas && localSub.firmas[role] && localSub.firmas[role].startsWith('data:image')) {
+        return localSub.firmas[role];
+    }
+    
+    // Descargar desde el bucket
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.storage.from('firmas').download(dbPath);
+            if (error) throw error;
+            const base64 = await blobToBase64(data);
+            return base64;
+        } catch (err) {
+            console.error(`Error al descargar firma ${role} (${dbPath}):`, err.message);
+            // Fallback: intentar firmar la URL
+            try {
+                const { data, error } = await supabase.storage.from('firmas').createSignedUrl(dbPath, 60);
+                if (!error && data) return data.signedUrl;
+            } catch (e) {}
+        }
+    }
+    return null;
+}
+
+async function uploadSignaturesToStorage(id, firmas) {
+    const updatedFirmas = { ...firmas };
+    if (!supabase) return updatedFirmas;
+
+    const roles = ['tic', 'emisor', 'receptor'];
+    for (const role of roles) {
+        const sigData = firmas[role];
+        if (sigData && sigData.startsWith('data:image/png;base64')) {
+            const blob = dataURLtoBlob(sigData);
+            if (blob) {
+                const filePath = `signatures/${id}/${role}.png`;
+                try {
+                    const { data, error } = await supabase.storage
+                        .from('firmas')
+                        .upload(filePath, blob, { upsert: true });
+                    if (error) throw error;
+                    updatedFirmas[role] = filePath;
+                    console.log(`Firma ${role} subida exitosamente:`, filePath);
+                } catch (err) {
+                    console.error(`Error al subir firma ${role}:`, err.message);
+                }
+            }
+        }
+    }
+    return updatedFirmas;
+}
+
+async function mapDbRowsToSubmissions(data) {
+    if (!data) return [];
+    return await Promise.all(data.map(async dbRow => {
+        const ticSig = await resolveSignature(dbRow.id, 'tic', dbRow.firma_tic);
+        const emisorSig = await resolveSignature(dbRow.id, 'emisor', dbRow.firma_emisor);
+        const receptorSig = await resolveSignature(dbRow.id, 'receptor', dbRow.firma_receptor);
+
+        return {
+            id: dbRow.id,
+            fecha: dbRow.fecha,
+            ticket: dbRow.ticket,
+            funcionario: {
+                nombre: dbRow.funcionario_nombre,
+                rut: formatRut(dbRow.funcionario_rut),
+                cargo: dbRow.funcionario_cargo,
+                depto: dbRow.funcionario_depto
+            },
+            tipo_solicitud: dbRow.tipo_solicitud,
+            propiedad_equipamiento: dbRow.propiedad_equipamiento,
+            equipamiento_categorias: dbRow.equipamiento_categorias,
+            otros_detalles: dbRow.otros_detalles || '',
+            traspaso: dbRow.tipo_solicitud === 'Traspaso' ? {
+                emisor_nombre: dbRow.traspaso_emisor_nombre,
+                emisor_depto: dbRow.traspaso_emisor_depto,
+                receptor_nombre: dbRow.traspaso_receptor_nombre,
+                receptor_depto: dbRow.traspaso_receptor_depto,
+                observacion: dbRow.traspaso_observacion
+            } : null,
+            equipamiento: dbRow.equipamiento,
+            accesorios: dbRow.accesorios || '',
+            observaciones_generales: dbRow.observaciones_generales || '',
+            firmas: {
+                tic_mode: dbRow.firmas_tic_mode,
+                emisor_mode: dbRow.firmas_emisor_mode,
+                receptor_mode: dbRow.firmas_receptor_mode,
+                tic: ticSig,
+                emisor: emisorSig,
+                receptor: receptorSig
+            }
+        };
+    }));
+}
+
 // Al iniciar la página
 window.addEventListener('load', () => {
     // Inicializar Tema (Claro / Oscuro)
@@ -36,12 +350,6 @@ window.addEventListener('load', () => {
 
     // Inicializar Iconos Lucide
     lucide.createIcons();
-    
-    // Cargar datos guardados
-    loadSubmissions();
-    
-    // Renderizar la tabla principal
-    renderTable();
     
     // Configurar Listeners para las Firmas
     initSignaturePads();
@@ -55,14 +363,21 @@ window.addEventListener('load', () => {
     // Intentar precargar el catastro Excel desde el servidor local automáticamente
     preloadExcelData();
 
-    // Inicializar canal de tiempo real con Supabase
-    initRealtime();
+    // Si Supabase está configurado, iniciar flujo de autenticación
+    if (supabase) {
+        checkAuthSession();
+    } else {
+        // En modo local/offline, cargar caché local inmediatamente
+        currentUserRole = 'admin';
+        applyRolePermissions();
+        loadSubmissions();
+    }
 
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('[PWA] Service Worker registrado con éxito en el ámbito:', reg.scope))
-            .catch(err => console.error('[PWA] Error al registrar el Service Worker:', err));
+            .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+            .catch(err => console.error('[PWA] Error en Service Worker:', err));
     }
 });
 
@@ -87,46 +402,14 @@ async function loadSubmissionsBackground() {
     if (supabase) {
         try {
             const { data, error } = await supabase
-                .from('solicitudes_tic')
+                .from('solicitudes_tic_secure')
                 .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
             if (data) {
-                const mappedSubmissions = data.map(dbRow => ({
-                    id: dbRow.id,
-                    fecha: dbRow.fecha,
-                    ticket: dbRow.ticket,
-                    funcionario: {
-                        nombre: dbRow.funcionario_nombre,
-                        rut: formatRut(dbRow.funcionario_rut),
-                        cargo: dbRow.funcionario_cargo,
-                        depto: dbRow.funcionario_depto
-                    },
-                    tipo_solicitud: dbRow.tipo_solicitud,
-                    propiedad_equipamiento: dbRow.propiedad_equipamiento,
-                    equipamiento_categorias: dbRow.equipamiento_categorias,
-                    otros_detalles: dbRow.otros_detalles || '',
-                    traspaso: dbRow.tipo_solicitud === 'Traspaso' ? {
-                        emisor_nombre: dbRow.traspaso_emisor_nombre,
-                        emisor_depto: dbRow.traspaso_emisor_depto,
-                        receptor_nombre: dbRow.traspaso_receptor_nombre,
-                        receptor_depto: dbRow.traspaso_receptor_depto,
-                        observacion: dbRow.traspaso_observacion
-                    } : null,
-                    equipamiento: dbRow.equipamiento,
-                    accesorios: dbRow.accesorios || '',
-                    observaciones_generales: dbRow.observaciones_generales || '',
-                    firmas: {
-                        tic_mode: dbRow.firmas_tic_mode,
-                        emisor_mode: dbRow.firmas_emisor_mode,
-                        receptor_mode: dbRow.firmas_receptor_mode,
-                        tic: dbRow.firma_tic,
-                        emisor: dbRow.firma_emisor,
-                        receptor: dbRow.firma_receptor
-                    }
-                }));
+                const mappedSubmissions = await mapDbRowsToSubmissions(data);
 
                 submissions = mappedSubmissions;
                 consolidateDuplicateSubmissions();
@@ -313,39 +596,45 @@ function consolidateDuplicateSubmissions() {
             // 2. Upsertar registros consolidados que sufrieron cambios
             updatedSubmissions.forEach(s => {
                 pendingUpserts.add(s.id);
-                const dbRow = {
-                    id: s.id,
-                    fecha: s.fecha,
-                    ticket: s.ticket,
-                    funcionario_nombre: s.funcionario.nombre,
-                    funcionario_rut: s.funcionario.rut,
-                    funcionario_cargo: s.funcionario.cargo,
-                    funcionario_depto: s.funcionario.depto,
-                    tipo_solicitud: s.tipo_solicitud,
-                    propiedad_equipamiento: s.propiedad_equipamiento,
-                    equipamiento_categorias: s.equipamiento_categorias,
-                    otros_detalles: s.otros_detalles,
-                    traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
-                    traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
-                    traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
-                    traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
-                    traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
-                    equipamiento: s.equipamiento,
-                    accesorios: s.accesorios,
-                    observaciones_generales: s.observaciones_generales,
-                    firmas_tic_mode: s.firmas.tic_mode,
-                    firmas_emisor_mode: s.firmas.emisor_mode,
-                    firmas_receptor_mode: s.firmas.receptor_mode,
-                    firma_tic: s.firmas.tic,
-                    firma_emisor: s.firmas.emisor,
-                    firma_receptor: s.firmas.receptor
-                };
-                supabase.from('solicitudes_tic').upsert(dbRow)
-                    .then(({ error }) => {
-                        pendingUpserts.delete(s.id);
+                (async () => {
+                    try {
+                        const storageFirmas = await uploadSignaturesToStorage(s.id, s.firmas);
+                        
+                        const dbRow = {
+                            id: s.id,
+                            fecha: s.fecha,
+                            ticket: s.ticket,
+                            funcionario_nombre: s.funcionario.nombre,
+                            funcionario_rut: s.funcionario.rut,
+                            funcionario_cargo: s.funcionario.cargo,
+                            funcionario_depto: s.funcionario.depto,
+                            tipo_solicitud: s.tipo_solicitud,
+                            propiedad_equipamiento: s.propiedad_equipamiento,
+                            equipamiento_categorias: s.equipamiento_categorias,
+                            otros_detalles: s.otros_detalles,
+                            traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
+                            traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
+                            traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
+                            traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
+                            traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
+                            equipamiento: s.equipamiento,
+                            accesorios: s.accesorios,
+                            observaciones_generales: s.observaciones_generales,
+                            firmas_tic_mode: s.firmas.tic_mode,
+                            firmas_emisor_mode: s.firmas.emisor_mode,
+                            firmas_receptor_mode: s.firmas.receptor_mode,
+                            firma_tic: storageFirmas.tic,
+                            firma_emisor: storageFirmas.emisor,
+                            firma_receptor: storageFirmas.receptor
+                        };
+                        const { error } = await supabase.from('solicitudes_tic').upsert(dbRow);
                         if (error) console.error(`Error al actualizar consolidado ${s.id} en Supabase:`, error.message);
-                    })
-                    .catch(() => pendingUpserts.delete(s.id));
+                    } catch (e) {
+                        console.error(`Error de conexión al actualizar consolidado ${s.id}:`, e);
+                    } finally {
+                        pendingUpserts.delete(s.id);
+                    }
+                })();
             });
         }
     }
@@ -380,47 +669,14 @@ async function loadSubmissions() {
     if (supabase) {
         try {
             const { data, error } = await supabase
-                .from('solicitudes_tic')
+                .from('solicitudes_tic_secure')
                 .select('*')
                 .order('created_at', { ascending: false });
  
             if (error) throw error;
  
             if (data) {
-                // Mapear los campos de la base de datos al formato local
-                const mappedSubmissions = data.map(dbRow => ({
-                    id: dbRow.id,
-                    fecha: dbRow.fecha,
-                    ticket: dbRow.ticket,
-                    funcionario: {
-                        nombre: dbRow.funcionario_nombre,
-                        rut: formatRut(dbRow.funcionario_rut),
-                        cargo: dbRow.funcionario_cargo,
-                        depto: dbRow.funcionario_depto
-                    },
-                    tipo_solicitud: dbRow.tipo_solicitud,
-                    propiedad_equipamiento: dbRow.propiedad_equipamiento,
-                    equipamiento_categorias: dbRow.equipamiento_categorias,
-                    otros_detalles: dbRow.otros_detalles || '',
-                    traspaso: dbRow.tipo_solicitud === 'Traspaso' ? {
-                        emisor_nombre: dbRow.traspaso_emisor_nombre,
-                        emisor_depto: dbRow.traspaso_emisor_depto,
-                        receptor_nombre: dbRow.traspaso_receptor_nombre,
-                        receptor_depto: dbRow.traspaso_receptor_depto,
-                        observacion: dbRow.traspaso_observacion
-                    } : null,
-                    equipamiento: dbRow.equipamiento,
-                    accesorios: dbRow.accesorios || '',
-                    observaciones_generales: dbRow.observaciones_generales || '',
-                    firmas: {
-                        tic_mode: dbRow.firmas_tic_mode,
-                        emisor_mode: dbRow.firmas_emisor_mode,
-                        receptor_mode: dbRow.firmas_receptor_mode,
-                        tic: dbRow.firma_tic,
-                        emisor: dbRow.firma_emisor,
-                        receptor: dbRow.firma_receptor
-                    }
-                }));
+                const mappedSubmissions = await mapDbRowsToSubmissions(data);
  
                 submissions = mappedSubmissions;
                 // Consolidar duplicados en base a datos frescos de la nube
@@ -553,6 +809,7 @@ function openNewForm() {
     document.getElementById('pdf-btn-form').classList.add('hidden');
     document.getElementById('preview-btn-form').classList.add('hidden');
     
+    setFormReadOnly(false);
     switchTab('form-view');
 }
 
@@ -670,22 +927,22 @@ function addEquipmentRow(data = {}) {
     
     tr.innerHTML = `
         <td class="p-2">
-            <input type="text" name="eq_tipo" value="${data.tipo || ''}" placeholder="Ej: Notebook" required oninput="syncEquipmentCategoriesFromRows()" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_tipo" value="${escapeHTML(data.tipo || '')}" placeholder="Ej: Notebook" required oninput="syncEquipmentCategoriesFromRows()" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_marca" value="${data.marca || ''}" placeholder="Ej: Lenovo" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_modelo" value="${data.modelo || ''}" placeholder="Ej: ThinkPad L14" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_modelo" value="${escapeHTML(data.modelo || '')}" placeholder="Ej: ThinkPad L14" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_serie" value="${data.serie || ''}" placeholder="Ej: SPF0349A" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
+            <input type="text" name="eq_serie" value="${escapeHTML(data.serie || '')}" placeholder="Ej: SPF0349A" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_inventario" value="${data.inventario || ''}" placeholder="Ej: ISP-2024-49" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
+            <input type="text" name="eq_inventario" value="${escapeHTML(data.inventario || '')}" placeholder="Ej: ISP-2024-49" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_obs" value="${data.observacion || ''}" placeholder="Opcional" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs transition-all">
+            <input type="text" name="eq_obs" value="${escapeHTML(data.observacion || '')}" placeholder="Opcional" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs transition-all">
         </td>
         <td class="p-2 text-center no-print">
             <button type="button" onclick="removeEquipmentRow('${rowId}')" class="text-rose-500 hover:text-rose-750 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
@@ -1074,49 +1331,53 @@ function saveForm(event) {
 
     // Sincronizar en caliente con Supabase
     if (supabase) {
-        const dbRow = {
-            id: submissionData.id,
-            fecha: submissionData.fecha,
-            ticket: submissionData.ticket,
-            funcionario_nombre: submissionData.funcionario.nombre,
-            funcionario_rut: submissionData.funcionario.rut,
-            funcionario_cargo: submissionData.funcionario.cargo,
-            funcionario_depto: submissionData.funcionario.depto,
-            tipo_solicitud: submissionData.tipo_solicitud,
-            propiedad_equipamiento: submissionData.propiedad_equipamiento,
-            equipamiento_categorias: submissionData.equipamiento_categorias,
-            otros_detalles: submissionData.otros_detalles,
-            traspaso_emisor_nombre: submissionData.traspaso ? submissionData.traspaso.emisor_nombre : null,
-            traspaso_emisor_depto: submissionData.traspaso ? submissionData.traspaso.emisor_depto : null,
-            traspaso_receptor_nombre: submissionData.traspaso ? submissionData.traspaso.receptor_nombre : null,
-            traspaso_receptor_depto: submissionData.traspaso ? submissionData.traspaso.receptor_depto : null,
-            traspaso_observacion: submissionData.traspaso ? submissionData.traspaso.observacion : null,
-            equipamiento: submissionData.equipamiento,
-            accesorios: submissionData.accesorios,
-            observaciones_generales: submissionData.observaciones_generales,
-            firmas_tic_mode: submissionData.firmas.tic_mode,
-            firmas_emisor_mode: submissionData.firmas.emisor_mode,
-            firmas_receptor_mode: submissionData.firmas.receptor_mode,
-            firma_tic: submissionData.firmas.tic,
-            firma_emisor: submissionData.firmas.emisor,
-            firma_receptor: submissionData.firmas.receptor
-        };
+        (async () => {
+            try {
+                const storageFirmas = await uploadSignaturesToStorage(submissionData.id, submissionData.firmas);
+                
+                const dbRow = {
+                    id: submissionData.id,
+                    fecha: submissionData.fecha,
+                    ticket: submissionData.ticket,
+                    funcionario_nombre: submissionData.funcionario.nombre,
+                    funcionario_rut: submissionData.funcionario.rut,
+                    funcionario_cargo: submissionData.funcionario.cargo,
+                    funcionario_depto: submissionData.funcionario.depto,
+                    tipo_solicitud: submissionData.tipo_solicitud,
+                    propiedad_equipamiento: submissionData.propiedad_equipamiento,
+                    equipamiento_categorias: submissionData.equipamiento_categorias,
+                    otros_detalles: submissionData.otros_detalles,
+                    traspaso_emisor_nombre: submissionData.traspaso ? submissionData.traspaso.emisor_nombre : null,
+                    traspaso_emisor_depto: submissionData.traspaso ? submissionData.traspaso.emisor_depto : null,
+                    traspaso_receptor_nombre: submissionData.traspaso ? submissionData.traspaso.receptor_nombre : null,
+                    traspaso_receptor_depto: submissionData.traspaso ? submissionData.traspaso.receptor_depto : null,
+                    traspaso_observacion: submissionData.traspaso ? submissionData.traspaso.observacion : null,
+                    equipamiento: submissionData.equipamiento,
+                    accesorios: submissionData.accesorios,
+                    observaciones_generales: submissionData.observaciones_generales,
+                    firmas_tic_mode: submissionData.firmas.tic_mode,
+                    firmas_emisor_mode: submissionData.firmas.emisor_mode,
+                    firmas_receptor_mode: submissionData.firmas.receptor_mode,
+                    firma_tic: storageFirmas.tic,
+                    firma_emisor: storageFirmas.emisor,
+                    firma_receptor: storageFirmas.receptor
+                };
 
-        supabase
-            .from('solicitudes_tic')
-            .upsert(dbRow)
-            .then(({ error }) => {
+                const { error } = await supabase
+                    .from('solicitudes_tic')
+                    .upsert(dbRow);
+                
                 if (error) {
                     console.error("Error al guardar en Supabase:", error.message);
                     showToast("Guardado localmente. Error al sincronizar con la nube.", "error");
                 } else {
                     showToast("Registro guardado y sincronizado con la nube.", "success");
                 }
-            })
-            .catch(err => {
+            } catch (err) {
                 console.error("Error de conexión al guardar en Supabase:", err);
                 showToast("Guardado localmente. Error de conexión con la nube.", "error");
-            });
+            }
+        })();
     }
     
     // Habilitar impresión, PDF y previsualización tras guardar exitosamente
@@ -1210,12 +1471,12 @@ function syncPrintTemplate() {
         const item = items[i] || { tipo: '', marca: '', modelo: '', serie: '', inventario: '', obs: '' };
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.tipo || '&nbsp;'}</td>
-            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.marca || '&nbsp;'}</td>
-            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.modelo || '&nbsp;'}</td>
-            <td class="border border-black p-1.5 h-8 font-mono print-calibri-12">${item.serie || '&nbsp;'}</td>
-            <td class="border border-black p-1.5 h-8 font-mono print-calibri-12">${item.inventario || '&nbsp;'}</td>
-            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.obs || '&nbsp;'}</td>
+            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.tipo ? escapeHTML(item.tipo) : '&nbsp;'}</td>
+            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.marca ? escapeHTML(item.marca) : '&nbsp;'}</td>
+            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.modelo ? escapeHTML(item.modelo) : '&nbsp;'}</td>
+            <td class="border border-black p-1.5 h-8 font-mono print-calibri-12">${item.serie ? escapeHTML(item.serie) : '&nbsp;'}</td>
+            <td class="border border-black p-1.5 h-8 font-mono print-calibri-12">${item.inventario ? escapeHTML(item.inventario) : '&nbsp;'}</td>
+            <td class="border border-black p-1.5 h-8 font-medium print-calibri-12">${item.obs ? escapeHTML(item.obs) : '&nbsp;'}</td>
         `;
         printEqTableBody.appendChild(tr);
     }
@@ -1319,14 +1580,20 @@ function renderTable() {
             }
 
             // Formatear resumen de equipos para la columna
-            const eqSummary = s.equipamiento.map(e => `${e.tipo} (${e.marca} ${e.modelo})`).join(', ');
+            const eqSummary = s.equipamiento.map(e => `${escapeHTML(e.tipo)} (${escapeHTML(e.marca)} ${escapeHTML(e.modelo)})`).join(', ');
+
+            const deleteBtnHtml = currentUserRole === 'admin' ? `
+                <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-755 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
+                    <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
+                </button>
+            ` : '';
 
             tr.innerHTML = `
-                <td class="py-4 px-6 font-medium text-slate-900 dark:text-slate-100">${s.fecha}</td>
-                <td class="py-4 px-6 font-mono text-xs text-indigo-650 dark:text-indigo-400 font-semibold">${s.ticket}</td>
+                <td class="py-4 px-6 font-medium text-slate-900 dark:text-slate-100">${escapeHTML(s.fecha)}</td>
+                <td class="py-4 px-6 font-mono text-xs text-indigo-650 dark:text-indigo-400 font-semibold">${escapeHTML(s.ticket)}</td>
                 <td class="py-4 px-6">
-                    <div class="font-medium text-slate-850 dark:text-slate-200">${s.funcionario.nombre}</div>
-                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${s.funcionario.rut}</div>
+                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(s.funcionario.nombre)}</div>
+                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(s.funcionario.rut)}</div>
                 </td>
                 <td class="py-4 px-6">${badgesSolicitud}</td>
                 <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-450" title="${eqSummary}">${eqSummary}</td>
@@ -1338,9 +1605,7 @@ function renderTable() {
                         <button onclick="exportSubmissionToPDF('${s.id}')" class="p-2 text-emerald-600 dark:text-emerald-450 hover:text-emerald-850 dark:hover:text-emerald-300 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors" title="Descargar PDF">
                             <i data-lucide="file-text" class="w-4.5 h-4.5"></i>
                         </button>
-                        <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-755 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
-                            <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
-                        </button>
+                        ${deleteBtnHtml}
                     </div>
                 </td>
             `;
@@ -1356,6 +1621,9 @@ function viewAndEditForm(id) {
     if (!s) return;
 
     activeSubmissionId = s.id;
+    
+    // Si el rol es técnico, deshabilitar edición
+    setFormReadOnly(currentUserRole === 'tecnico');
     
     // Rellenar cabecera
     document.getElementById('form-fecha').value = s.fecha;
@@ -2027,14 +2295,14 @@ async function showExcelSuggestions(query) {
         div.innerHTML = `
             <div>
                 <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                    ${item.funcionario || 'Sin Funcionario asignado'}
+                    ${item.funcionario ? escapeHTML(item.funcionario) : 'Sin Funcionario asignado'}
                     ${sourceBadge}
                 </div>
-                <div class="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">S/N: ${item.serie} | Inv: ${item.inventario || 'S/N'}</div>
+                <div class="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">S/N: ${escapeHTML(item.serie)} | Inv: ${item.inventario ? escapeHTML(item.inventario) : 'S/N'}</div>
             </div>
             <div class="text-right text-[10px]">
-                <span class="px-2 py-0.5 rounded-full font-semibold ${badgeClass}">${item.tipo || 'Equipo'}</span>
-                <div class="text-slate-400 dark:text-slate-500 mt-1">${item.marca || ''} ${item.modelo || ''}</div>
+                <span class="px-2 py-0.5 rounded-full font-semibold ${badgeClass}">${item.tipo ? escapeHTML(item.tipo) : 'Equipo'}</span>
+                <div class="text-slate-400 dark:text-slate-500 mt-1">${escapeHTML(item.marca || '')} ${escapeHTML(item.modelo || '')}</div>
             </div>
         `;
         dropdown.appendChild(div);
@@ -2420,7 +2688,7 @@ function renderMetrics() {
                 div.className = "space-y-1.5";
                 div.innerHTML = `
                     <div class="flex justify-between items-center text-xs font-semibold">
-                        <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" title="${dept.name}">${dept.name}</span>
+                        <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" title="${escapeHTML(dept.name)}">${escapeHTML(dept.name)}</span>
                         <span class="text-slate-500 dark:text-slate-400 font-mono">${dept.catastrado} / ${dept.total} (${pct}%)</span>
                     </div>
                     <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
@@ -2475,7 +2743,7 @@ function renderMetrics() {
                 div.className = "flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/20 border border-slate-100/50 dark:border-slate-800/40 text-xs";
                 div.innerHTML = `
                     <div>
-                        <span class="font-bold text-slate-700 dark:text-slate-300 block">${t.name}</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-300 block">${escapeHTML(t.name)}</span>
                         <span class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block font-medium">Arriendo: ${t.arriendo} | Propio: ${t.isp}</span>
                     </div>
                     <div class="text-right">
@@ -2683,8 +2951,8 @@ function detectDuplicatesAndInconsistencies() {
             if (normSub !== normExcel) {
                 userAlerts.push({
                     type: 'discrepancy',
-                    title: `Discrepancia de Nombre (RUT ${rut})`,
-                    desc: `En Formularios: <strong>"${subName}"</strong> <br>En Excel Catastro: <strong>"${excelName}"</strong>`,
+                    title: `Discrepancia de Nombre (RUT ${escapeHTML(rut)})`,
+                    desc: `En Formularios: <strong>"${escapeHTML(subName)}"</strong> <br>En Excel Catastro: <strong>"${escapeHTML(excelName)}"</strong>`,
                     severity: 'amber'
                 });
             }
@@ -2718,7 +2986,7 @@ function detectDuplicatesAndInconsistencies() {
                 userAlerts.push({
                     type: 'similar_names',
                     title: `Nombres similares con RUTs diferentes`,
-                    desc: `• <strong>"${f1.nombre}"</strong> con RUT: ${f1.rut}<br>• <strong>"${f2.nombre}"</strong> con RUT: ${f2.rut}`,
+                    desc: `• <strong>"${escapeHTML(f1.nombre)}"</strong> con RUT: ${escapeHTML(f1.rut)}<br>• <strong>"${escapeHTML(f2.nombre)}"</strong> con RUT: ${escapeHTML(f2.rut)}`,
                     severity: 'rose'
                 });
             }
@@ -2779,20 +3047,20 @@ function detectDuplicatesAndInconsistencies() {
             
             // Si hay más de un propietario único en formularios diferentes
             if (formAssigns.length > 1 && formAssigns.some((val, index, array) => val.ownerName !== array[0].ownerName)) {
-                const descDetails = assigns.map(a => `• <strong>${a.ownerName}</strong> en ${a.detail}`).join('<br>');
+                const descDetails = assigns.map(a => `• <strong>${escapeHTML(a.ownerName)}</strong> en ${escapeHTML(a.detail)}`).join('<br>');
                 equipAlerts.push({
                     type: 'duplicate_form',
                     title: `Serie duplicada en múltiples Formularios`,
-                    desc: `N° Serie: <strong>${serie}</strong> asignada a:<br>${descDetails}`,
+                    desc: `N° Serie: <strong>${escapeHTML(serie)}</strong> asignada a:<br>${descDetails}`,
                     severity: 'rose'
                 });
             } else {
                 // Si la discrepancia es entre Excel y Formularios
-                const descDetails = assigns.map(a => `• <strong>${a.ownerName}</strong> en ${a.detail}`).join('<br>');
+                const descDetails = assigns.map(a => `• <strong>${escapeHTML(a.ownerName)}</strong> en ${escapeHTML(a.detail)}`).join('<br>');
                 equipAlerts.push({
                     type: 'excel_discrepancy',
                     title: `Discrepancia Catastro vs Formularios`,
-                    desc: `N° Serie: <strong>${serie}</strong> asignada a:<br>${descDetails}`,
+                    desc: `N° Serie: <strong>${escapeHTML(serie)}</strong> asignada a:<br>${descDetails}`,
                     severity: 'amber'
                 });
             }
@@ -3058,12 +3326,12 @@ function showHistorySuggestions(query) {
         
         div.innerHTML = `
             <div>
-                <div class="font-bold text-slate-850 dark:text-slate-200 font-mono">S/N: ${item.serie}</div>
-                <div class="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">${item.marca} ${item.modelo}</div>
+                <div class="font-bold text-slate-850 dark:text-slate-200 font-mono">S/N: ${escapeHTML(item.serie)}</div>
+                <div class="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">${escapeHTML(item.marca || '')} ${escapeHTML(item.modelo || '')}</div>
             </div>
             <div class="text-right text-[10px]">
-                <span class="px-2 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">${item.tipo}</span>
-                <div class="text-slate-450 dark:text-slate-500 mt-1">Ref: ${item.origen}</div>
+                <span class="px-2 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">${item.tipo ? escapeHTML(item.tipo) : 'Equipo'}</span>
+                <div class="text-slate-450 dark:text-slate-500 mt-1">Ref: ${escapeHTML(item.origen)}</div>
             </div>
         `;
         dropdown.appendChild(div);
@@ -3184,16 +3452,16 @@ function renderHistoryTimeline(serie) {
     eqInfo.innerHTML = `
         <div class="space-y-2">
             <div class="flex items-center gap-3">
-                <span class="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-650 dark:text-indigo-400 flex items-center gap-1.5"><i data-lucide="laptop" class="w-4 h-4"></i> ${eqTipo}</span>
-                <span class="px-2.5 py-1 rounded-xl text-xs font-bold ${badgeClass}">${eqPropiedad}</span>
+                <span class="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-650 dark:text-indigo-400 flex items-center gap-1.5"><i data-lucide="laptop" class="w-4 h-4"></i> ${escapeHTML(eqTipo)}</span>
+                <span class="px-2.5 py-1 rounded-xl text-xs font-bold ${badgeClass}">${escapeHTML(eqPropiedad)}</span>
                 ${excelBadgeText}
             </div>
-            <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mt-1">${eqMarca} ${eqModelo}</h2>
+            <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mt-1">${escapeHTML(eqMarca)} ${escapeHTML(eqModelo)}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-500 dark:text-slate-455 font-medium">
-                <div><strong>N° Serie:</strong> <span class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">${term}</span></div>
-                <div><strong>N° Inventario:</strong> <span class="font-mono">${eqInventario || 'Sin Inventario'}</span></div>
-                ${eqFuncionarioExcel ? `<div><strong>Titular Catastral:</strong> ${eqFuncionarioExcel}</div>` : ''}
-                ${eqUbicacionExcel ? `<div><strong>Ubicación Catastral:</strong> ${eqUbicacionExcel}</div>` : ''}
+                <div><strong>N° Serie:</strong> <span class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">${escapeHTML(term)}</span></div>
+                <div><strong>N° Inventario:</strong> <span class="font-mono">${escapeHTML(eqInventario || 'Sin Inventario')}</span></div>
+                ${eqFuncionarioExcel ? `<div><strong>Titular Catastral:</strong> ${escapeHTML(eqFuncionarioExcel)}</div>` : ''}
+                ${eqUbicacionExcel ? `<div><strong>Ubicación Catastral:</strong> ${escapeHTML(eqUbicacionExcel)}</div>` : ''}
             </div>
         </div>
         <div class="bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30 text-center max-w-xs w-full">
@@ -3223,18 +3491,18 @@ function renderHistoryTimeline(serie) {
                 colorMarker = 'asignacion';
                 title = `Asignación de Equipo (Entrega)`;
                 contentHtml = `
-                    <p class="text-slate-650 dark:text-slate-350 text-xs">Asignado al funcionario <strong>${m.funcionario}</strong> (${m.cargo}) del departamento <strong>${m.depto}</strong>.</p>
+                    <p class="text-slate-650 dark:text-slate-350 text-xs">Asignado al funcionario <strong>${escapeHTML(m.funcionario)}</strong> (${escapeHTML(m.cargo)}) del departamento <strong>${escapeHTML(m.depto)}</strong>.</p>
                 `;
             } else if (m.tipo_solicitud === 'Traspaso') {
                 colorMarker = 'traspaso';
-                const emisor = m.traspaso ? m.traspaso.emisor_nombre : 'Emisor no registrado';
-                const receptor = m.traspaso ? m.traspaso.receptor_nombre : 'Receptor no registrado';
-                const obs = m.traspaso && m.traspaso.observacion ? `<div class="mt-2 p-2 bg-amber-500/5 rounded border border-amber-500/10 text-amber-800 dark:text-amber-350 italic text-[11px]">Obs: "${m.traspaso.observacion}"</div>` : '';
+                const emisor = m.traspaso ? escapeHTML(m.traspaso.emisor_nombre) : 'Emisor no registrado';
+                const receptor = m.traspaso ? escapeHTML(m.traspaso.receptor_nombre) : 'Receptor no registrado';
+                const obs = m.traspaso && m.traspaso.observacion ? `<div class="mt-2 p-2 bg-amber-500/5 rounded border border-amber-500/10 text-amber-800 dark:text-amber-350 italic text-[11px]">Obs: "${escapeHTML(m.traspaso.observacion)}"</div>` : '';
                 title = `Traspaso de Equipamiento`;
                 contentHtml = `
                     <p class="text-slate-650 dark:text-slate-350 text-xs">
                         Traspaso de <strong>${emisor}</strong> a <strong>${receptor}</strong>.<br>
-                        Firmante del traspaso: <strong>${m.funcionario}</strong>.
+                        Firmante del traspaso: <strong>${escapeHTML(m.funcionario)}</strong>.
                     </p>
                     ${obs}
                 `;
@@ -3242,7 +3510,7 @@ function renderHistoryTimeline(serie) {
                 colorMarker = 'devolucion';
                 title = `Devolución de Equipo`;
                 contentHtml = `
-                    <p class="text-slate-650 dark:text-slate-350 text-xs">Devuelto por el funcionario <strong>${m.funcionario}</strong> del departamento <strong>${m.depto}</strong>.</p>
+                    <p class="text-slate-650 dark:text-slate-350 text-xs">Devuelto por el funcionario <strong>${escapeHTML(m.funcionario)}</strong> del departamento <strong>${escapeHTML(m.depto)}</strong>.</p>
                 `;
             }
             
@@ -3250,15 +3518,15 @@ function renderHistoryTimeline(serie) {
                 <div class="timeline-marker ${colorMarker}"></div>
                 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between flex-wrap gap-2">
-                        <span class="text-xs font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500"></i> ${m.fecha}</span>
+                        <span class="text-xs font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500"></i> ${escapeHTML(m.fecha)}</span>
                         <div class="flex items-center gap-2">
-                            <span class="font-mono text-[10px] text-indigo-650 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">Ticket: ${m.ticket}</span>
-                            <button onclick="viewAndEditForm('${m.subId}')" class="text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold underline transition-colors">Ver Documento</button>
+                            <span class="font-mono text-[10px] text-indigo-650 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">Ticket: ${escapeHTML(m.ticket)}</span>
+                            <button onclick="viewAndEditForm('${escapeHTML(m.subId)}')" class="text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold underline transition-colors">Ver Documento</button>
                         </div>
                     </div>
                     <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">${title}</h4>
                     <div class="mt-1">${contentHtml}</div>
-                    ${m.observacion ? `<p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Nota: "${m.observacion}"</p>` : ''}
+                    ${m.observacion ? `<p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Nota: "${escapeHTML(m.observacion)}"</p>` : ''}
                 </div>
             `;
             timeline.appendChild(itemDiv);
@@ -3383,3 +3651,5 @@ window.triggerPDFExportFromPreview = triggerPDFExportFromPreview;
 window.triggerPrintFromPreview = triggerPrintFromPreview;
 window.showHistorySuggestions = showHistorySuggestions;
 window.selectHistoryEquipment = selectHistoryEquipment;
+window.handleLogin = handleLogin;
+window.handleLogout = handleLogout;

@@ -40,6 +40,39 @@
 
     <!-- CONTENEDOR DE PANTALLA INTERACTIVA (Se oculta al imprimir) -->
     <div class="print:hidden">
+        <!-- PANTALLA DE AUTENTICACIÓN (LOGIN) overlay -->
+        <div id="auth-login-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6">
+                <div class="text-center space-y-2">
+                    <div class="inline-flex bg-indigo-50 dark:bg-indigo-950/60 p-4 rounded-3xl text-indigo-600 dark:text-indigo-400 mb-2">
+                        <i data-lucide="shield-check" class="w-10 h-10"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-slate-850 dark:text-slate-100">Acceso Restringido</h2>
+                    <p class="text-sm text-slate-400 dark:text-slate-500">Inicie sesión para acceder al panel de soporte y catastro de TIC.</p>
+                </div>
+                <form id="auth-login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                        <div class="relative">
+                            <i data-lucide="mail" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i>
+                            <input type="email" id="login-email" required placeholder="admin.tic@ispch.cl" class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Contraseña</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i>
+                            <input type="password" id="login-password" required placeholder="••••••••" class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-indigo-600/30 transition-all">
+                        Ingresar al Sistema
+                    </button>
+                </form>
+                <div id="login-error-msg" class="hidden text-rose-500 dark:text-rose-455 text-xs text-center font-semibold bg-rose-50 dark:bg-rose-950/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/50"></div>
+            </div>
+        </div>
+
         <!-- Sistema de Notificaciones / Toast -->
         <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none">
             <div class="bg-slate-900 dark:bg-slate-850 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3">
@@ -77,6 +110,10 @@
                             </button>
                         </div>
                         <div class="h-6 w-[1px] bg-slate-800"></div>
+                        <button id="auth-logout-btn" onclick="handleLogout()" class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all border border-rose-900/50 flex items-center gap-1.5" title="Cerrar Sesión">
+                            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
+                        </button>
+                        <div id="auth-divider" class="hidden h-6 w-[1px] bg-slate-800"></div>
                         <button onclick="toggleTheme()" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" title="Cambiar Tema">
                             <span id="theme-toggle-icon"><i data-lucide="moon" class="w-5 h-5"></i></span>
                         </button>
@@ -100,7 +137,7 @@
                         <button onclick="exportToCSV()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
                             <i data-lucide="download" class="w-4 h-4"></i> Exportar a CSV
                         </button>
-                        <label class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px] cursor-pointer">
+                        <label id="excel-upload-label" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px] cursor-pointer">
                             <i data-lucide="upload" class="w-4 h-4"></i> Cargar Catastro Excel
                             <input type="file" id="excel-file-input" class="hidden" accept=".xlsx" onchange="handleExcelUpload(event)">
                         </label>
@@ -759,7 +796,7 @@
 
                         <!-- Botones de Control de Formulario -->
                         <div class="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
-                            <button type="button" onclick="switchTab('dashboard')" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            <button type="button" id="cancel-btn-form" onclick="switchTab('dashboard')" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                                 Cancelar
                             </button>
                             <div class="flex gap-2">
@@ -772,7 +809,7 @@
                                 <button type="button" onclick="triggerPrintMode()" id="print-btn-form" class="hidden bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
                                     <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
                                 </button>
-                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                                <button type="submit" id="save-btn-form" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
                                     <i data-lucide="save" class="w-4 h-4"></i> Guardar Registro
                                 </button>
                             </div>

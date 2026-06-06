@@ -29,15 +29,22 @@ function loadEnv() {
 
 const env = loadEnv();
 const supabaseUrl = env['VITE_SUPABASE_URL'];
-const supabaseAnonKey = env['VITE_SUPABASE_ANON_KEY'];
+const serviceRoleKey = env['SUPABASE_SERVICE_ROLE_KEY'] || env['VITE_SUPABASE_SERVICE_ROLE_KEY'];
+const supabaseKey = serviceRoleKey || env['VITE_SUPABASE_ANON_KEY'];
 
-if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('tu-proyecto-nuevo')) {
+if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('tu-proyecto-nuevo')) {
   console.error('Error: Las credenciales de Supabase en el .env no están configuradas correctamente.');
   process.exit(1);
 }
 
+if (!serviceRoleKey) {
+  console.warn('\x1b[33m%s\x1b[0m', 'Advertencia: No se detectó SUPABASE_SERVICE_ROLE_KEY en el archivo .env.');
+  console.warn('\x1b[33m%s\x1b[0m', 'Las nuevas políticas RLS restringirán la inserción de catastro para el rol anónimo.');
+  console.warn('\x1b[33m%s\x1b[0m', 'Para corregir esto, añade SUPABASE_SERVICE_ROLE_KEY a tu archivo .env o reemplaza temporalmente VITE_SUPABASE_ANON_KEY con tu clave de servicio.\n');
+}
+
 // 2. Inicializar cliente Supabase
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Normalizar claves para que coincidan con la base de datos
 function normalizeKey(key) {
@@ -126,14 +133,23 @@ async function importCatastro() {
     console.log(`- Encontradas ${cleaned.length} impresoras/scanners en el Excel.`);
   }
   
-  console.log(`Total de registros a importar: ${allRows.length}. Iniciando subida a Supabase...`);
+  // Deduplicar en memoria para evitar que un mismo lote contenga la misma serie duplicada
+  const uniqueRowsMap = new Map();
+  allRows.forEach(row => {
+    const key = row.serie.toLowerCase().trim();
+    uniqueRowsMap.set(key, row);
+  });
+  const uniqueRows = Array.from(uniqueRowsMap.values());
+  console.log(`Deduplicación en memoria: ${uniqueRows.length} registros únicos de un total de ${allRows.length}.`);
   
-  // Dividir en lotes de 100 y subir mediante upsert (para evitar duplicados por Número de Serie)
+  console.log(`Total de registros a importar: ${uniqueRows.length}. Iniciando subida a Supabase...`);
+  
+  // Dividir en lotes de 100 y subir mediante upsert
   const batchSize = 100;
   let successful = 0;
   
-  for (let i = 0; i < allRows.length; i += batchSize) {
-    const batch = allRows.slice(i, i + batchSize);
+  for (let i = 0; i < uniqueRows.length; i += batchSize) {
+    const batch = uniqueRows.slice(i, i + batchSize);
     try {
       const { error } = await supabase
         .from('catastro_equipos')
@@ -142,7 +158,7 @@ async function importCatastro() {
       if (error) throw error;
       
       successful += batch.length;
-      console.log(`  Subido lote ${i / batchSize + 1} (${successful}/${allRows.length} completados)...`);
+      console.log(`  Subido lote ${i / batchSize + 1} (${successful}/${uniqueRows.length} completados)...`);
     } catch (err) {
       console.error(`  Error al subir lote ${i / batchSize + 1}:`, err.message);
     }

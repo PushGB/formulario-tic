@@ -1940,7 +1940,7 @@ function handleExcelUpload(event) {
             const data = new Uint8Array(e.target.result);
             uploadedWorkbook = XLSX.read(data, { type: 'array' });
             
-            processWorkbookData();
+            processWorkbookData(true); // Indica carga manual para guardar en Supabase
             
             showToast("Planilla Excel cargada y lista para auto-relleno.", "success");
             
@@ -1952,8 +1952,164 @@ function handleExcelUpload(event) {
     reader.readAsArrayBuffer(file);
 }
 
+// Intentar cargar el catastro de equipos desde Supabase
+async function loadCatastroFromSupabase() {
+    if (!supabase) return false;
+    try {
+        const { data, error } = await supabase
+            .from('catastro_equipos')
+            .select('*');
+            
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            loadedAllEquipments = data.map(row => ({
+                n: row.n || '',
+                inventario: row.inventario || '',
+                serie: row.serie || '',
+                tipo: row.tipo || '',
+                marca: row.marca || '',
+                modelo: row.modelo || '',
+                propiedad: row.propiedad || '',
+                funcionario: row.funcionario || '',
+                mail: row.mail || '',
+                depto: row.depto || '',
+                estado: row.estado || 'Disponible',
+                observaciones: row.observaciones || '',
+                sheet: row.sheet || 'Computadores'
+            }));
+            
+            // Actualizar interfaz con el badge
+            const badge = document.getElementById('excel-status-badge');
+            if (badge) {
+                const comps = loadedAllEquipments.filter(e => e.sheet === 'Computadores');
+                const printers = loadedAllEquipments.filter(e => e.sheet === 'Impresoras-Scanner');
+                badge.innerHTML = `
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-450 border border-emerald-200/50 dark:border-emerald-800 text-xs font-semibold">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Catastro en la Nube: ${comps.length} Computadores y ${printers.length} Impresoras/Scanners disponibles.
+                    </div>
+                `;
+            }
+            
+            // Mostrar controles relacionados
+            const searchContainer = document.getElementById('excel-search-container');
+            if (searchContainer) searchContainer.classList.remove('hidden');
+            
+            const exportBtn = document.getElementById('excel-export-btn');
+            if (exportBtn) exportBtn.classList.remove('hidden');
+            
+            console.log(`Catastro cargado con éxito desde Supabase: ${loadedAllEquipments.length} equipos.`);
+            return true;
+        }
+    } catch (e) {
+        console.error("Error al cargar catastro desde Supabase:", e.message);
+    }
+    return false;
+}
+
+// Guardar el catastro cargado en Supabase
+async function saveCatastroToSupabase(equipments) {
+    if (!supabase) return;
+    try {
+        showToast("Sincronizando catastro con la base de datos...", "info");
+        const batchSize = 100;
+        let successful = 0;
+        
+        const dbRows = equipments.map(e => ({
+            n: e.n || '',
+            inventario: e.inventario || '',
+            serie: String(e.serie || '').trim(),
+            tipo: e.tipo || '',
+            marca: e.marca || '',
+            modelo: e.modelo || '',
+            propiedad: e.propiedad || '',
+            funcionario: e.funcionario || '',
+            mail: e.mail || '',
+            depto: e.depto || '',
+            estado: e.estado || 'Disponible',
+            observaciones: e.observaciones || '',
+            sheet: e.sheet || 'Computadores'
+        })).filter(e => e.serie.length > 0);
+
+        for (let i = 0; i < dbRows.length; i += batchSize) {
+            const batch = dbRows.slice(i, i + batchSize);
+            const { error } = await supabase
+                .from('catastro_equipos')
+                .upsert(batch, { onConflict: 'serie' });
+            
+            if (error) throw error;
+            successful += batch.length;
+        }
+        console.log(`Sincronizados ${successful} equipos con Supabase.`);
+        showToast(`Sincronización de catastro exitosa: ${successful} equipos guardados.`, "success");
+    } catch (e) {
+        console.error("Error al sincronizar catastro con Supabase:", e.message);
+        showToast("Error al guardar el catastro en la base de datos.", "error");
+    }
+}
+
+// Guardar solicitudes importadas en Supabase
+async function saveSubmissionsToSupabase(subs) {
+    if (!supabase || subs.length === 0) return;
+    try {
+        showToast("Sincronizando registros importados con la base de datos...", "info");
+        const dbRows = subs.map(s => ({
+            id: s.id,
+            fecha: s.fecha,
+            ticket: s.ticket,
+            funcionario_nombre: s.funcionario.nombre,
+            funcionario_rut: s.funcionario.rut,
+            funcionario_cargo: s.funcionario.cargo,
+            funcionario_depto: s.funcionario.depto,
+            tipo_solicitud: s.tipo_solicitud,
+            propiedad_equipamiento: s.propiedad_equipamiento,
+            equipamiento_categorias: s.equipamiento_categorias,
+            otros_detalles: s.otros_detalles,
+            traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
+            traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
+            traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
+            traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
+            traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
+            equipamiento: s.equipamiento,
+            accesorios: s.accesorios,
+            observaciones_generales: s.observaciones_generales,
+            firmas_tic_mode: s.firmas.tic_mode,
+            firmas_emisor_mode: s.firmas.emisor_mode,
+            firmas_receptor_mode: s.firmas.receptor_mode,
+            firma_tic: s.firmas.tic,
+            firma_emisor: s.firmas.emisor,
+            firma_receptor: s.firmas.receptor
+        }));
+
+        const batchSize = 50;
+        let successful = 0;
+        for (let i = 0; i < dbRows.length; i += batchSize) {
+            const batch = dbRows.slice(i, i + batchSize);
+            const { error } = await supabase
+                .from('solicitudes_tic')
+                .upsert(batch);
+            
+            if (error) throw error;
+            successful += batch.length;
+        }
+        console.log(`Sincronizados ${successful} registros importados con Supabase.`);
+        showToast(`Sincronización de registros exitosa: ${successful} cargados.`, "success");
+    } catch (e) {
+        console.error("Error al guardar registros en Supabase:", e.message);
+        showToast("Error al guardar los registros en la base de datos.", "error");
+    }
+}
+
 // Intentar precargar el catastro Excel automáticamente desde el servidor local al iniciar la app
-function preloadExcelData() {
+async function preloadExcelData() {
+    // Intentar primero cargar desde la base de datos centralizada
+    const loadedFromDb = await loadCatastroFromSupabase();
+    if (loadedFromDb) {
+        return;
+    }
+    
+    // Plan de contingencia: cargar archivo local predeterminado
     fetch('Catastro_ISP_2025_PRECARGADO.xlsx')
         .then(response => {
             if (!response.ok) {
@@ -1964,7 +2120,7 @@ function preloadExcelData() {
         .then(buffer => {
             const data = new Uint8Array(buffer);
             uploadedWorkbook = XLSX.read(data, { type: 'array' });
-            processWorkbookData();
+            processWorkbookData(false);
             console.log("Excel catastral precargado de forma automática.");
         })
         .catch(err => {
@@ -1973,7 +2129,7 @@ function preloadExcelData() {
 }
 
 // Procesar el libro de Excel cargado (computadores, impresoras y registros catastrados existentes)
-function processWorkbookData() {
+function processWorkbookData(isManualUpload = false) {
     if (!uploadedWorkbook) return;
 
     // 1. Procesar Hoja de Computadores para auto-relleno
@@ -2003,6 +2159,10 @@ function processWorkbookData() {
     }
     
     loadedAllEquipments = [...computers, ...printers];
+    
+    if (isManualUpload && supabase && loadedAllEquipments.length > 0) {
+        saveCatastroToSupabase(loadedAllEquipments);
+    }
     
     // 3. Procesar Hoja de Equipos para importar registros ya catastrados
     const equiposSheet = uploadedWorkbook.Sheets['Equipos'];
@@ -2062,6 +2222,7 @@ function processWorkbookData() {
             });
         });
         
+        const importedSubs = [];
         // Crear las solicitudes agrupadas en LocalStorage
         Object.keys(grouped).forEach(key => {
             const group = grouped[key];
@@ -2148,11 +2309,15 @@ function processWorkbookData() {
             });
             
             submissions.push(sub);
+            importedSubs.push(sub);
             importedCount++;
         });
         
         if (importedCount > 0) {
             saveSubmissionsToStorage();
+            if (isManualUpload && supabase && importedSubs.length > 0) {
+                saveSubmissionsToSupabase(importedSubs);
+            }
             renderTable();
         }
     }
@@ -2160,7 +2325,8 @@ function processWorkbookData() {
     // 4. Actualizar estado de interfaz
     const badge = document.getElementById('excel-status-badge');
     if (badge) {
-        let text = `Catastro Excel Precargado: ${computers.length} Computadores y ${printers.length} Impresoras/Scanners disponibles.`;
+        let text = isManualUpload ? `Catastro Excel Cargado Manualmente.` : `Catastro Excel Precargado.`;
+        text += ` ${computers.length} Computadores y ${printers.length} Impresoras/Scanners disponibles.`;
         if (importedCount > 0) {
             text += ` Se importaron ${importedCount} registros ya catastrados al historial.`;
         }

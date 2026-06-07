@@ -703,6 +703,7 @@ function consolidateDuplicateSubmissions() {
     // Procesamos de más antiguo a más reciente para preservar el orden y datos actualizados
     for (let i = submissions.length - 1; i >= 0; i--) {
         const sub = submissions[i];
+        if (!sub) continue;
         const rawRut = sub.funcionario && sub.funcionario.rut;
         if (!rawRut) {
             consolidated.push(sub);
@@ -717,9 +718,11 @@ function consolidateDuplicateSubmissions() {
             
             // Fusionar equipamiento evitando duplicados
             if (sub.equipamiento) {
+                if (!existing.equipamiento) existing.equipamiento = [];
                 sub.equipamiento.forEach(eq => {
+                    if (!eq) return;
                     const isDup = existing.equipamiento.some(e => 
-                        (e.serie || '').trim().toUpperCase() === (eq.serie || '').trim().toUpperCase()
+                        e && (e.serie || '').trim().toUpperCase() === (eq.serie || '').trim().toUpperCase()
                     );
                     if (!isDup) {
                         existing.equipamiento.push(eq);
@@ -732,6 +735,7 @@ function consolidateDuplicateSubmissions() {
             
             // Fusionar categorías
             if (sub.equipamiento_categorias) {
+                if (!existing.equipamiento_categorias) existing.equipamiento_categorias = [];
                 sub.equipamiento_categorias.forEach(cat => {
                     if (!existing.equipamiento_categorias.includes(cat)) {
                         existing.equipamiento_categorias.push(cat);
@@ -743,38 +747,51 @@ function consolidateDuplicateSubmissions() {
             }
             
             // Fusionar observaciones
-            if (sub.observaciones_generales && !existing.observaciones_generales.includes(sub.observaciones_generales)) {
-                existing.observaciones_generales += (existing.observaciones_generales ? ' | ' : '') + sub.observaciones_generales;
-                if (!pendingUpserts.has(existing.id)) {
-                    updatedSubmissions.add(existing);
+            if (sub.observaciones_generales) {
+                if (existing.observaciones_generales === null || existing.observaciones_generales === undefined) {
+                    existing.observaciones_generales = '';
+                }
+                if (!existing.observaciones_generales.includes(sub.observaciones_generales)) {
+                    existing.observaciones_generales += (existing.observaciones_generales ? ' | ' : '') + sub.observaciones_generales;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
                 }
             }
-            if (sub.accesorios && !existing.accesorios.includes(sub.accesorios)) {
-                existing.accesorios += (existing.accesorios ? ' | ' : '') + sub.accesorios;
-                if (!pendingUpserts.has(existing.id)) {
-                    updatedSubmissions.add(existing);
+            if (sub.accesorios) {
+                if (existing.accesorios === null || existing.accesorios === undefined) {
+                    existing.accesorios = '';
+                }
+                if (!existing.accesorios.includes(sub.accesorios)) {
+                    existing.accesorios += (existing.accesorios ? ' | ' : '') + sub.accesorios;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
                 }
             }
             
             // Fusionar firmas
             if (sub.firmas) {
+                if (!existing.firmas) {
+                    existing.firmas = { tic_mode: 'digital', emisor_mode: 'digital', receptor_mode: 'digital', tic: null, emisor: null, receptor: null };
+                }
                 if (!existing.firmas.tic && sub.firmas.tic) {
                     existing.firmas.tic = sub.firmas.tic;
-                    existing.firmas.tic_mode = sub.firmas.tic_mode;
+                    existing.firmas.tic_mode = sub.firmas.tic_mode || 'digital';
                     if (!pendingUpserts.has(existing.id)) {
                         updatedSubmissions.add(existing);
                     }
                 }
                 if (!existing.firmas.emisor && sub.firmas.emisor) {
                     existing.firmas.emisor = sub.firmas.emisor;
-                    existing.firmas.emisor_mode = sub.firmas.emisor_mode;
+                    existing.firmas.emisor_mode = sub.firmas.emisor_mode || 'digital';
                     if (!pendingUpserts.has(existing.id)) {
                         updatedSubmissions.add(existing);
                     }
                 }
                 if (!existing.firmas.receptor && sub.firmas.receptor) {
                     existing.firmas.receptor = sub.firmas.receptor;
-                    existing.firmas.receptor_mode = sub.firmas.receptor_mode;
+                    existing.firmas.receptor_mode = sub.firmas.receptor_mode || 'digital';
                     if (!pendingUpserts.has(existing.id)) {
                         updatedSubmissions.add(existing);
                     }
@@ -782,7 +799,10 @@ function consolidateDuplicateSubmissions() {
             }
             
             // Unificar nombre conservando el más largo/completo (evitar typos como Mors vs Mora)
-            if (sub.funcionario.nombre && existing.funcionario.nombre && sub.funcionario.nombre.length > existing.funcionario.nombre.length) {
+            if (!existing.funcionario) {
+                existing.funcionario = { nombre: '', rut: '', cargo: '', depto: '' };
+            }
+            if (sub.funcionario && sub.funcionario.nombre && existing.funcionario.nombre && sub.funcionario.nombre.length > existing.funcionario.nombre.length) {
                 existing.funcionario.nombre = sub.funcionario.nombre;
                 if (!pendingUpserts.has(existing.id)) {
                     updatedSubmissions.add(existing);
@@ -795,6 +815,9 @@ function consolidateDuplicateSubmissions() {
                 hasChanges = true;
             }
         } else {
+            if (!sub.funcionario) {
+                sub.funcionario = { nombre: '', rut: '', cargo: '', depto: '' };
+            }
             sub.funcionario.rut = rutKey;
             rutMap.set(rutKey, sub);
         }
@@ -1917,17 +1940,18 @@ function renderTable() {
     tbody.innerHTML = '';
     
     const filtered = submissions.filter(s => {
+        if (!s) return false;
         // Filtro por Tipo de Solicitud (Categoría de Botón)
         if (activeFilterType !== 'All' && s.tipo_solicitud !== activeFilterType) {
             return false;
         }
 
         // Filtro por Texto de Búsqueda
-        const matchNombre = s.funcionario.nombre.toLowerCase().includes(search);
-        const matchRut = s.funcionario.rut.toLowerCase().includes(search);
-        const matchTicket = s.ticket.toLowerCase().includes(search);
-        const matchTipo = s.tipo_solicitud.toLowerCase().includes(search);
-        const matchSerie = s.equipamiento.some(e => e.serie.toLowerCase().includes(search));
+        const matchNombre = (s.funcionario && s.funcionario.nombre) ? s.funcionario.nombre.toLowerCase().includes(search) : false;
+        const matchRut = (s.funcionario && s.funcionario.rut) ? s.funcionario.rut.toLowerCase().includes(search) : false;
+        const matchTicket = s.ticket ? s.ticket.toLowerCase().includes(search) : false;
+        const matchTipo = s.tipo_solicitud ? s.tipo_solicitud.toLowerCase().includes(search) : false;
+        const matchSerie = s.equipamiento ? s.equipamiento.some(e => e && e.serie && e.serie.toLowerCase().includes(search)) : false;
         return matchNombre || matchRut || matchTicket || matchTipo || matchSerie;
     });
 
@@ -1950,7 +1974,7 @@ function renderTable() {
             }
 
             // Formatear resumen de equipos para la columna
-            const eqSummary = s.equipamiento.map(e => `${escapeHTML(e.tipo)} (${escapeHTML(e.marca)} ${escapeHTML(e.modelo)})`).join(', ');
+            const eqSummary = s.equipamiento ? s.equipamiento.map(e => e ? `${escapeHTML(e.tipo || '')} (${escapeHTML(e.marca || '')} ${escapeHTML(e.modelo || '')})` : '').join(', ') : '';
 
             const deleteBtnHtml = currentUserRole === 'admin' ? `
                 <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-755 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
@@ -1958,15 +1982,18 @@ function renderTable() {
                 </button>
             ` : '';
 
+            const funcNombre = s.funcionario ? s.funcionario.nombre : '';
+            const funcRut = s.funcionario ? s.funcionario.rut : '';
+
             tr.innerHTML = `
                 <td class="py-4 px-6 font-medium text-slate-900 dark:text-slate-100">${escapeHTML(s.fecha)}</td>
                 <td class="py-4 px-6 font-mono text-xs text-indigo-650 dark:text-indigo-400 font-semibold">${escapeHTML(s.ticket)}</td>
                 <td class="py-4 px-6">
-                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(s.funcionario.nombre)}</div>
-                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(s.funcionario.rut)}</div>
+                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(funcNombre)}</div>
+                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(funcRut)}</div>
                 </td>
                 <td class="py-4 px-6">${badgesSolicitud}</td>
-                <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-450" title="${eqSummary}">${eqSummary}</td>
+                <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-455" title="${eqSummary}">${eqSummary}</td>
                 <td class="py-4 px-6 text-center">
                     <div class="flex items-center justify-center gap-2">
                         <button onclick="viewAndEditForm('${s.id}')" class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors" title="Ver / Editar">

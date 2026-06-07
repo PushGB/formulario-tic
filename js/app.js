@@ -1184,6 +1184,8 @@ function autoDetectTypeFromFields(inputEl) {
         detectedType = 'Notebook';
     } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
         detectedType = 'Monitor';
+    } else if (modeloVal.includes('p24v') || modeloVal.includes('p22v') || modeloVal.includes('p27v') || modeloVal.includes('monitor') || modeloVal.includes('pantalla')) {
+        detectedType = 'Monitor';
     }
     
     if (detectedType) {
@@ -1198,13 +1200,30 @@ function addEquipmentRow(data = {}) {
     const container = document.getElementById('equipment-rows');
     const rowId = 'row_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
     
+    // Auto-detectar/normalizar tipo antes de rellenar la fila si viene genérico o vacío
+    let tipoVal = String(data.tipo || '').trim();
+    const modeloVal = String(data.modelo || '').trim().toLowerCase();
+    const serieVal = String(data.serie || '').trim().toLowerCase();
+    
+    if (!tipoVal || tipoVal.toLowerCase() === 'equipo') {
+        if (modeloVal.includes('probook') || tipoVal.toLowerCase().includes('probook')) {
+            tipoVal = 'Notebook';
+        } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
+            tipoVal = 'Notebook';
+        } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
+            tipoVal = 'Monitor';
+        } else if (modeloVal.includes('p24v') || modeloVal.includes('p22v') || modeloVal.includes('p27v') || modeloVal.includes('monitor') || modeloVal.includes('pantalla')) {
+            tipoVal = 'Monitor';
+        }
+    }
+
     const tr = document.createElement('tr');
     tr.id = rowId;
     tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850";
     
     tr.innerHTML = `
         <td class="p-2">
-            <input type="text" name="eq_tipo" value="${escapeHTML(data.tipo || '')}" placeholder="Ej: Notebook" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_tipo" value="${escapeHTML(tipoVal)}" placeholder="Ej: Notebook" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
             <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
@@ -3102,6 +3121,8 @@ function splitEquipmentIfCombined(rawEq) {
         } else if (itemSerieLower.startsWith('5cd') || itemSerieLower.includes('5cd')) {
             item.tipo = 'Notebook';
         } else if (itemSerieLower.startsWith('cnc') || itemSerieLower.includes('cnc')) {
+            item.tipo = 'Monitor';
+        } else if (itemModelLower.includes('p24v') || itemModelLower.includes('p22v') || itemModelLower.includes('p27v') || itemModelLower.includes('monitor') || itemModelLower.includes('pantalla')) {
             item.tipo = 'Monitor';
         } else if (itemTipoLower === 'aio' || itemTipoLower === 'all in one' || itemTipoLower === 'all-in-one') {
             item.tipo = 'All In One';

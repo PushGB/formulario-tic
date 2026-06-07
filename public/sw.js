@@ -1,9 +1,10 @@
-const CACHE_NAME = 'tic-form-cache-v12';
+const CACHE_NAME = 'tic-form-cache-v13';
 const ASSETS = [
   '/',
   '/index.html',
   '/css/styles.css',
-  '/js/app.js',
+  '/js/index.js',
+  '/js/vendor.js',
   '/js/xlsx.full.min.js',
   '/js/tailwind.min.js',
   '/js/lucide.min.js',

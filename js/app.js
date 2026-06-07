@@ -1181,10 +1181,33 @@ function saveForm(event) {
     const tipo_solicitud = document.querySelector('input[name="solicitud_tipo"]:checked').value;
     const propiedad_tipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
     
+    // Normalizar campos de la Sección 1 y Traspaso antes de validar
+    const nombreField = document.getElementById('func-nombre');
+    const cargoField = document.getElementById('func-cargo');
+    const deptoField = document.getElementById('func-depto');
+    
+    if (nombreField) nombreField.value = normalizeName(nombreField.value);
+    if (cargoField) cargoField.value = normalizeName(cargoField.value);
+    if (deptoField) deptoField.value = normalizeName(deptoField.value);
+
+    if (tipo_solicitud === 'Traspaso') {
+        const emisorNombreField = document.getElementById('traspaso-emisor-nombre');
+        const emisorDeptoField = document.getElementById('traspaso-emisor-depto');
+        const receptorNombreField = document.getElementById('traspaso-receptor-nombre');
+        const receptorDeptoField = document.getElementById('traspaso-receptor-depto');
+        const traspasoObsField = document.getElementById('traspaso-observacion');
+
+        if (emisorNombreField) emisorNombreField.value = normalizeName(emisorNombreField.value);
+        if (emisorDeptoField) emisorDeptoField.value = normalizeName(emisorDeptoField.value);
+        if (receptorNombreField) receptorNombreField.value = normalizeName(receptorNombreField.value);
+        if (receptorDeptoField) receptorDeptoField.value = normalizeName(receptorDeptoField.value);
+        if (traspasoObsField) traspasoObsField.value = traspasoObsField.value.trim();
+    }
+
     // Validar campos obligatorios de la Sección 1
-    const nombreVal = validateField(document.getElementById('func-nombre'), 3);
-    const cargoVal = validateField(document.getElementById('func-cargo'), 2);
-    const deptoVal = validateField(document.getElementById('func-depto'), 3);
+    const nombreVal = validateField(nombreField, 3);
+    const cargoVal = validateField(cargoField, 2);
+    const deptoVal = validateField(deptoField, 3);
     
     if (!nombreVal || !cargoVal || !deptoVal) {
         showToast("Por favor, complete correctamente los datos del Funcionario.", "error");
@@ -1203,6 +1226,7 @@ function saveForm(event) {
         return;
     }
     const rut = formatRut(rutInput);
+    document.getElementById('func-rut').value = rut;
 
     // Validar que se haya marcado al menos una categoría o llenado "Otros"
     const eqCategorias = Array.from(document.querySelectorAll('input[name="eq_cat"]:checked')).map(cb => cb.value);
@@ -1212,19 +1236,36 @@ function saveForm(event) {
         return;
     }
 
-    // Obtener registros de la tabla dinámica
+    // Obtener registros de la tabla dinámica y normalizar inline
     const eqRows = document.getElementById('equipment-rows').children;
     const equipamiento = [];
     for (let tr of eqRows) {
-        const tipo = tr.querySelector('[name="eq_tipo"]').value.trim();
-        const marca = tr.querySelector('[name="eq_marca"]').value.trim();
-        const modelo = tr.querySelector('[name="eq_modelo"]').value.trim();
-        const serie = tr.querySelector('[name="eq_serie"]').value.trim();
-        const inventario = tr.querySelector('[name="eq_inventario"]').value.trim();
-        const observacion = tr.querySelector('[name="eq_obs"]').value.trim();
+        const tipoField = tr.querySelector('[name="eq_tipo"]');
+        const marcaField = tr.querySelector('[name="eq_marca"]');
+        const modeloField = tr.querySelector('[name="eq_modelo"]');
+        const serieField = tr.querySelector('[name="eq_serie"]');
+        const inventarioField = tr.querySelector('[name="eq_inventario"]');
+        const obsField = tr.querySelector('[name="eq_obs"]');
         
-        if (tipo && marca && modelo && serie) {
-            equipamiento.push({ tipo, marca, modelo, serie, inventario, observacion });
+        if (tipoField && marcaField && modeloField && serieField) {
+            tipoField.value = normalizeName(tipoField.value);
+            const rawM = marcaField.value.trim();
+            marcaField.value = rawM.length <= 3 ? rawM.toUpperCase() : normalizeName(rawM);
+            modeloField.value = modeloField.value.trim().toUpperCase();
+            serieField.value = serieField.value.trim().toUpperCase();
+            if (inventarioField) inventarioField.value = inventarioField.value.trim().toUpperCase();
+            if (obsField) obsField.value = obsField.value.trim();
+
+            const tipo = tipoField.value;
+            const marca = marcaField.value;
+            const modelo = modeloField.value;
+            const serie = serieField.value;
+            const inventario = inventarioField ? inventarioField.value : '';
+            const observacion = obsField ? obsField.value : '';
+            
+            if (tipo && marca && modelo && serie) {
+                equipamiento.push({ tipo, marca, modelo, serie, inventario, observacion });
+            }
         }
     }
 
@@ -1840,7 +1881,7 @@ function normalizeKey(key) {
               .replace(/[^a-z0-9]/g, '');                      // mantener solo caracteres alfanuméricos
 }
 
-// Convertir fila genérica a un formato estructurado y limpio
+// Convertir fila genérica a un formato estructurado y limpio con normalización automática de datos
 function cleanRowData(row, sourceSheet) {
     const cleaned = {
         n: '',
@@ -1862,16 +1903,16 @@ function cleanRowData(row, sourceSheet) {
         const norm = normalizeKey(key);
         const val = String(row[key] || '').trim();
         if (norm === 'n') cleaned.n = val;
-        else if (norm === 'ninventarioisp') cleaned.inventario = val;
-        else if (norm === 'nserie') cleaned.serie = val;
-        else if (norm === 'tipopcnotebookaio' || norm === 'tipoimpresorascannermfp') cleaned.tipo = val;
-        else if (norm === 'marca') cleaned.marca = val;
-        else if (norm === 'modelo') cleaned.modelo = val;
-        else if (norm === 'propiedadarriendoisp') cleaned.propiedad = val;
-        else if (norm === 'funcionarioa') cleaned.funcionario = val;
-        else if (norm === 'mail') cleaned.mail = val;
-        else if (norm === 'unidaddepto') cleaned.depto = val;
-        else if (norm === 'estado') cleaned.estado = val;
+        else if (norm === 'ninventarioisp') cleaned.inventario = val.toUpperCase();
+        else if (norm === 'nserie') cleaned.serie = val.toUpperCase();
+        else if (norm === 'tipopcnotebookaio' || norm === 'tipoimpresorascannermfp') cleaned.tipo = normalizeName(val);
+        else if (norm === 'marca') cleaned.marca = val.length <= 3 ? val.toUpperCase() : normalizeName(val);
+        else if (norm === 'modelo') cleaned.modelo = val.toUpperCase();
+        else if (norm === 'propiedadarriendoisp') cleaned.propiedad = normalizeName(val);
+        else if (norm === 'funcionarioa') cleaned.funcionario = normalizeName(val);
+        else if (norm === 'mail') cleaned.mail = val.toLowerCase();
+        else if (norm === 'unidaddepto') cleaned.depto = normalizeName(val);
+        else if (norm === 'estado') cleaned.estado = normalizeName(val);
         else if (norm === 'observaciones') cleaned.observaciones = val;
     }
     cleaned.sheet = sourceSheet;
@@ -3034,6 +3075,236 @@ function renderMetrics() {
     detectDuplicatesAndInconsistencies();
 }
 
+// Capitalizar correctamente nombres propios y departamentos
+function normalizeName(str) {
+    if (!str) return '';
+    return str.trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .map(word => {
+            if (word.length === 0) return '';
+            // No capitalizar conectores pequeños en español a menos que sea la primera palabra
+            const lowerWord = word.toLowerCase();
+            const connectors = ['de', 'del', 'la', 'las', 'el', 'los', 'y', 'en'];
+            if (connectors.includes(lowerWord)) {
+                return lowerWord;
+            }
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' ')
+        // Asegurar que la primera letra del string completo esté en mayúscula
+        .replace(/^\w/, c => c.toUpperCase());
+}
+
+// Unificar nombres en caliente tanto localmente como en Supabase
+async function consolidateFuncionarioNames(rut, targetName) {
+    try {
+        const normalizedTargetName = normalizeName(targetName);
+        showToast(`Unificando nombre a "${normalizedTargetName}"...`, "info");
+        const rutKey = formatRut(rut);
+        
+        // 1. Actualizar localmente en submissions
+        let subToUpdate = null;
+        submissions.forEach(sub => {
+            if (sub.funcionario && formatRut(sub.funcionario.rut) === rutKey) {
+                sub.funcionario.nombre = normalizedTargetName;
+                subToUpdate = sub;
+            }
+        });
+        
+        // 2. Recrear mapa temporal de RUT a Nombres de submissions para vincular catastro
+        const tempNameToRutMap = new Map();
+        submissions.forEach(sub => {
+            if (sub.funcionario && sub.funcionario.nombre && sub.funcionario.rut) {
+                tempNameToRutMap.set(sub.funcionario.nombre.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""), formatRut(sub.funcionario.rut));
+            }
+        });
+        
+        // 3. Actualizar localmente en loadedAllEquipments (Catastro)
+        let catRowsToUpdate = [];
+        loadedAllEquipments.forEach(eq => {
+            if (eq.funcionario) {
+                const normExcelName = eq.funcionario.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const mappedRut = tempNameToRutMap.get(normExcelName);
+                if (mappedRut === rutKey || eq.funcionario.trim() === normalizedTargetName) {
+                    eq.funcionario = normalizedTargetName;
+                    catRowsToUpdate.push(eq);
+                }
+            }
+        });
+        
+        // 4. Guardar localmente
+        saveSubmissionsToStorage();
+        
+        // 5. Sincronizar en Supabase
+        if (supabase) {
+            // A. Actualizar solicitudes_tic
+            if (subToUpdate) {
+                const storageFirmas = await uploadSignaturesToStorage(subToUpdate.id, subToUpdate.firmas);
+                const dbRow = {
+                    id: subToUpdate.id,
+                    fecha: subToUpdate.fecha,
+                    ticket: subToUpdate.ticket,
+                    funcionario_nombre: subToUpdate.funcionario.nombre,
+                    funcionario_rut: subToUpdate.funcionario.rut,
+                    funcionario_cargo: subToUpdate.funcionario.cargo,
+                    funcionario_depto: subToUpdate.funcionario.depto,
+                    tipo_solicitud: subToUpdate.tipo_solicitud,
+                    propiedad_equipamiento: subToUpdate.propiedad_equipamiento,
+                    equipamiento_categorias: subToUpdate.equipamiento_categorias,
+                    otros_detalles: subToUpdate.otros_detalles,
+                    traspaso_emisor_nombre: subToUpdate.traspaso ? subToUpdate.traspaso.emisor_nombre : null,
+                    traspaso_emisor_depto: subToUpdate.traspaso ? subToUpdate.traspaso.emisor_depto : null,
+                    traspaso_receptor_nombre: subToUpdate.traspaso ? subToUpdate.traspaso.receptor_nombre : null,
+                    traspaso_receptor_depto: subToUpdate.traspaso ? subToUpdate.traspaso.receptor_depto : null,
+                    traspaso_observacion: subToUpdate.traspaso ? subToUpdate.traspaso.observacion : null,
+                    equipamiento: subToUpdate.equipamiento,
+                    accesorios: subToUpdate.accesorios,
+                    observaciones_generales: subToUpdate.observaciones_generales,
+                    firmas_tic_mode: subToUpdate.firmas.tic_mode,
+                    firmas_emisor_mode: subToUpdate.firmas.emisor_mode,
+                    firmas_receptor_mode: subToUpdate.firmas.receptor_mode,
+                    firma_tic: storageFirmas.tic,
+                    firma_emisor: storageFirmas.emisor,
+                    firma_receptor: storageFirmas.receptor
+                };
+                const { error: subError } = await supabase.from('solicitudes_tic').upsert(dbRow);
+                if (subError) throw subError;
+            }
+            
+            // B. Actualizar catastro_equipos
+            if (catRowsToUpdate.length > 0) {
+                const batch = catRowsToUpdate.map(e => ({
+                    n: e.n || '',
+                    inventario: e.inventario || '',
+                    serie: String(e.serie || '').trim(),
+                    tipo: e.tipo || '',
+                    marca: e.marca || '',
+                    modelo: e.modelo || '',
+                    propiedad: e.propiedad || '',
+                    funcionario: e.funcionario || '',
+                    mail: e.mail || '',
+                    depto: e.depto || '',
+                    estado: e.estado || 'Disponible',
+                    observaciones: e.observaciones || '',
+                    sheet: e.sheet || 'Computadores'
+                }));
+                const { error: catError } = await supabase.from('catastro_equipos').upsert(batch, { onConflict: 'serie' });
+                if (catError) throw catError;
+            }
+        }
+        
+        showToast("Nombre unificado exitosamente.", "success");
+        renderTable();
+        updateStats();
+        detectDuplicatesAndInconsistencies();
+    } catch (err) {
+        console.error("Error al unificar nombres:", err);
+        showToast("Error al unificar nombres: " + err.message, "error");
+    }
+}
+
+// Resolver duplicados de series de equipos
+async function resolveEquipmentDuplicate(serial, correctSubId) {
+    try {
+        showToast(`Resolviendo duplicado de serie ${serial}...`, "info");
+        
+        const correctSub = submissions.find(s => s.id === correctSubId);
+        if (!correctSub) throw new Error("No se encontró la solicitud de origen.");
+        
+        const targetName = correctSub.funcionario.nombre;
+        const targetDepto = correctSub.funcionario.depto;
+        
+        // A. Remover de las demás solicitudes
+        const subsToUpdate = [];
+        submissions.forEach(sub => {
+            if (sub.id !== correctSubId && sub.equipamiento) {
+                const initialLen = sub.equipamiento.length;
+                sub.equipamiento = sub.equipamiento.filter(eq => (eq.serie || '').trim().toUpperCase() !== serial.toUpperCase());
+                if (sub.equipamiento.length !== initialLen) {
+                    subsToUpdate.push(sub);
+                }
+            }
+        });
+        
+        // B. Actualizar catastro
+        let catRowToUpdate = null;
+        loadedAllEquipments.forEach(eq => {
+            if ((eq.serie || '').trim().toUpperCase() === serial.toUpperCase()) {
+                eq.funcionario = targetName;
+                eq.depto = targetDepto;
+                eq.estado = 'Entregado';
+                catRowToUpdate = eq;
+            }
+        });
+        
+        saveSubmissionsToStorage();
+        
+        if (supabase) {
+            for (const sub of subsToUpdate) {
+                const storageFirmas = await uploadSignaturesToStorage(sub.id, sub.firmas);
+                const dbRow = {
+                    id: sub.id,
+                    fecha: sub.fecha,
+                    ticket: sub.ticket,
+                    funcionario_nombre: sub.funcionario.nombre,
+                    funcionario_rut: sub.funcionario.rut,
+                    funcionario_cargo: sub.funcionario.cargo,
+                    funcionario_depto: sub.funcionario.depto,
+                    tipo_solicitud: sub.tipo_solicitud,
+                    propiedad_equipamiento: sub.propiedad_equipamiento,
+                    equipamiento_categorias: sub.equipamiento_categorias,
+                    otros_detalles: sub.otros_detalles,
+                    traspaso_emisor_nombre: sub.traspaso ? sub.traspaso.emisor_nombre : null,
+                    traspaso_emisor_depto: sub.traspaso ? sub.traspaso.emisor_depto : null,
+                    traspaso_receptor_nombre: sub.traspaso ? sub.traspaso.receptor_nombre : null,
+                    traspaso_receptor_depto: sub.traspaso ? sub.traspaso.receptor_depto : null,
+                    traspaso_observacion: sub.traspaso ? sub.traspaso.observacion : null,
+                    equipamiento: sub.equipamiento,
+                    accesorios: sub.accesorios,
+                    observaciones_generales: sub.observaciones_generales,
+                    firmas_tic_mode: sub.firmas.tic_mode,
+                    firmas_emisor_mode: sub.firmas.emisor_mode,
+                    firmas_receptor_mode: sub.firmas.receptor_mode,
+                    firma_tic: storageFirmas.tic,
+                    firma_emisor: storageFirmas.emisor,
+                    firma_receptor: storageFirmas.receptor
+                };
+                const { error: subError } = await supabase.from('solicitudes_tic').upsert(dbRow);
+                if (subError) throw subError;
+            }
+            
+            if (catRowToUpdate) {
+                const dbRowCat = {
+                    n: catRowToUpdate.n || '',
+                    inventario: catRowToUpdate.inventario || '',
+                    serie: String(catRowToUpdate.serie || '').trim(),
+                    tipo: catRowToUpdate.tipo || '',
+                    marca: catRowToUpdate.marca || '',
+                    modelo: catRowToUpdate.modelo || '',
+                    propiedad: catRowToUpdate.propiedad || '',
+                    funcionario: catRowToUpdate.funcionario || '',
+                    mail: catRowToUpdate.mail || '',
+                    depto: catRowToUpdate.depto || '',
+                    estado: catRowToUpdate.estado || 'Disponible',
+                    observaciones: catRowToUpdate.observaciones || '',
+                    sheet: catRowToUpdate.sheet || 'Computadores'
+                };
+                const { error: catError } = await supabase.from('catastro_equipos').upsert(dbRowCat, { onConflict: 'serie' });
+                if (catError) throw catError;
+            }
+        }
+        
+        showToast("Conflicto de serie resuelto exitosamente.", "success");
+        renderTable();
+        updateStats();
+        detectDuplicatesAndInconsistencies();
+    } catch (err) {
+        console.error("Error al resolver duplicado de serie:", err);
+        showToast("Error al resolver duplicado: " + err.message, "error");
+    }
+}
+
 // Algoritmo de distancia de Levenshtein para medir similitud de nombres
 function levenshteinDistance(s1, s2) {
     s1 = (s1 || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -3111,7 +3382,6 @@ function detectDuplicatesAndInconsistencies() {
         }
     });
     
-    // A. Detectar discrepancias de nombre para el mismo RUT (Excel vs Formularios)
     rutToNames.forEach((data, rut) => {
         const subsNames = Array.from(data.namesInSubmissions);
         const excelNames = Array.from(data.namesInExcel);
@@ -3129,6 +3399,9 @@ function detectDuplicatesAndInconsistencies() {
                     type: 'discrepancy',
                     title: `Discrepancia de Nombre (RUT ${escapeHTML(rut)})`,
                     desc: `En Formularios: <strong>"${escapeHTML(subName)}"</strong> <br>En Excel Catastro: <strong>"${escapeHTML(excelName)}"</strong>`,
+                    rut: rut,
+                    subName: subName,
+                    excelName: excelName,
                     severity: 'amber'
                 });
             }
@@ -3146,7 +3419,8 @@ function detectDuplicatesAndInconsistencies() {
                 seenRuts.add(normalizedRut);
                 uniqueFuncs.push({
                     nombre: sub.funcionario.nombre.trim(),
-                    rut: normalizedRut
+                    rut: normalizedRut,
+                    subId: sub.id
                 });
             }
         }
@@ -3163,6 +3437,10 @@ function detectDuplicatesAndInconsistencies() {
                     type: 'similar_names',
                     title: `Nombres similares con RUTs diferentes`,
                     desc: `• <strong>"${escapeHTML(f1.nombre)}"</strong> con RUT: ${escapeHTML(f1.rut)}<br>• <strong>"${escapeHTML(f2.nombre)}"</strong> con RUT: ${escapeHTML(f2.rut)}`,
+                    subId1: f1.subId,
+                    subId2: f2.subId,
+                    name1: f1.nombre,
+                    name2: f2.nombre,
                     severity: 'rose'
                 });
             }
@@ -3170,7 +3448,7 @@ function detectDuplicatesAndInconsistencies() {
     }
     
     // --- 2. CONFLICTOS DE EQUIPAMIENTO ---
-    const serieToAssignments = new Map(); // serie -> Array de { source, ownerName, detail }
+    const serieToAssignments = new Map(); // serie -> Array de { source, ownerName, subId, detail }
     
     // Equipamiento en formularios activos
     submissions.forEach(sub => {
@@ -3185,6 +3463,7 @@ function detectDuplicatesAndInconsistencies() {
                 serieToAssignments.get(sKey).push({
                     source: 'Formulario',
                     ownerName: sub.funcionario.nombre,
+                    subId: sub.id,
                     detail: `Ticket: ${sub.ticket || 'S/N'} (${sub.tipo_solicitud})`
                 });
             });
@@ -3203,6 +3482,7 @@ function detectDuplicatesAndInconsistencies() {
             serieToAssignments.get(sKey).push({
                 source: 'Excel',
                 ownerName: eq.funcionario,
+                subId: null,
                 detail: `Inventario Excel (${eq.tipo || 'Equipo'})`
             });
         }
@@ -3214,7 +3494,7 @@ function detectDuplicatesAndInconsistencies() {
         assigns.forEach(a => {
             const normName = a.ownerName.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             if (!uniqueOwners.some(o => o.normName === normName)) {
-                uniqueOwners.push({ normName, name: a.ownerName, detail: a.detail, source: a.source });
+                uniqueOwners.push({ normName, name: a.ownerName, detail: a.detail, source: a.source, subId: a.subId });
             }
         });
         
@@ -3228,6 +3508,8 @@ function detectDuplicatesAndInconsistencies() {
                     type: 'duplicate_form',
                     title: `Serie duplicada en múltiples Formularios`,
                     desc: `N° Serie: <strong>${escapeHTML(serie)}</strong> asignada a:<br>${descDetails}`,
+                    serie: serie,
+                    owners: uniqueOwners.filter(o => o.source === 'Formulario'),
                     severity: 'rose'
                 });
             } else {
@@ -3237,6 +3519,8 @@ function detectDuplicatesAndInconsistencies() {
                     type: 'excel_discrepancy',
                     title: `Discrepancia Catastro vs Formularios`,
                     desc: `N° Serie: <strong>${escapeHTML(serie)}</strong> asignada a:<br>${descDetails}`,
+                    serie: serie,
+                    owners: uniqueOwners.filter(o => o.source === 'Formulario'),
                     severity: 'amber'
                 });
             }
@@ -3257,13 +3541,41 @@ function detectDuplicatesAndInconsistencies() {
             const bgClass = alert.severity === 'rose' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-350' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-350';
             const icon = alert.severity === 'rose' ? 'alert-octagon' : 'alert-circle';
             
-            div.className = `p-3 rounded-2xl border text-xs leading-relaxed ${bgClass}`;
+            let actionHtml = '';
+            if (alert.type === 'discrepancy') {
+                actionHtml = `
+                    <div class="mt-3 flex gap-2 flex-wrap">
+                        <button onclick="consolidateFuncionarioNames('${escapeHTML(alert.rut)}', '${escapeHTML(alert.subName)}')" class="px-3 py-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-700 text-white font-bold text-[11px] transition-all shadow-md shadow-indigo-600/10 flex items-center gap-1.5 cursor-pointer">
+                            <i data-lucide="user-check" class="w-3.5 h-3.5"></i> Usar Formulario
+                        </button>
+                        <button onclick="consolidateFuncionarioNames('${escapeHTML(alert.rut)}', '${escapeHTML(alert.excelName)}')" class="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold text-[11px] transition-all flex items-center gap-1.5 cursor-pointer">
+                            <i data-lucide="sheet" class="w-3.5 h-3.5"></i> Usar Catastro
+                        </button>
+                    </div>
+                `;
+            } else if (alert.type === 'similar_names') {
+                actionHtml = `
+                    <div class="mt-3 flex gap-2 flex-wrap">
+                        <button onclick="viewAndEditForm('${escapeHTML(alert.subId1)}'); switchTab('form-view');" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition-all shadow-md shadow-rose-650/10 flex items-center gap-1.5 cursor-pointer">
+                            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Editar "${escapeHTML(alert.name1)}"
+                        </button>
+                        <button onclick="viewAndEditForm('${escapeHTML(alert.subId2)}'); switchTab('form-view');" class="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold text-[11px] transition-all flex items-center gap-1.5 cursor-pointer">
+                            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Editar "${escapeHTML(alert.name2)}"
+                        </button>
+                    </div>
+                `;
+            }
+            
+            div.className = `p-4 rounded-2xl border text-xs leading-relaxed ${bgClass} flex flex-col justify-between`;
             div.innerHTML = `
-                <div class="font-bold flex items-center gap-1.5 mb-1 text-[13px]">
-                    <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
-                    ${alert.title}
+                <div>
+                    <div class="font-bold flex items-center gap-1.5 mb-1.5 text-[13px]">
+                        <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
+                        ${alert.title}
+                    </div>
+                    <div class="text-[11px] opacity-90">${alert.desc}</div>
                 </div>
-                <div>${alert.desc}</div>
+                ${actionHtml}
             `;
             duplicateUsersContainer.appendChild(div);
         });
@@ -3283,13 +3595,39 @@ function detectDuplicatesAndInconsistencies() {
             const bgClass = alert.severity === 'rose' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-350' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-350';
             const icon = alert.severity === 'rose' ? 'alert-octagon' : 'alert-circle';
             
-            div.className = `p-3 rounded-2xl border text-xs leading-relaxed ${bgClass}`;
+            let actionHtml = '';
+            if (alert.type === 'duplicate_form' && alert.owners && alert.owners.length > 0) {
+                actionHtml = `
+                    <div class="mt-3 flex gap-2 flex-wrap">
+                        ${alert.owners.map(owner => `
+                            <button onclick="resolveEquipmentDuplicate('${escapeHTML(alert.serie)}', '${escapeHTML(owner.subId)}')" class="px-3 py-1.5 rounded-xl bg-indigo-655 hover:bg-indigo-700 text-white font-bold text-[11px] transition-all shadow-md shadow-indigo-600/10 flex items-center gap-1.5 cursor-pointer">
+                                <i data-lucide="check" class="w-3.5 h-3.5"></i> Mantener para "${escapeHTML(owner.name)}"
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (alert.type === 'excel_discrepancy' && alert.owners && alert.owners.length > 0) {
+                actionHtml = `
+                    <div class="mt-3 flex gap-2 flex-wrap">
+                        ${alert.owners.map(owner => `
+                            <button onclick="resolveEquipmentDuplicate('${escapeHTML(alert.serie)}', '${escapeHTML(owner.subId)}')" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition-all shadow-md shadow-amber-600/10 flex items-center gap-1.5 cursor-pointer">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Asignar Catastro a "${escapeHTML(owner.name)}"
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            div.className = `p-4 rounded-2xl border text-xs leading-relaxed ${bgClass} flex flex-col justify-between`;
             div.innerHTML = `
-                <div class="font-bold flex items-center gap-1.5 mb-1 text-[13px]">
-                    <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
-                    ${alert.title}
+                <div>
+                    <div class="font-bold flex items-center gap-1.5 mb-1.5 text-[13px]">
+                        <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
+                        ${alert.title}
+                    </div>
+                    <div class="text-[11px] opacity-90">${alert.desc}</div>
                 </div>
-                <div>${alert.desc}</div>
+                ${actionHtml}
             `;
             duplicateEquipContainer.appendChild(div);
         });
@@ -3829,3 +4167,7 @@ window.showHistorySuggestions = showHistorySuggestions;
 window.selectHistoryEquipment = selectHistoryEquipment;
 window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
+
+window.normalizeName = normalizeName;
+window.consolidateFuncionarioNames = consolidateFuncionarioNames;
+window.resolveEquipmentDuplicate = resolveEquipmentDuplicate;

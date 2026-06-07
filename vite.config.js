@@ -6,6 +6,17 @@ export default defineConfig({
     host: true
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    chunkSizeWarningLimit: 1500, // Aumentar el límite para librerías grandes como Chart.js y XLSX
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Dividir las dependencias externas de node_modules en un chunk separado
+            return 'vendor';
+          }
+        }
+      }
+    }
   }
 });

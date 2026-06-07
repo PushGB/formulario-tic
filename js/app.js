@@ -2547,7 +2547,7 @@ function processWorkbookData(isManualUpload = false) {
             if (!grouped[key]) {
                 grouped[key] = {
                     nombre: String(nombre).trim(),
-                    rut: (rutKey && rutKey !== '-') ? rutKey : '',
+                    rut: (rutKey && rutKey !== '-') ? rutKey : '1-9',
                     cargo: String(item['Cargo'] || '').trim(),
                     depto: String(item['Departamento'] || '').trim(),
                     propiedad: item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo',

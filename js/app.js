@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import Chart from 'chart.js/auto';
 
+console.log("=== SOPORTE TIC APP v4.1 LOADED ===");
+
 // Inicializar Supabase Client (Producción con variables de entorno)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;

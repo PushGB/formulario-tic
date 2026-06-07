@@ -547,7 +547,7 @@ async function mapDbRowsToSubmissions(data) {
             ticket: dbRow.ticket,
             funcionario: {
                 nombre: dbRow.funcionario_nombre,
-                rut: formatRut(dbRow.funcionario_rut),
+                rut: formatRut(dbRow.funcionario_rut || '1-9'),
                 cargo: dbRow.funcionario_cargo,
                 depto: dbRow.funcionario_depto
             },
@@ -1062,7 +1062,9 @@ function openNewForm() {
 
 // Formatear RUT Chileno
 function formatRut(rut) {
-    let valor = rut.replace(/[^0-9kK]/g, '');
+    if (rut === null || rut === undefined) return '';
+    const strRut = String(rut).trim();
+    let valor = strRut.replace(/[^0-9kK]/g, '');
     if (valor.length <= 1) return valor;
     let cuerpo = valor.slice(0, -1);
     let dv = valor.slice(-1).toUpperCase();
@@ -1079,7 +1081,8 @@ function formatRut(rut) {
 // Algoritmo de validación del RUT (Módulo 11)
 function validateRut(rut) {
     if (!rut) return false;
-    const clean = rut.replace(/\./g, '').replace(/-/g, '').trim().toUpperCase();
+    const strRut = String(rut);
+    const clean = strRut.replace(/\./g, '').replace(/-/g, '').trim().toUpperCase();
     if (clean.length < 2) return false;
     
     const body = clean.slice(0, -1);

@@ -112,30 +112,30 @@
                             </div>
                             <div>
                                 <span class="font-bold text-sm tracking-wide text-slate-800 dark:text-slate-100 block font-title">Soporte TIC</span>
-                                <span class="text-[10px] text-indigo-500 dark:text-indigo-400 block font-mono">RG-02-IT-140.03-004 V5</span>
+                                <span class="text-[10px] text-indigo-500 dark:text-indigo-400 hidden sm:block font-mono">RG-02-IT-140.03-004 V5</span>
                             </div>
                         </div>
                         <div class="flex items-center space-x-4">
                             <div class="flex space-x-1 p-1 bg-slate-100/80 dark:bg-slate-900/80 rounded-xl">
-                                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm">
-                                    <span class="flex items-center gap-1.5"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Panel</span>
+                                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Panel</span></span>
                                 </button>
-                                <button onclick="switchTab('metrics')" id="nav-metrics" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
-                                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Métricas</span>
+                                <button onclick="switchTab('metrics')" id="nav-metrics" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Métricas</span></span>
                                 </button>
-                                <button onclick="switchTab('history')" id="nav-history" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
-                                    <span class="flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i> Historial</span>
+                                <button onclick="switchTab('history')" id="nav-history" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Historial</span></span>
                                 </button>
-                                <button onclick="switchTab('users')" id="nav-users" class="hidden px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
-                                    <span class="flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5"></i> Accesos</span>
+                                <button onclick="switchTab('users')" id="nav-users" class="hidden px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Accesos</span></span>
                                 </button>
-                                <button onclick="openNewForm()" id="nav-form" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
-                                    <span class="flex items-center gap-1.5"><i data-lucide="file-plus" class="w-3.5 h-3.5"></i> Nueva Solicitud</span>
+                                <button onclick="openNewForm()" id="nav-form" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="file-plus" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Nueva Solicitud</span></span>
                                 </button>
                             </div>
                             <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
-                            <button id="auth-logout-btn" onclick="handleLogout()" class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-all border border-rose-500/20 flex items-center gap-1.5" title="Cerrar Sesión">
-                                <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
+                            <button id="auth-logout-btn" onclick="handleLogout()" class="hidden px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-all border border-rose-500/20 flex items-center gap-1.5" title="Cerrar Sesión">
+                                <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Salir</span>
                             </button>
                             <div id="auth-divider" class="hidden h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
                             <button onclick="toggleTheme()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors" title="Cambiar Tema">

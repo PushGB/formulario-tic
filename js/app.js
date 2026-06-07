@@ -972,8 +972,8 @@ function switchTab(tabId) {
     const btnHistory = document.getElementById('nav-history');
     const btnUsers = document.getElementById('nav-users');
     
-    const inactiveClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-850/50";
-    const activeClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-650 text-white shadow-sm shadow-indigo-600/30";
+    const inactiveClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-850/50";
+    const activeClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-650 text-white shadow-sm shadow-indigo-600/30";
     
     if (btnDash) btnDash.className = inactiveClass;
     if (btnForm) btnForm.className = inactiveClass;

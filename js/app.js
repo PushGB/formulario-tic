@@ -922,6 +922,38 @@ function toggleTraspasoSection() {
     }
 }
 
+// Auto-detectar tipo de equipamiento en base a modelo o serie
+function autoDetectTypeFromFields(inputEl) {
+    const row = inputEl.closest('tr');
+    if (!row) return;
+    
+    const tipoInput = row.querySelector('[name="eq_tipo"]');
+    const modeloInput = row.querySelector('[name="eq_modelo"]');
+    const serieInput = row.querySelector('[name="eq_serie"]');
+    
+    if (!tipoInput || !modeloInput || !serieInput) return;
+    
+    const tipoVal = tipoInput.value.trim().toLowerCase();
+    const modeloVal = modeloInput.value.trim().toLowerCase();
+    const serieVal = serieInput.value.trim().toLowerCase();
+    
+    let detectedType = '';
+    
+    if (modeloVal.includes('probook') || tipoVal.includes('probook')) {
+        detectedType = 'Notebook';
+    } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
+        detectedType = 'Notebook';
+    } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
+        detectedType = 'Monitor';
+    }
+    
+    if (detectedType) {
+        tipoInput.value = detectedType;
+    }
+    
+    syncEquipmentCategoriesFromRows();
+}
+
 // Tabla de Equipos Dinámica: Añadir Fila
 function addEquipmentRow(data = {}) {
     const container = document.getElementById('equipment-rows');
@@ -933,16 +965,16 @@ function addEquipmentRow(data = {}) {
     
     tr.innerHTML = `
         <td class="p-2">
-            <input type="text" name="eq_tipo" value="${escapeHTML(data.tipo || '')}" placeholder="Ej: Notebook" required oninput="syncEquipmentCategoriesFromRows()" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_tipo" value="${escapeHTML(data.tipo || '')}" placeholder="Ej: Notebook" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
             <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_modelo" value="${escapeHTML(data.modelo || '')}" placeholder="Ej: ThinkPad L14" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_modelo" value="${escapeHTML(data.modelo || '')}" placeholder="Ej: ThinkPad L14" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_serie" value="${escapeHTML(data.serie || '')}" placeholder="Ej: SPF0349A" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
+            <input type="text" name="eq_serie" value="${escapeHTML(data.serie || '')}" placeholder="Ej: SPF0349A" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
         </td>
         <td class="p-2">
             <input type="text" name="eq_inventario" value="${escapeHTML(data.inventario || '')}" placeholder="Ej: ISP-2024-49" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
@@ -2762,67 +2794,86 @@ function splitEquipmentIfCombined(rawEq) {
     const isCombined = hasSlashTipo || hasSlashSerie || 
                        (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')));
 
-    if (!isCombined) {
-        return [rawEq];
-    }
-
-    const splitTipo = hasSlashTipo ? tipo.split('/') : [tipo];
-    const splitSerie = hasSlashSerie ? serie.split('/') : [serie];
-    const splitMarca = marca.includes('/') ? marca.split('/') : [marca];
-    const splitModelo = modelo.includes('/') ? modelo.split('/') : [modelo];
-    const splitInventario = inventario.includes('/') ? inventario.split('/') : [inventario];
-    const splitObservacion = observacion.includes('/') ? observacion.split('/') : [observacion];
-
-    let numItems = Math.max(splitTipo.length, splitSerie.length);
-    if (numItems === 1 && (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')))) {
-        numItems = 2;
-    }
-
     const results = [];
-    for (let i = 0; i < numItems; i++) {
-        let itemTipo = (splitTipo[i] || splitTipo[0] || 'Equipo').trim();
-        let itemSerie = (splitSerie[i] || '').trim();
-        let itemMarca = (splitMarca[i] || splitMarca[0] || '').trim();
-        let itemModelo = (splitModelo[i] || splitModelo[0] || '').trim();
-        let itemInventario = (splitInventario[i] || splitInventario[0] || '').trim();
-        let itemObservacion = (splitObservacion[i] || splitObservacion[0] || '').trim();
 
-        // Limpiar el número de serie para el segundo ítem si el original no tenía división (ej. sólo serial del AIO)
-        // Excepto si es una etiqueta especial como "ARRIENDO", "N/A" o "S/N"
-        if (i > 0 && splitSerie.length === 1) {
-            const sLower = itemSerie.toLowerCase();
-            if (sLower !== 'arriendo' && sLower !== 'n/a' && sLower !== 's/n') {
-                itemSerie = '';
-            }
-        }
-
-        // Normalizar tipos
-        const itemTipoLower = itemTipo.toLowerCase();
-        if (itemTipoLower === 'aio' || itemTipoLower === 'all in one' || itemTipoLower === 'all-in-one') {
-            itemTipo = 'All In One';
-        } else if (itemTipoLower === 'monitor' || itemTipoLower === 'pantalla' || itemTipoLower === 'display') {
-            itemTipo = 'Monitor';
-        } else if (itemTipoLower === 'pc' || itemTipoLower === 'torre' || itemTipoLower === 'desktop') {
-            itemTipo = 'PC';
-        } else if (itemTipoLower === 'notebook' || itemTipoLower === 'laptop') {
-            itemTipo = 'Notebook';
-        }
-
+    if (!isCombined) {
         results.push({
-            tipo: itemTipo,
-            marca: itemMarca,
-            modelo: itemModelo,
-            serie: itemSerie,
-            inventario: itemInventario,
-            observacion: itemObservacion
+            tipo,
+            serie,
+            marca,
+            modelo,
+            inventario,
+            observacion
         });
+    } else {
+        const splitTipo = hasSlashTipo ? tipo.split('/') : [tipo];
+        const splitSerie = hasSlashSerie ? serie.split('/') : [serie];
+        const splitMarca = marca.includes('/') ? marca.split('/') : [marca];
+        const splitModelo = modelo.includes('/') ? modelo.split('/') : [modelo];
+        const splitInventario = inventario.includes('/') ? inventario.split('/') : [inventario];
+        const splitObservacion = observacion.includes('/') ? observacion.split('/') : [observacion];
+
+        let numItems = Math.max(splitTipo.length, splitSerie.length);
+        if (numItems === 1 && (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')))) {
+            numItems = 2;
+        }
+
+        for (let i = 0; i < numItems; i++) {
+            let itemTipo = (splitTipo[i] || splitTipo[0] || 'Equipo').trim();
+            let itemSerie = (splitSerie[i] || '').trim();
+            let itemMarca = (splitMarca[i] || splitMarca[0] || '').trim();
+            let itemModelo = (splitModelo[i] || splitModelo[0] || '').trim();
+            let itemInventario = (splitInventario[i] || splitInventario[0] || '').trim();
+            let itemObservacion = (splitObservacion[i] || splitObservacion[0] || '').trim();
+
+            // Limpiar el número de serie para el segundo ítem si el original no tenía división (ej. sólo serial del AIO)
+            // Excepto si es una etiqueta especial como "ARRIENDO", "N/A" o "S/N"
+            if (i > 0 && splitSerie.length === 1) {
+                const sLower = itemSerie.toLowerCase();
+                if (sLower !== 'arriendo' && sLower !== 'n/a' && sLower !== 's/n') {
+                    itemSerie = '';
+                }
+            }
+
+            results.push({
+                tipo: itemTipo,
+                marca: itemMarca,
+                modelo: itemModelo,
+                serie: itemSerie,
+                inventario: itemInventario,
+                observacion: itemObservacion
+            });
+        }
+
+        // Caso especial: si el tipo contiene AIO y Monitor pero no se dividió por slashes, forzar la asignación
+        if (splitTipo.length === 1 && tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla'))) {
+            if (results[0]) results[0].tipo = 'All In One';
+            if (results[1]) results[1].tipo = 'Monitor';
+        }
     }
 
-    // Caso especial: si el tipo contiene AIO y Monitor pero no se dividió por slashes, forzar la asignación
-    if (splitTipo.length === 1 && tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla'))) {
-        if (results[0]) results[0].tipo = 'All In One';
-        if (results[1]) results[1].tipo = 'Monitor';
-    }
+    // Normalizar tipos para todos los elementos resultantes (tanto combinados como individuales)
+    results.forEach(item => {
+        const itemTipoLower = item.tipo.toLowerCase();
+        const itemModelLower = item.modelo.toLowerCase();
+        const itemSerieLower = item.serie.toLowerCase();
+
+        if (itemModelLower.includes('probook') || itemTipoLower.includes('probook')) {
+            item.tipo = 'Notebook';
+        } else if (itemSerieLower.startsWith('5cd') || itemSerieLower.includes('5cd')) {
+            item.tipo = 'Notebook';
+        } else if (itemSerieLower.startsWith('cnc') || itemSerieLower.includes('cnc')) {
+            item.tipo = 'Monitor';
+        } else if (itemTipoLower === 'aio' || itemTipoLower === 'all in one' || itemTipoLower === 'all-in-one') {
+            item.tipo = 'All In One';
+        } else if (itemTipoLower === 'monitor' || itemTipoLower === 'pantalla' || itemTipoLower === 'display') {
+            item.tipo = 'Monitor';
+        } else if (itemTipoLower === 'pc' || itemTipoLower === 'torre' || itemTipoLower === 'desktop') {
+            item.tipo = 'PC';
+        } else if (itemTipoLower === 'notebook' || itemTipoLower === 'laptop') {
+            item.tipo = 'Notebook';
+        }
+    });
 
     return results;
 }
@@ -4173,6 +4224,7 @@ window.triggerPrintMode = triggerPrintMode;
 window.clearCanvas = clearCanvas;
 window.addEquipmentRow = addEquipmentRow;
 window.syncEquipmentCategoriesFromRows = syncEquipmentCategoriesFromRows;
+window.autoDetectTypeFromFields = autoDetectTypeFromFields;
 window.toggleSigMode = toggleSigMode;
 
 window.exportSubmissionToPDF = exportSubmissionToPDF;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tic-form-cache-v1';
+const CACHE_NAME = 'tic-form-cache-v3';
 const ASSETS = [
   '/',
   '/index.html',

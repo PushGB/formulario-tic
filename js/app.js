@@ -54,7 +54,7 @@ function showLoginOverlay() {
     if (divider) divider.classList.add('hidden');
     
     // Deshabilitar botones de navegación
-    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
     });
@@ -69,7 +69,7 @@ function hideLoginOverlay() {
     if (divider) divider.classList.remove('hidden');
     
     // Habilitar botones de navegación
-    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = false;
     });
@@ -169,19 +169,23 @@ async function fetchUserRole(user) {
 function applyRolePermissions() {
     const uploadLabel = document.getElementById('excel-upload-label');
     const exportBtn = document.getElementById('excel-export-btn');
+    const navUsers = document.getElementById('nav-users');
     
     if (currentUserRole === 'tecnico') {
         if (uploadLabel) uploadLabel.classList.add('hidden');
         if (exportBtn) exportBtn.classList.add('hidden');
-    } else {
-        if (currentUserRole === 'admin') {
-            if (uploadLabel) uploadLabel.classList.remove('hidden');
-            if (window.uploadedWorkbook || (window.loadedAllEquipments && window.loadedAllEquipments.length > 0)) {
-                if (exportBtn) exportBtn.classList.remove('hidden');
-            } else {
-                if (exportBtn) exportBtn.classList.add('hidden');
-            }
+        if (navUsers) navUsers.classList.add('hidden');
+        if (activeTab === 'users') {
+            switchTab('dashboard');
         }
+    } else if (currentUserRole === 'admin') {
+        if (uploadLabel) uploadLabel.classList.remove('hidden');
+        if (window.uploadedWorkbook || (window.loadedAllEquipments && window.loadedAllEquipments.length > 0)) {
+            if (exportBtn) exportBtn.classList.remove('hidden');
+        } else {
+            if (exportBtn) exportBtn.classList.add('hidden');
+        }
+        if (navUsers) navUsers.classList.remove('hidden');
     }
 }
 
@@ -231,24 +235,17 @@ async function handleLogin(event) {
     
     if (errorMsg) errorMsg.classList.add('hidden');
     
-    // 1. Verificación local / offline de las dos cuentas fijas requeridas
-    if (email === 'admin@ispch.cl' && password === 'Admin.1234') {
-        currentUserRole = 'admin';
-        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: 'admin@ispch.cl', role: 'admin' }));
-        hideLoginOverlay();
-        applyRolePermissions();
-        showToast("Sesión iniciada como Administrador (Local).", "success");
-        await loadSubmissions();
-        lucide.createIcons();
-        return;
-    }
+    // 1. Verificación local / offline en localStorage
+    initLocalUsersStorage();
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
     
-    if (email === 'tecnico@ispch.cl' && password === 'Tacnico.1234') {
-        currentUserRole = 'tecnico';
-        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: 'tecnico@ispch.cl', role: 'tecnico' }));
+    if (matchedUser) {
+        currentUserRole = matchedUser.role;
+        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
         hideLoginOverlay();
         applyRolePermissions();
-        showToast("Sesión iniciada como Técnico (Local).", "success");
+        showToast(`Sesión iniciada como ${matchedUser.role === 'admin' ? 'Administrador' : 'Técnico'} (Local).`, "success");
         await loadSubmissions();
         lucide.createIcons();
         return;
@@ -290,6 +287,169 @@ async function handleLogout() {
     showLoginOverlay();
     submissions = [];
     renderTable();
+}
+
+// --- GESTIÓN DE ACCESOS Y USUARIOS LOCALES (ADMIN ONLY) ---
+
+// Inicializar listado local de usuarios en localStorage si no existe
+function initLocalUsersStorage() {
+    let localUsers = localStorage.getItem('tic_local_users');
+    if (!localUsers) {
+        const defaultUsers = [
+            { email: 'admin@ispch.cl', password: 'Admin.1234', role: 'admin' },
+            { email: 'tecnico@ispch.cl', password: 'Tacnico.1234', role: 'tecnico' }
+        ];
+        localStorage.setItem('tic_local_users', JSON.stringify(defaultUsers));
+    }
+}
+
+// Renderizar la tabla de usuarios locales
+function renderUsersTab() {
+    initLocalUsersStorage();
+    const tbody = document.getElementById('local-users-list');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    
+    // Obtener correo del usuario actualmente autenticado para evitar auto-eliminación
+    let currentAuthEmail = '';
+    const localSession = sessionStorage.getItem('tic_auth_user');
+    if (localSession) {
+        currentAuthEmail = JSON.parse(localSession).email.toLowerCase();
+    }
+    
+    localUsers.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850/60";
+        
+        const roleBadge = u.role === 'admin'
+            ? '<span class="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold font-mono text-[9px] uppercase tracking-wider">Administrador</span>'
+            : '<span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold font-mono text-[9px] uppercase tracking-wider">Técnico</span>';
+            
+        // No permitir que un administrador se auto-elimine
+        const isSelf = u.email.toLowerCase() === currentAuthEmail;
+        const deleteButton = isSelf 
+            ? '<span class="text-[9px] text-slate-400 font-medium italic">Tu Cuenta</span>' 
+            : `<button type="button" onclick="deleteUser('${escapeHTML(u.email)}')" class="p-1.5 text-rose-500 hover:text-rose-750 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Eliminar Cuenta"><i data-lucide="user-minus" class="w-4 h-4"></i></button>`;
+            
+        tr.innerHTML = `
+            <td class="py-3 px-4 font-medium text-slate-800 dark:text-slate-200">${escapeHTML(u.email)}</td>
+            <td class="py-3 px-4">${roleBadge}</td>
+            <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" onclick="openChangePassModal('${escapeHTML(u.email)}')" class="p-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors" title="Cambiar Contraseña">
+                        <i data-lucide="key" class="w-4 h-4"></i>
+                    </button>
+                    ${deleteButton}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    lucide.createIcons();
+}
+
+// Crear un nuevo usuario en localStorage
+function createUser(event) {
+    event.preventDefault();
+    const email = document.getElementById('new-user-email').value.trim().toLowerCase();
+    const password = document.getElementById('new-user-password').value;
+    const role = document.getElementById('new-user-role').value;
+    
+    if (!email || !password || !role) {
+        showToast("Por favor complete todos los campos.", "error");
+        return;
+    }
+    
+    initLocalUsersStorage();
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    
+    // Validar duplicado
+    const exists = localUsers.some(u => u.email.toLowerCase() === email);
+    if (exists) {
+        showToast("Esta dirección de correo ya tiene un registro de acceso.", "error");
+        return;
+    }
+    
+    localUsers.push({ email, password, role });
+    localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
+    
+    // Resetear formulario
+    document.getElementById('create-user-form').reset();
+    showToast("Cuenta de acceso creada con éxito.", "success");
+    renderUsersTab();
+}
+
+// Eliminar un usuario de localStorage
+function deleteUser(email) {
+    if (!confirm(`¿Está seguro de que desea eliminar la cuenta de acceso para ${email}?`)) {
+        return;
+    }
+    
+    initLocalUsersStorage();
+    let localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    
+    // Evitar eliminar el último administrador
+    const adminsCount = localUsers.filter(u => u.role === 'admin').length;
+    const targetUser = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (targetUser && targetUser.role === 'admin' && adminsCount <= 1) {
+        showToast("No se puede eliminar el único administrador disponible en el sistema.", "error");
+        return;
+    }
+    
+    localUsers = localUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase());
+    localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
+    
+    showToast("Cuenta eliminada con éxito.", "success");
+    renderUsersTab();
+}
+
+// Abrir el modal de cambio de contraseña
+function openChangePassModal(email) {
+    const modal = document.getElementById('change-pass-modal');
+    const displayEmail = document.getElementById('change-pass-email-display');
+    const hiddenEmail = document.getElementById('change-pass-email-hidden');
+    
+    if (modal && displayEmail && hiddenEmail) {
+        displayEmail.innerText = email;
+        hiddenEmail.value = email;
+        document.getElementById('change-pass-new-password').value = '';
+        modal.classList.remove('hidden');
+    }
+}
+
+// Cerrar el modal de cambio de contraseña
+function closeChangePassModal() {
+    const modal = document.getElementById('change-pass-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Guardar la nueva contraseña de usuario en localStorage
+function saveUserPassword(event) {
+    event.preventDefault();
+    const email = document.getElementById('change-pass-email-hidden').value;
+    const newPassword = document.getElementById('change-pass-new-password').value;
+    
+    if (!email || !newPassword) {
+        showToast("La contraseña no puede estar vacía.", "error");
+        return;
+    }
+    
+    initLocalUsersStorage();
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    const userIdx = localUsers.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (userIdx !== -1) {
+        localUsers[userIdx].password = newPassword;
+        localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
+        showToast(`Contraseña actualizada para ${email}.`, "success");
+        closeChangePassModal();
+    } else {
+        showToast("No se encontró la cuenta especificada.", "error");
+    }
 }
 
 // --- RESOLUCIÓN Y SUBIDA DE FIRMAS (SUPABASE STORAGE) ---
@@ -789,9 +949,12 @@ function updateStats() {
 
 // Alternar visualización de pestañas
 function switchTab(tabId) {
+    if (tabId === 'users' && currentUserRole !== 'admin') {
+        tabId = 'dashboard';
+    }
     activeTab = tabId;
     
-    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-metrics', 'tab-history'];
+    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-metrics', 'tab-history', 'tab-users'];
     tabs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -805,14 +968,16 @@ function switchTab(tabId) {
     const btnForm = document.getElementById('nav-form');
     const btnMetrics = document.getElementById('nav-metrics');
     const btnHistory = document.getElementById('nav-history');
+    const btnUsers = document.getElementById('nav-users');
     
-    const inactiveClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50";
-    const activeClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+    const inactiveClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-850/50";
+    const activeClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-650 text-white shadow-sm shadow-indigo-600/30";
     
     if (btnDash) btnDash.className = inactiveClass;
     if (btnForm) btnForm.className = inactiveClass;
     if (btnMetrics) btnMetrics.className = inactiveClass;
     if (btnHistory) btnHistory.className = inactiveClass;
+    if (btnUsers) btnUsers.className = inactiveClass;
 
     let targetEl = null;
     if (tabId === 'dashboard') {
@@ -832,6 +997,10 @@ function switchTab(tabId) {
         targetEl = document.getElementById('tab-history');
         if (btnHistory) btnHistory.className = activeClass;
         resetHistoryTab();
+    } else if (tabId === 'users') {
+        targetEl = document.getElementById('tab-users');
+        if (btnUsers) btnUsers.className = activeClass;
+        renderUsersTab();
     }
     
     if (targetEl) {
@@ -4311,3 +4480,9 @@ window.handleLogout = handleLogout;
 window.normalizeName = normalizeName;
 window.consolidateFuncionarioNames = consolidateFuncionarioNames;
 window.resolveEquipmentDuplicate = resolveEquipmentDuplicate;
+
+window.createUser = createUser;
+window.deleteUser = deleteUser;
+window.openChangePassModal = openChangePassModal;
+window.closeChangePassModal = closeChangePassModal;
+window.saveUserPassword = saveUserPassword;

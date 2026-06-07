@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tic-form-cache-v11';
+const CACHE_NAME = 'tic-form-cache-v12';
 const ASSETS = [
   '/',
   '/index.html',
@@ -62,4 +62,11 @@ self.addEventListener('fetch', e => {
       return fetch(e.request);
     })
   );
+});
+
+// Escuchar mensajes del cliente para forzar la actualización (skipWaiting)
+self.addEventListener('message', e => {
+  if (e.data && e.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });

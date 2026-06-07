@@ -603,8 +603,36 @@ window.addEventListener('load', () => {
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+            .then(reg => {
+                console.log('[PWA] Service Worker registrado con éxito:', reg.scope);
+                
+                // Si hay un service worker esperando, forzar que se active
+                if (reg.waiting) {
+                    reg.waiting.postMessage({ action: 'skipWaiting' });
+                }
+                
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('[PWA] Nuevo service worker disponible, activando...');
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                            }
+                        });
+                    }
+                });
+            })
             .catch(err => console.error('[PWA] Error en Service Worker:', err));
+
+        // Escuchar cuando el nuevo service worker tome el control y recargar la página automáticamente
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+            }
+        });
     }
 });
 

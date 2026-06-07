@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +13,10 @@
             darkMode: 'class',
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        title: ['Outfit', 'sans-serif'],
+                    },
                     colors: {
                         brand: {
                             50: '#f5f3ff',
@@ -36,36 +40,40 @@
     <!-- External Custom Stylesheet -->
     <link rel="stylesheet" href="/css/styles.css">
 </head>
-<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen transition-colors duration-300">
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen transition-colors duration-300 flex flex-col">
 
     <!-- CONTENEDOR DE PANTALLA INTERACTIVA (Se oculta al imprimir) -->
-    <div class="print:hidden">
+    <div class="print:hidden flex-1 flex flex-col">
         <!-- PANTALLA DE AUTENTICACIÓN (LOGIN) overlay -->
-        <div id="auth-login-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6">
+        <div id="auth-login-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-lg flex items-center justify-center p-4">
+            <!-- Ambient glows -->
+            <div class="absolute w-72 h-72 rounded-full bg-indigo-500/10 glow-ambient top-1/4 left-1/4 pointer-events-none"></div>
+            <div class="absolute w-72 h-72 rounded-full bg-violet-500/10 glow-ambient bottom-1/4 right-1/4 pointer-events-none"></div>
+            
+            <div class="bg-white/80 dark:bg-slate-900/80 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-white/20 dark:border-slate-800/80 backdrop-blur-xl space-y-6 transform transition-all duration-350 scale-100">
                 <div class="text-center space-y-2">
-                    <div class="inline-flex bg-indigo-50 dark:bg-indigo-950/60 p-4 rounded-3xl text-indigo-600 dark:text-indigo-400 mb-2">
-                        <i data-lucide="shield-check" class="w-10 h-10"></i>
+                    <div class="inline-flex bg-gradient-to-tr from-indigo-500 to-violet-500 p-4 rounded-3xl text-white mb-2 shadow-lg shadow-indigo-500/20">
+                        <i data-lucide="shield-check" class="w-8 h-8"></i>
                     </div>
-                    <h2 class="text-2xl font-black text-slate-850 dark:text-slate-100">Acceso Restringido</h2>
-                    <p class="text-sm text-slate-400 dark:text-slate-500">Inicie sesión para acceder al panel de soporte y catastro de TIC.</p>
+                    <h2 class="text-2xl font-black tracking-tight text-slate-850 dark:text-slate-100 font-title">Acceso Restringido</h2>
+                    <p class="text-xs text-slate-400 dark:text-slate-500">Inicie sesión para acceder al panel de soporte y catastro de TIC.</p>
                 </div>
                 <form id="auth-login-form" onsubmit="handleLogin(event)" class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
                         <div class="relative">
                             <i data-lucide="mail" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i>
-                            <input type="email" id="login-email" required placeholder="admin.tic@ispch.cl" class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                            <input type="email" id="login-email" required placeholder="admin.tic@ispch.cl" class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-955 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Contraseña</label>
                         <div class="relative">
                             <i data-lucide="lock" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i>
-                            <input type="password" id="login-password" required placeholder="••••••••" class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                            <input type="password" id="login-password" required placeholder="••••••••" class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-955 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-indigo-600/30 transition-all">
+                    <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 transition-all hover:translate-y-[-1px]">
                         Ingresar al Sistema
                     </button>
                 </form>
@@ -75,76 +83,78 @@
 
         <!-- Sistema de Notificaciones / Toast -->
         <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none">
-            <div class="bg-slate-900 dark:bg-slate-850 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3">
+            <div class="bg-slate-900 dark:bg-slate-850 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 border border-slate-800 dark:border-slate-750">
                 <span id="toast-icon"></span>
                 <span id="toast-message" class="text-sm font-medium"></span>
             </div>
         </div>
 
-        <!-- Barra de Navegación Superior -->
-        <nav class="bg-slate-900 dark:bg-slate-950 text-white shadow-md border-b border-slate-800">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center space-x-3">
-                        <div class="bg-indigo-600 p-2 rounded-lg shadow-sm">
-                            <i data-lucide="laptop" class="h-6 w-6 text-white"></i>
+        <!-- Barra de Navegación Superior Sticky -->
+        <div class="sticky top-0 z-40 w-full px-4 pt-4 print:hidden">
+            <nav class="max-w-7xl mx-auto rounded-2xl bg-white/70 dark:bg-slate-955/70 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-lg shadow-slate-100/50 dark:shadow-none transition-all duration-300">
+                <div class="px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <div class="flex items-center space-x-3 cursor-pointer group" onclick="switchTab('dashboard')">
+                            <div class="bg-gradient-to-tr from-indigo-500 to-violet-600 p-2 rounded-xl text-white shadow-md shadow-indigo-500/25 transition-transform group-hover:scale-105">
+                                <i data-lucide="laptop" class="h-5 w-5"></i>
+                            </div>
+                            <div>
+                                <span class="font-bold text-sm tracking-wide text-slate-800 dark:text-slate-100 block font-title">Soporte TIC</span>
+                                <span class="text-[10px] text-indigo-500 dark:text-indigo-400 block font-mono">RG-02-IT-140.03-004 V5</span>
+                            </div>
                         </div>
-                        <div>
-                            <span class="font-bold text-lg tracking-wide block">Soporte TIC</span>
-                            <span class="text-xs text-indigo-300 block font-mono">RG-02-IT-140.03-004 V5</span>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex space-x-1 p-1 bg-slate-100/80 dark:bg-slate-900/80 rounded-xl">
+                                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Panel</span>
+                                </button>
+                                <button onclick="switchTab('metrics')" id="nav-metrics" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Métricas</span>
+                                </button>
+                                <button onclick="switchTab('history')" id="nav-history" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i> Historial</span>
+                                </button>
+                                <button onclick="openNewForm()" id="nav-form" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                                    <span class="flex items-center gap-1.5"><i data-lucide="file-plus" class="w-3.5 h-3.5"></i> Nueva Solicitud</span>
+                                </button>
+                            </div>
+                            <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+                            <button id="auth-logout-btn" onclick="handleLogout()" class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-all border border-rose-500/20 flex items-center gap-1.5" title="Cerrar Sesión">
+                                <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
+                            </button>
+                            <div id="auth-divider" class="hidden h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+                            <button onclick="toggleTheme()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors" title="Cambiar Tema">
+                                <span id="theme-toggle-icon"><i data-lucide="moon" class="w-4.5 h-4.5"></i></span>
+                            </button>
                         </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex space-x-2">
-                            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30">
-                                <span class="flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Panel de Registros</span>
-                            </button>
-                            <button onclick="switchTab('metrics')" id="nav-metrics" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
-                                <span class="flex items-center gap-2"><i data-lucide="bar-chart-2" class="w-4 h-4"></i> Métricas</span>
-                            </button>
-                            <button onclick="switchTab('history')" id="nav-history" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
-                                <span class="flex items-center gap-2"><i data-lucide="history" class="w-4 h-4"></i> Historial</span>
-                            </button>
-                            <button onclick="openNewForm()" id="nav-form" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
-                                <span class="flex items-center gap-2"><i data-lucide="file-plus" class="w-4 h-4"></i> Nueva Solicitud</span>
-                            </button>
-                        </div>
-                        <div class="h-6 w-[1px] bg-slate-800"></div>
-                        <button id="auth-logout-btn" onclick="handleLogout()" class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all border border-rose-900/50 flex items-center gap-1.5" title="Cerrar Sesión">
-                            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Salir
-                        </button>
-                        <div id="auth-divider" class="hidden h-6 w-[1px] bg-slate-800"></div>
-                        <button onclick="toggleTheme()" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" title="Cambiar Tema">
-                            <span id="theme-toggle-icon"><i data-lucide="moon" class="w-5 h-5"></i></span>
-                        </button>
                     </div>
                 </div>
-            </div>
-        </nav>
+            </nav>
+        </div>
 
         <!-- Contenido Principal -->
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
 
             <!-- ================= PANEL DE REGISTROS (DASHBOARD) ================= -->
-            <section id="tab-dashboard" class="space-y-6">
+            <section id="tab-dashboard" class="space-y-6 fade-in-slide">
                 <!-- Encabezado & Estadísticas -->
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Control de Entregas y Traspasos de Equipos</h1>
-                        <p class="text-sm text-slate-500 dark:text-slate-400">Historial y estado de asignaciones de equipamiento tecnológico institucional.</p>
+                        <h1 class="text-2xl font-black text-slate-900 dark:text-slate-100 font-title tracking-tight">Control de Entregas y Traspasos de Equipos</h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Historial y estado de asignaciones de equipamiento tecnológico institucional.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <button onclick="exportToCSV()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
-                            <i data-lucide="download" class="w-4 h-4"></i> Exportar a CSV
+                        <button onclick="exportToCSV()" class="bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 px-4 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                            <i data-lucide="download" class="w-4 h-4 text-slate-550"></i> Exportar a CSV
                         </button>
-                        <label id="excel-upload-label" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px] cursor-pointer">
+                        <label id="excel-upload-label" class="bg-violet-600/10 hover:bg-violet-600/20 text-violet-600 dark:text-violet-400 border border-violet-600/20 px-4 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px] cursor-pointer">
                             <i data-lucide="upload" class="w-4 h-4"></i> Cargar Catastro Excel
                             <input type="file" id="excel-file-input" class="hidden" accept=".xlsx" onchange="handleExcelUpload(event)">
                         </label>
-                        <button id="excel-export-btn" onclick="exportUpdatedExcel()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                        <button id="excel-export-btn" onclick="exportUpdatedExcel()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
                             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Catastro Actualizado
                         </button>
-                        <button onclick="openNewForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                        <button onclick="openNewForm()" class="bg-gradient-to-r from-indigo-650 to-violet-600 hover:from-indigo-700 hover:to-violet-750 text-white px-4.5 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-indigo-600/10 transition-all hover:translate-y-[-1px]">
                             <i data-lucide="plus" class="w-4 h-4"></i> Crear Solicitud
                         </button>
                     </div>
@@ -154,58 +164,58 @@
                 <div id="excel-status-badge" class="mt-2"></div>
 
                 <!-- Tarjetas de Estadísticas Rápidas -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
-                        <div>
-                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Total Solicitudes</span>
-                            <span id="stat-total" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:shadow-none hover:-translate-y-0.5 group">
+                        <div class="space-y-1">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Total Solicitudes</span>
+                            <span id="stat-total" class="text-3xl font-black text-slate-800 dark:text-slate-100 block">0</span>
                         </div>
-                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-xl text-indigo-600 dark:text-indigo-400"><i data-lucide="files" class="w-6 h-6"></i></div>
+                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3.5 rounded-2xl text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300"><i data-lucide="files" class="w-5 h-5"></i></div>
                     </div>
-                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
-                        <div>
-                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Asignaciones</span>
-                            <span id="stat-asignaciones" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/5 dark:hover:shadow-none hover:-translate-y-0.5 group">
+                        <div class="space-y-1">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Asignaciones</span>
+                            <span id="stat-asignaciones" class="text-3xl font-black text-slate-800 dark:text-slate-100 block">0</span>
                         </div>
-                        <div class="bg-blue-50 dark:bg-blue-950/40 p-3 rounded-xl text-blue-600 dark:text-blue-400"><i data-lucide="user-plus" class="w-6 h-6"></i></div>
+                        <div class="bg-blue-50 dark:bg-blue-950/40 p-3.5 rounded-2xl text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300"><i data-lucide="user-plus" class="w-5 h-5"></i></div>
                     </div>
-                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
-                        <div>
-                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Traspasos</span>
-                            <span id="stat-traspasos" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5 dark:hover:shadow-none hover:-translate-y-0.5 group">
+                        <div class="space-y-1">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Traspasos</span>
+                            <span id="stat-traspasos" class="text-3xl font-black text-slate-800 dark:text-slate-100 block">0</span>
                         </div>
-                        <div class="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl text-amber-600 dark:text-amber-400"><i data-lucide="git-compare" class="w-6 h-6"></i></div>
+                        <div class="bg-amber-50 dark:bg-amber-950/40 p-3.5 rounded-2xl text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300"><i data-lucide="git-compare" class="w-5 h-5"></i></div>
                     </div>
-                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
-                        <div>
-                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Devoluciones</span>
-                            <span id="stat-devoluciones" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5 dark:hover:shadow-none hover:-translate-y-0.5 group">
+                        <div class="space-y-1">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Devoluciones</span>
+                            <span id="stat-devoluciones" class="text-3xl font-black text-slate-800 dark:text-slate-100 block">0</span>
                         </div>
-                        <div class="bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl text-rose-600 dark:text-rose-400"><i data-lucide="user-minus" class="w-6 h-6"></i></div>
+                        <div class="bg-rose-50 dark:bg-rose-950/40 p-3.5 rounded-2xl text-rose-600 dark:text-rose-455 group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300"><i data-lucide="user-minus" class="w-5 h-5"></i></div>
                     </div>
                 </div>
 
                 <!-- Buscador y Filtros -->
-                <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                    <div class="p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden transition-all duration-300">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800/80 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                         <div class="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
                             <div class="relative w-full sm:max-w-xs">
-                                <i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500"></i>
-                                <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar por Nombre, RUT, Ticket, Serie..." class="pl-9 pr-4 py-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                                <i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-450 dark:text-slate-500"></i>
+                                <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar por Nombre, RUT, Ticket, Serie..." class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/35 focus:border-indigo-500 text-xs transition-all">
                             </div>
                             
                             <!-- Filtros por tipo de solicitud -->
-                            <div class="flex flex-wrap gap-2 items-center">
-                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1">Filtrar:</span>
-                                <button onclick="setFilterType('All')" id="filter-all" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-indigo-650 dark:bg-indigo-600 text-white shadow-sm">Todos</button>
-                                <button onclick="setFilterType('Asignacion')" id="filter-asignacion" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">Asignación</button>
-                                <button onclick="setFilterType('Traspaso')" id="filter-traspaso" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">Traspaso</button>
-                                <button onclick="setFilterType('Devolucion')" id="filter-devolucion" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">Devolución</button>
+                            <div class="flex flex-wrap gap-1.5 items-center bg-slate-150/40 dark:bg-slate-950/40 p-1 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2">Filtro:</span>
+                                <button onclick="setFilterType('All')" id="filter-all" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-indigo-600 text-white shadow-sm">Todos</button>
+                                <button onclick="setFilterType('Asignacion')" id="filter-asignacion" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">Asignación</button>
+                                <button onclick="setFilterType('Traspaso')" id="filter-traspaso" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">Traspaso</button>
+                                <button onclick="setFilterType('Devolucion')" id="filter-devolucion" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">Devolución</button>
                             </div>
                         </div>
                         
-                        <div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
-                            <i data-lucide="info" class="w-4 h-4"></i>
+                        <div class="flex items-center gap-2 text-xs text-slate-450 dark:text-slate-500">
+                            <i data-lucide="info" class="w-4 h-4 text-indigo-500"></i>
                             <span>Autoguardado en LocalStorage</span>
                         </div>
                     </div>
@@ -214,7 +224,7 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 uppercase text-[11px] font-bold tracking-wider border-b border-slate-100 dark:border-slate-800/80">
+                                <tr class="bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-455 uppercase text-[10px] font-bold tracking-wider border-b border-slate-250/50 dark:border-slate-800/80">
                                     <th class="py-4 px-6">Fecha</th>
                                     <th class="py-4 px-6">N° Ticket</th>
                                     <th class="py-4 px-6">Funcionario Asignado</th>
@@ -223,10 +233,11 @@
                                     <th class="py-4 px-6 text-center">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody id="submissions-list" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                            <tbody id="submissions-list" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs text-slate-700 dark:text-slate-200">
                                 <!-- Filas dinámicas -->
                             </tbody>
                         </table>
+                    </div>
                     </div>
 
                     <!-- Estado Vacío -->
@@ -695,6 +706,11 @@
 
                                         <!-- Contenedor del Canvas -->
                                         <div id="sig-container-tic" class="signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                            <!-- Marca de agua / Guía interactiva -->
+                                            <div class="signature-guide select-none text-slate-400/60 pointer-events-none">
+                                                <i data-lucide="pen-tool" class="w-8 h-8 mb-1.5 opacity-40"></i>
+                                                <span class="text-xs font-semibold tracking-wide opacity-40">Dibuje su firma aquí</span>
+                                            </div>
                                             <!-- CSS Guide Line -->
                                             <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
                                             <canvas id="canvas-tic" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>
@@ -731,6 +747,11 @@
 
                                         <!-- Contenedor del Canvas -->
                                         <div id="sig-container-emisor" class="signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                            <!-- Marca de agua / Guía interactiva -->
+                                            <div class="signature-guide select-none text-slate-400/60 pointer-events-none">
+                                                <i data-lucide="pen-tool" class="w-8 h-8 mb-1.5 opacity-40"></i>
+                                                <span class="text-xs font-semibold tracking-wide opacity-40">Dibuje su firma aquí</span>
+                                            </div>
                                             <!-- CSS Guide Line -->
                                             <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
                                             <canvas id="canvas-emisor" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>
@@ -767,6 +788,11 @@
 
                                         <!-- Contenedor del Canvas -->
                                         <div id="sig-container-receptor" class="signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                            <!-- Marca de agua / Guía interactiva -->
+                                            <div class="signature-guide select-none text-slate-400/60 pointer-events-none">
+                                                <i data-lucide="pen-tool" class="w-8 h-8 mb-1.5 opacity-40"></i>
+                                                <span class="text-xs font-semibold tracking-wide opacity-40">Dibuje su firma aquí</span>
+                                            </div>
                                             <!-- CSS Guide Line -->
                                             <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
                                             <canvas id="canvas-receptor" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>

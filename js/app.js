@@ -720,11 +720,15 @@ function updateStats() {
 // Alternar visualización de pestañas
 function switchTab(tabId) {
     activeTab = tabId;
-    document.getElementById('tab-dashboard').classList.add('hidden');
-    document.getElementById('tab-form-view').classList.add('hidden');
-    document.getElementById('tab-metrics').classList.add('hidden');
-    const tabHistory = document.getElementById('tab-history');
-    if (tabHistory) tabHistory.classList.add('hidden');
+    
+    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-metrics', 'tab-history'];
+    tabs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.add('hidden');
+            el.classList.remove('fade-in-slide');
+        }
+    });
     
     // Estilos de botones de navegación
     const btnDash = document.getElementById('nav-dashboard');
@@ -732,32 +736,39 @@ function switchTab(tabId) {
     const btnMetrics = document.getElementById('nav-metrics');
     const btnHistory = document.getElementById('nav-history');
     
-    if (btnDash) btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnForm) btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnMetrics) btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnHistory) btnHistory.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
+    const inactiveClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50";
+    const activeClass = "px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+    
+    if (btnDash) btnDash.className = inactiveClass;
+    if (btnForm) btnForm.className = inactiveClass;
+    if (btnMetrics) btnMetrics.className = inactiveClass;
+    if (btnHistory) btnHistory.className = inactiveClass;
 
+    let targetEl = null;
     if (tabId === 'dashboard') {
-        document.getElementById('tab-dashboard').classList.remove('hidden');
-        if (btnDash) btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+        targetEl = document.getElementById('tab-dashboard');
+        if (btnDash) btnDash.className = activeClass;
         renderTable();
     } else if (tabId === 'form-view') {
-        document.getElementById('tab-form-view').classList.remove('hidden');
-        if (btnForm) btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+        targetEl = document.getElementById('tab-form-view');
+        if (btnForm) btnForm.className = activeClass;
         // Redimensionar canvases de firma al visualizar
         setTimeout(resizeAllCanvases, 50);
     } else if (tabId === 'metrics') {
-        document.getElementById('tab-metrics').classList.remove('hidden');
-        if (btnMetrics) {
-            btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        }
+        targetEl = document.getElementById('tab-metrics');
+        if (btnMetrics) btnMetrics.className = activeClass;
         renderMetrics();
     } else if (tabId === 'history') {
-        if (tabHistory) tabHistory.classList.remove('hidden');
-        if (btnHistory) {
-            btnHistory.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        }
+        targetEl = document.getElementById('tab-history');
+        if (btnHistory) btnHistory.className = activeClass;
         resetHistoryTab();
+    }
+    
+    if (targetEl) {
+        targetEl.classList.remove('hidden');
+        // Forzar reflow para reiniciar la animación
+        void targetEl.offsetWidth;
+        targetEl.classList.add('fade-in-slide');
     }
 }
 
@@ -1101,7 +1112,7 @@ function updateSignatureFeedback(id) {
     let badge = container.querySelector('.sig-badge');
     if (hasSigned) {
         container.classList.remove('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
-        container.classList.add('border-emerald-500', 'dark:border-emerald-500');
+        container.classList.add('border-emerald-500', 'dark:border-emerald-500', 'has-signature');
         
         if (!badge) {
             badge = document.createElement('div');
@@ -1110,7 +1121,7 @@ function updateSignatureFeedback(id) {
             container.appendChild(badge);
         }
     } else {
-        container.classList.remove('border-emerald-500', 'dark:border-emerald-500');
+        container.classList.remove('border-emerald-500', 'dark:border-emerald-500', 'has-signature');
         container.classList.add('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
         if (badge) badge.remove();
     }
@@ -1118,6 +1129,9 @@ function updateSignatureFeedback(id) {
 
 function startDrawing(e, id, isTouch = false) {
     const canvas = document.getElementById(`canvas-${id}`);
+    const container = canvas.parentElement;
+    container.classList.add('drawing');
+    
     const state = drawingStates[id];
     state.isDrawing = true;
     
@@ -1156,6 +1170,10 @@ function draw(e, id, isTouch = false) {
 
 function stopDrawing(id) {
     drawingStates[id].isDrawing = false;
+    const canvas = document.getElementById(`canvas-${id}`);
+    if (canvas) {
+        canvas.parentElement.classList.remove('drawing');
+    }
 }
 
 function getCoords(e, canvas, isTouch) {

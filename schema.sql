@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS public.solicitudes_tic (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Habilitar RLS para solicitudes_tic
-ALTER TABLE public.solicitudes_tic ENABLE ROW LEVEL SECURITY;
+-- Deshabilitar RLS para solicitudes_tic para acceso público completo
+ALTER TABLE public.solicitudes_tic DISABLE ROW LEVEL SECURITY;
 
 -- Eliminar políticas previas si existen
 DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.solicitudes_tic;
@@ -93,8 +93,8 @@ CREATE TABLE IF NOT EXISTS public.catastro_equipos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Habilitar RLS para catastro_equipos
-ALTER TABLE public.catastro_equipos ENABLE ROW LEVEL SECURITY;
+-- Deshabilitar RLS para catastro_equipos para acceso público completo
+ALTER TABLE public.catastro_equipos DISABLE ROW LEVEL SECURITY;
 
 -- Eliminar políticas previas si existen
 DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.catastro_equipos;

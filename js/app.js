@@ -76,29 +76,59 @@ function hideLoginOverlay() {
 }
 
 async function checkAuthSession() {
-    if (!supabase) return;
-    try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        if (session) {
-            onUserAuthenticated(session.user);
-        } else {
-            showLoginOverlay();
+    // 1. Intentar restaurar sesión local desde sessionStorage
+    const localUser = sessionStorage.getItem('tic_auth_user');
+    if (localUser) {
+        try {
+            const user = JSON.parse(localUser);
+            currentUserRole = user.role;
+            hideLoginOverlay();
+            applyRolePermissions();
+            showToast(`Sesión restaurada: ${user.email}`, "success");
+            await loadSubmissions();
+            return;
+        } catch (e) {
+            console.error("Error al parsear usuario local:", e);
+            sessionStorage.removeItem('tic_auth_user');
         }
-    } catch (err) {
-        console.error("Error al obtener sesión de Supabase:", err.message);
-        showLoginOverlay();
     }
     
-    // Escuchar cambios de estado en auth
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            onUserAuthenticated(session.user);
-        } else if (event === 'SIGNED_OUT') {
-            showLoginOverlay();
+    // 2. Si no hay sesión local y hay Supabase configurado, intentar autenticación remota
+    if (supabase) {
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            
+            if (session) {
+                hideLoginOverlay();
+                await fetchUserRole(session.user);
+                applyRolePermissions();
+                showToast(`Sesión iniciada (Nube): ${session.user.email}`, "success");
+                await loadSubmissions();
+                
+                // Escuchar cambios de estado en auth
+                supabase.auth.onAuthStateChange(async (event, newSession) => {
+                    if (event === 'SIGNED_IN' && newSession) {
+                        hideLoginOverlay();
+                        await fetchUserRole(newSession.user);
+                        applyRolePermissions();
+                        await loadSubmissions();
+                        lucide.createIcons();
+                    } else if (event === 'SIGNED_OUT') {
+                        showLoginOverlay();
+                    }
+                });
+                return;
+            }
+        } catch (err) {
+            console.error("Error al obtener sesión de Supabase:", err.message);
         }
-    });
+    }
+    
+    // 3. Si no hay sesión local ni remota, mostrar el overlay de login y deshabilitar navegación
+    showLoginOverlay();
+    submissions = [];
+    renderTable();
 }
 
 async function onUserAuthenticated(user) {
@@ -144,7 +174,14 @@ function applyRolePermissions() {
         if (uploadLabel) uploadLabel.classList.add('hidden');
         if (exportBtn) exportBtn.classList.add('hidden');
     } else {
-        if (uploadLabel) uploadLabel.classList.remove('hidden');
+        if (currentUserRole === 'admin') {
+            if (uploadLabel) uploadLabel.classList.remove('hidden');
+            if (window.uploadedWorkbook || (window.loadedAllEquipments && window.loadedAllEquipments.length > 0)) {
+                if (exportBtn) exportBtn.classList.remove('hidden');
+            } else {
+                if (exportBtn) exportBtn.classList.add('hidden');
+            }
+        }
     }
 }
 
@@ -160,7 +197,7 @@ function setFormReadOnly(readOnly) {
         }
         
         // Botones de firma y selección de modo
-        if (el.classList.contains('clear-sig-btn') || el.classList.contains('mode-sig-btn')) {
+        if (el.classList.contains('clear-sig-btn') || el.classList.contains('mode-sig-btn') || el.classList.contains('sig-clear-btn')) {
             el.disabled = readOnly;
             el.style.opacity = readOnly ? '0.5' : '1';
             el.style.pointerEvents = readOnly ? 'none' : 'auto';
@@ -188,36 +225,71 @@ function setFormReadOnly(readOnly) {
 
 async function handleLogin(event) {
     event.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
+    const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value;
     const errorMsg = document.getElementById('login-error-msg');
     
     if (errorMsg) errorMsg.classList.add('hidden');
     
-    if (!supabase) return;
+    // 1. Verificación local / offline de las dos cuentas fijas requeridas
+    if (email === 'admin@ispch.cl' && password === 'Admin.1234') {
+        currentUserRole = 'admin';
+        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: 'admin@ispch.cl', role: 'admin' }));
+        hideLoginOverlay();
+        applyRolePermissions();
+        showToast("Sesión iniciada como Administrador (Local).", "success");
+        await loadSubmissions();
+        lucide.createIcons();
+        return;
+    }
     
-    try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-    } catch (err) {
-        console.error("Error de autenticación:", err.message);
+    if (email === 'tecnico@ispch.cl' && password === 'Tacnico.1234') {
+        currentUserRole = 'tecnico';
+        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: 'tecnico@ispch.cl', role: 'tecnico' }));
+        hideLoginOverlay();
+        applyRolePermissions();
+        showToast("Sesión iniciada como Técnico (Local).", "success");
+        await loadSubmissions();
+        lucide.createIcons();
+        return;
+    }
+    
+    // 2. Si no coincide localmente, intentar con Supabase si está configurado
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error de autenticación remota:", err.message);
+            if (errorMsg) {
+                errorMsg.innerText = "Credenciales inválidas. Intente de nuevo.";
+                errorMsg.classList.remove('hidden');
+            }
+        }
+    } else {
         if (errorMsg) {
-            errorMsg.innerText = "Credenciales inválidas. Intente de nuevo.";
+            errorMsg.innerText = "Credenciales inválidas para el modo local.";
             errorMsg.classList.remove('hidden');
         }
     }
 }
 
 async function handleLogout() {
+    sessionStorage.removeItem('tic_auth_user');
+    currentUserRole = null;
+    
     if (supabase) {
         try {
             await supabase.auth.signOut();
-            currentUserRole = null;
-            showToast("Sesión cerrada.", "success");
         } catch (err) {
-            console.error("Error al cerrar sesión:", err.message);
+            console.error("Error al cerrar sesión remota:", err.message);
         }
     }
+    
+    showToast("Sesión cerrada.", "success");
+    showLoginOverlay();
+    submissions = [];
+    renderTable();
 }
 
 // --- RESOLUCIÓN Y SUBIDA DE FIRMAS (SUPABASE STORAGE) ---
@@ -363,10 +435,8 @@ window.addEventListener('load', () => {
     // Intentar precargar el catastro Excel desde el servidor local automáticamente
     preloadExcelData();
 
-    // Cargar caché local e iniciar sincronización de datos
-    currentUserRole = 'admin';
-    applyRolePermissions();
-    loadSubmissions();
+    // Verificar sesión e iniciar carga de datos
+    checkAuthSession();
 
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {

@@ -1178,12 +1178,15 @@ function autoDetectTypeFromFields(inputEl) {
     if (!tipoInput || !modeloInput || !serieInput) return;
     
     const tipoVal = tipoInput.value.trim().toLowerCase();
+    const marcaVal = marcaInput ? marcaInput.value.trim().toLowerCase() : '';
     const modeloVal = modeloInput.value.trim().toLowerCase();
     const serieVal = serieInput.value.trim().toLowerCase();
     
     let detectedType = '';
     
-    if (modeloVal.includes('probook') || tipoVal.includes('probook')) {
+    if (modeloVal.includes('veriton') || tipoVal.includes('veriton') || (marcaVal.includes('acer') && modeloVal.includes('veriton'))) {
+        detectedType = 'All In One';
+    } else if (modeloVal.includes('probook') || tipoVal.includes('probook')) {
         detectedType = 'Notebook';
     } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
         detectedType = 'Notebook';
@@ -1211,7 +1214,9 @@ function addEquipmentRow(data = {}) {
     const serieVal = String(data.serie || '').trim().toLowerCase();
     
     if (!tipoVal || tipoVal.toLowerCase() === 'equipo') {
-        if (modeloVal.includes('probook') || tipoVal.toLowerCase().includes('probook')) {
+        if (modeloVal.includes('veriton') || (marcaVal.includes('acer') && modeloVal.includes('veriton'))) {
+            tipoVal = 'All In One';
+        } else if (modeloVal.includes('probook') || tipoVal.toLowerCase().includes('probook')) {
             tipoVal = 'Notebook';
         } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
             tipoVal = 'Notebook';
@@ -1231,7 +1236,7 @@ function addEquipmentRow(data = {}) {
             <input type="text" name="eq_tipo" value="${escapeHTML(tipoVal)}" placeholder="Ej: Notebook" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
             <input type="text" name="eq_modelo" value="${escapeHTML(data.modelo || '')}" placeholder="Ej: ThinkPad L14" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
@@ -3120,8 +3125,11 @@ function splitEquipmentIfCombined(rawEq) {
         const itemTipoLower = item.tipo.toLowerCase();
         const itemModelLower = item.modelo.toLowerCase();
         const itemSerieLower = item.serie.toLowerCase();
+        const itemMarcaLower = item.marca ? item.marca.toLowerCase() : '';
 
-        if (itemModelLower.includes('probook') || itemTipoLower.includes('probook')) {
+        if (itemModelLower.includes('veriton') || itemTipoLower.includes('veriton') || (itemMarcaLower.includes('acer') && itemModelLower.includes('veriton'))) {
+            item.tipo = 'All In One';
+        } else if (itemModelLower.includes('probook') || itemTipoLower.includes('probook')) {
             item.tipo = 'Notebook';
         } else if (itemSerieLower.startsWith('5cd') || itemSerieLower.includes('5cd')) {
             item.tipo = 'Notebook';

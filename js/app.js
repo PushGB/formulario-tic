@@ -1140,7 +1140,8 @@ function handleRutInput(element) {
 
 // Alternar modo de firma (Digital / Manual)
 function toggleSigMode(id) {
-    const mode = document.querySelector(`input[name="sig_mode_${id}"]:checked`).value;
+    const modeRadio = document.querySelector(`input[name="sig_mode_${id}"]:checked`);
+    const mode = modeRadio ? modeRadio.value : 'digital';
     const container = document.getElementById(`sig-container-${id}`);
     const placeholder = document.getElementById(`sig-manual-placeholder-${id}`);
     
@@ -1157,7 +1158,8 @@ function toggleSigMode(id) {
 
 // Toggle Seccion Traspaso
 function toggleTraspasoSection() {
-    const isTraspaso = document.querySelector('input[name="solicitud_tipo"]:checked').value === 'Traspaso';
+    const tipoRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const isTraspaso = tipoRadio ? tipoRadio.value === 'Traspaso' : false;
     const section = document.getElementById('section-traspaso');
     if (isTraspaso) {
         section.classList.remove('hidden');
@@ -1172,6 +1174,7 @@ function autoDetectTypeFromFields(inputEl) {
     if (!row) return;
     
     const tipoInput = row.querySelector('[name="eq_tipo"]');
+    const marcaInput = row.querySelector('[name="eq_marca"]');
     const modeloInput = row.querySelector('[name="eq_modelo"]');
     const serieInput = row.querySelector('[name="eq_serie"]');
     
@@ -1210,6 +1213,7 @@ function addEquipmentRow(data = {}) {
     
     // Auto-detectar/normalizar tipo antes de rellenar la fila si viene genérico o vacío
     let tipoVal = String(data.tipo || '').trim();
+    const marcaVal = String(data.marca || '').trim().toLowerCase();
     const modeloVal = String(data.modelo || '').trim().toLowerCase();
     const serieVal = String(data.serie || '').trim().toLowerCase();
     
@@ -1496,8 +1500,10 @@ function getCoords(e, canvas, isTouch) {
 function saveForm(event) {
     event.preventDefault();
     
-    const tipo_solicitud = document.querySelector('input[name="solicitud_tipo"]:checked').value;
-    const propiedad_tipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
+    const tipoSolicitudRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const tipo_solicitud = tipoSolicitudRadio ? tipoSolicitudRadio.value : 'Asignacion';
+    const propiedadTipoRadio = document.querySelector('input[name="propiedad_tipo"]:checked');
+    const propiedad_tipo = propiedadTipoRadio ? propiedadTipoRadio.value : 'Fiscal';
     
     // Normalizar campos de la Sección 1 y Traspaso antes de validar
     const nombreField = document.getElementById('func-nombre');
@@ -1593,9 +1599,14 @@ function saveForm(event) {
     }
 
     // Obtener modos de firma
-    const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked').value;
-    const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked').value;
-    const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked').value;
+    const sigModeTicEl = document.querySelector('input[name="sig_mode_tic"]:checked');
+    const sigModeTic = sigModeTicEl ? sigModeTicEl.value : 'digital';
+    
+    const sigModeEmisorEl = document.querySelector('input[name="sig_mode_emisor"]:checked');
+    const sigModeEmisor = sigModeEmisorEl ? sigModeEmisorEl.value : 'digital';
+    
+    const sigModeReceptorEl = document.querySelector('input[name="sig_mode_receptor"]:checked');
+    const sigModeReceptor = sigModeReceptorEl ? sigModeReceptorEl.value : 'digital';
 
     // Validar firmas digitales requeridas
     if (sigModeTic === 'digital' && !drawingStates.tic.hasSigned) {
@@ -1758,8 +1769,10 @@ function syncPrintTemplate() {
     document.getElementById('print-func-depto').innerText = document.getElementById('func-depto').value.trim() || '-';
     
     // Seccion 2 checkboxes
-    const solicitudTipo = document.querySelector('input[name="solicitud_tipo"]:checked').value;
-    const propiedadTipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
+    const solTipoRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const solicitudTipo = solTipoRadio ? solTipoRadio.value : 'Asignacion';
+    const propTipoRadio = document.querySelector('input[name="propiedad_tipo"]:checked');
+    const propiedadTipo = propTipoRadio ? propTipoRadio.value : 'Fiscal';
     
     document.getElementById('print-solicitud-asignacion').querySelector('span').innerText = solicitudTipo === 'Asignacion' ? 'X' : '';
     document.getElementById('print-solicitud-traspaso').querySelector('span').innerText = solicitudTipo === 'Traspaso' ? 'X' : '';
@@ -1840,9 +1853,12 @@ function syncPrintTemplate() {
     document.getElementById('print-observaciones').innerText = document.getElementById('form-observaciones').value.trim() || 'Sin observaciones.';
     
     // Renderizar firmas de acuerdo a la modalidad
-    const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked').value;
-    const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked').value;
-    const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked').value;
+    const sigModeTicEl = document.querySelector('input[name="sig_mode_tic"]:checked');
+    const sigModeTic = sigModeTicEl ? sigModeTicEl.value : 'digital';
+    const sigModeEmisorEl = document.querySelector('input[name="sig_mode_emisor"]:checked');
+    const sigModeEmisor = sigModeEmisorEl ? sigModeEmisorEl.value : 'digital';
+    const sigModeReceptorEl = document.querySelector('input[name="sig_mode_receptor"]:checked');
+    const sigModeReceptor = sigModeReceptorEl ? sigModeReceptorEl.value : 'digital';
     
     // TIC (Pagina 1)
     const imgTic = document.getElementById('print-sig-tic-img');
@@ -1993,8 +2009,10 @@ function viewAndEditForm(id) {
     document.getElementById('func-depto').value = s.funcionario.depto;
 
     // Rellenar sección 2: Solicitud y propiedad
-    document.querySelector(`input[name="solicitud_tipo"][value="${s.tipo_solicitud}"]`).checked = true;
-    document.querySelector(`input[name="propiedad_tipo"][value="${s.propiedad_equipamiento}"]`).checked = true;
+    const solTipoRadio = document.querySelector(`input[name="solicitud_tipo"][value="${s.tipo_solicitud}"]`);
+    if (solTipoRadio) solTipoRadio.checked = true;
+    const propTipoRadio = document.querySelector(`input[name="propiedad_tipo"][value="${s.propiedad_equipamiento}"]`);
+    if (propTipoRadio) propTipoRadio.checked = true;
     
     // Desmarcar todos y re-marcar
     document.querySelectorAll('input[name="eq_cat"]').forEach(cb => cb.checked = false);
@@ -2027,9 +2045,12 @@ function viewAndEditForm(id) {
 
     // Rellenar modos de firma (Digital vs Manual)
     const sigModes = s.firmas || { tic_mode: 'digital', emisor_mode: 'digital', receptor_mode: 'digital' };
-    document.querySelector(`input[name="sig_mode_tic"][value="${sigModes.tic_mode || 'digital'}"]`).checked = true;
-    document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`).checked = true;
-    document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`).checked = true;
+    const ticRadio = document.querySelector(`input[name="sig_mode_tic"][value="${sigModes.tic_mode || 'digital'}"]`);
+    if (ticRadio) ticRadio.checked = true;
+    const emisorRadio = document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`);
+    if (emisorRadio) emisorRadio.checked = true;
+    const receptorRadio = document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`);
+    if (receptorRadio) receptorRadio.checked = true;
     
     toggleSigMode('tic');
     toggleSigMode('emisor');

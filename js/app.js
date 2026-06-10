@@ -726,8 +726,7 @@ function updateThemeIcon() {
 function consolidateDuplicateSubmissions() {
     if (submissions.length === 0) return;
     
-    const consolidated = [];
-    const rutMap = new Map(); // rut -> submission
+    const rutMap = new Map(); // rutKey -> submission
     let hasChanges = false;
     const deletedIds = [];
     const updatedSubmissions = new Set();
@@ -736,14 +735,13 @@ function consolidateDuplicateSubmissions() {
     for (let i = submissions.length - 1; i >= 0; i--) {
         const sub = submissions[i];
         if (!sub) continue;
-        const rawRut = sub.funcionario && sub.funcionario.rut;
-        if (!rawRut) {
-            consolidated.push(sub);
-            continue;
-        }
         
-        // Normalizar RUT
-        const rutKey = formatRut(rawRut);
+        const rawRut = sub.funcionario && sub.funcionario.rut;
+        const cleanRut = (rawRut || '').trim();
+        const shouldConsolidate = cleanRut && cleanRut !== '1-9' && cleanRut !== '-';
+        
+        // Normalizar RUT si corresponde, si no, usar una clave única para no consolidar y no perder el registro
+        const rutKey = shouldConsolidate ? formatRut(cleanRut) : ('no_consolidar_' + sub.id);
         
         if (rutMap.has(rutKey)) {
             const existing = rutMap.get(rutKey);
@@ -850,7 +848,9 @@ function consolidateDuplicateSubmissions() {
             if (!sub.funcionario) {
                 sub.funcionario = { nombre: '', rut: '', cargo: '', depto: '' };
             }
-            sub.funcionario.rut = rutKey;
+            if (shouldConsolidate) {
+                sub.funcionario.rut = rutKey;
+            }
             rutMap.set(rutKey, sub);
         }
     }

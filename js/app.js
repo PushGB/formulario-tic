@@ -111,7 +111,28 @@ function hideLoginOverlay() {
 }
 
 async function checkAuthSession() {
-    // 1. Si hay Supabase configurado, intentar autenticación remota y configurar listener reactivo
+    // 1. Comprobar si hay una sesión local en sessionStorage
+    const localUserStr = sessionStorage.getItem('tic_auth_user');
+    let localUser = null;
+    if (localUserStr) {
+        try {
+            localUser = JSON.parse(localUserStr);
+        } catch (e) {
+            sessionStorage.removeItem('tic_auth_user');
+        }
+    }
+
+    // 2. Si la sesión activa proviene de la base de datos local (local/offline), restaurarla de inmediato
+    if (localUser && localUser.source === 'local') {
+        currentUserRole = localUser.role;
+        hideLoginOverlay();
+        applyRolePermissions();
+        showToast(`Sesión restaurada: ${localUser.email}`, "success");
+        await loadSubmissions();
+        return;
+    }
+
+    // 3. Si no hay sesión local o es una sesión que proviene de la nube ('cloud')
     if (supabase) {
         try {
             // Obtener la sesión inicial de forma asíncrona para comprobar conectividad
@@ -123,13 +144,13 @@ async function checkAuthSession() {
                 console.log("Supabase Auth Event:", event, currentSession?.user?.email);
                 
                 if (currentSession) {
-                    // Evitar recargar y toasts si ya teníamos cargado al mismo usuario
+                    // Evitar recargar y toasts si ya teníamos cargado al mismo usuario desde la nube
                     const currentSessionUser = sessionStorage.getItem('tic_auth_user');
                     let alreadyLoaded = false;
                     if (currentSessionUser) {
                         try {
                             const parsed = JSON.parse(currentSessionUser);
-                            if (parsed.email === currentSession.user.email) {
+                            if (parsed.email === currentSession.user.email && parsed.source === 'cloud') {
                                 alreadyLoaded = true;
                             }
                         } catch (e) {}
@@ -138,10 +159,11 @@ async function checkAuthSession() {
                     hideLoginOverlay();
                     await fetchUserRole(currentSession.user);
                     
-                    // Respaldar sesión en sessionStorage para soporte offline/recarga rápida
+                    // Respaldar sesión en sessionStorage marcando que proviene de la nube
                     sessionStorage.setItem('tic_auth_user', JSON.stringify({
                         email: currentSession.user.email,
-                        role: currentUserRole
+                        role: currentUserRole,
+                        source: 'cloud'
                     }));
                     
                     applyRolePermissions();
@@ -153,27 +175,31 @@ async function checkAuthSession() {
                     await loadSubmissions();
                     lucide.createIcons();
                 } else {
-                    // Si no hay sesión remota, pero el navegador está offline, intentar fallback a sessionStorage
-                    if (!navigator.onLine) {
-                        const localUser = sessionStorage.getItem('tic_auth_user');
-                        if (localUser) {
-                            try {
-                                const user = JSON.parse(localUser);
-                                currentUserRole = user.role;
-                                hideLoginOverlay();
-                                applyRolePermissions();
-                                showToast(`Sesión restaurada (Modo Local): ${user.email}`, "success");
-                                await loadSubmissions();
-                                return;
-                            } catch (e) {}
-                        }
+                    // Si no hay sesión remota, pero la sesión local proviene de la base de datos local ('local'),
+                    // o el navegador está offline y tenemos una sesión local, la respetamos.
+                    const currentSessionUser = sessionStorage.getItem('tic_auth_user');
+                    let isCloudSession = false;
+                    if (currentSessionUser) {
+                        try {
+                            const parsed = JSON.parse(currentSessionUser);
+                            if (parsed.source === 'cloud') {
+                                isCloudSession = true;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (!currentSession && !navigator.onLine && currentSessionUser) {
+                        // Modo offline: conservar sesión local
+                        return;
                     }
                     
-                    // Si no hay sesión remota y estamos online (o no hay fallback local), limpiar y forzar login
-                    sessionStorage.removeItem('tic_auth_user');
-                    showLoginOverlay();
-                    submissions = [];
-                    renderTable();
+                    // Si la sesión activa era de la nube (o no había sesión) y ahora es nula, forzar login
+                    if (isCloudSession || !currentSessionUser) {
+                        sessionStorage.removeItem('tic_auth_user');
+                        showLoginOverlay();
+                        submissions = [];
+                        renderTable();
+                    }
                 }
             });
 
@@ -186,15 +212,13 @@ async function checkAuthSession() {
         }
     }
     
-    // 2. Fallback offline: si Supabase falló o no está inicializado, intentar usar sessionStorage
-    const localUser = sessionStorage.getItem('tic_auth_user');
+    // 4. Fallback offline: si Supabase falló o no está inicializado, e intentamos usar sessionStorage
     if (localUser) {
         try {
-            const user = JSON.parse(localUser);
-            currentUserRole = user.role;
+            currentUserRole = localUser.role;
             hideLoginOverlay();
             applyRolePermissions();
-            showToast(`Sesión restaurada (Modo Offline): ${user.email}`, "success");
+            showToast(`Sesión restaurada (Modo Offline): ${localUser.email}`, "success");
             await loadSubmissions();
             return;
         } catch (e) {
@@ -203,7 +227,7 @@ async function checkAuthSession() {
         }
     }
     
-    // 3. Si no hay sesión local ni en la nube, mostrar login
+    // 5. Si no hay sesión local ni en la nube, mostrar login
     showLoginOverlay();
     submissions = [];
     renderTable();
@@ -331,7 +355,7 @@ async function handleLogin(event) {
                 const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
                 if (matchedUser) {
                     currentUserRole = matchedUser.role;
-                    sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+                    sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role, source: 'local' }));
                     hideLoginOverlay();
                     applyRolePermissions();
                     showToast(`Sesión iniciada (Modo Offline).`, 'success');
@@ -351,7 +375,7 @@ async function handleLogin(event) {
                 const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
                 if (matchedUser) {
                     currentUserRole = matchedUser.role;
-                    sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+                    sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role, source: 'local' }));
                     hideLoginOverlay();
                     applyRolePermissions();
                     showToast(`Sesión iniciada (Sin conexión — modo local).`, 'success');
@@ -373,7 +397,7 @@ async function handleLogin(event) {
         const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
         if (matchedUser) {
             currentUserRole = matchedUser.role;
-            sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+            sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role, source: 'local' }));
             hideLoginOverlay();
             applyRolePermissions();
             showToast(`Sesión iniciada (Modo Local).`, 'success');

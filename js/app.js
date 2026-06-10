@@ -172,16 +172,19 @@ function applyRolePermissions() {
     const uploadLabel = document.getElementById('excel-upload-label');
     const exportBtn = document.getElementById('excel-export-btn');
     const navUsers = document.getElementById('nav-users');
+    const clearDbBtn = document.getElementById('admin-clear-db-btn');
     
     if (currentUserRole === 'tecnico') {
         if (uploadLabel) uploadLabel.classList.add('hidden');
         if (exportBtn) exportBtn.classList.add('hidden');
         if (navUsers) navUsers.classList.add('hidden');
+        if (clearDbBtn) clearDbBtn.classList.add('hidden');
         if (activeTab === 'users') {
             switchTab('dashboard');
         }
     } else if (currentUserRole === 'admin') {
         if (uploadLabel) uploadLabel.classList.remove('hidden');
+        if (clearDbBtn) clearDbBtn.classList.remove('hidden');
         if (window.uploadedWorkbook || (window.loadedAllEquipments && window.loadedAllEquipments.length > 0)) {
             if (exportBtn) exportBtn.classList.remove('hidden');
         } else {
@@ -634,6 +637,7 @@ window.addEventListener('load', () => {
             }
         });
     }
+    updateStatusIndicator();
 });
 
 // Inicializar la sincronización en tiempo real de Supabase
@@ -2408,7 +2412,10 @@ function handleExcelUpload(event) {
 
 // Intentar cargar el catastro de equipos desde Supabase
 async function loadCatastroFromSupabase() {
-    if (!supabase) return false;
+    if (!supabase) {
+        updateStatusIndicator();
+        return false;
+    }
     try {
         const { data, error } = await supabase
             .from('catastro_equipos')
@@ -2462,11 +2469,33 @@ async function loadCatastroFromSupabase() {
                 renderMetrics();
             }
             
+            updateStatusIndicator();
             return true;
+        } else {
+            loadedAllEquipments = [];
+            const badge = document.getElementById('excel-status-badge');
+            if (badge) {
+                badge.innerHTML = `
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-450 border border-amber-200/50 dark:border-amber-800 text-xs font-semibold">
+                        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        Catastro Vacío: No hay equipos registrados en la base de datos.
+                    </div>
+                `;
+            }
+            
+            const exportBtn = document.getElementById('excel-export-btn');
+            if (exportBtn) exportBtn.classList.add('hidden');
+            
+            renderTable();
+            updateStats();
+            if (activeTab === 'metrics') {
+                renderMetrics();
+            }
         }
     } catch (e) {
         console.error("Error al cargar catastro desde Supabase:", e.message);
     }
+    updateStatusIndicator();
     return false;
 }
 
@@ -2517,9 +2546,11 @@ async function saveCatastroToSupabase(equipments) {
         }
         console.log(`Sincronizados ${successful} equipos con Supabase.`);
         showToast(`Sincronización de catastro exitosa: ${successful} equipos guardados.`, "success");
+        updateStatusIndicator();
     } catch (e) {
         console.error("Error al sincronizar catastro con Supabase:", e);
         showToast("Error de base de datos: " + (e.message || JSON.stringify(e) || e), "error");
+        updateStatusIndicator();
     }
 }
 
@@ -2636,6 +2667,8 @@ function processWorkbookData(isManualUpload = false) {
     
     if (isManualUpload && supabase && loadedAllEquipments.length > 0) {
         saveCatastroToSupabase(loadedAllEquipments);
+    } else {
+        updateStatusIndicator();
     }
     
     // 3. Procesar Hoja de Equipos para importar registros ya catastrados
@@ -4627,3 +4660,91 @@ window.deleteUser = deleteUser;
 window.openChangePassModal = openChangePassModal;
 window.closeChangePassModal = closeChangePassModal;
 window.saveUserPassword = saveUserPassword;
+
+// =======================================================================
+// CONTROL DE ESTADO (ONLINE & CARGADO) Y OPERACIONES DE CATASTRO
+// =======================================================================
+
+function updateStatusIndicator() {
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const statusIndicator = document.getElementById('status-indicator');
+    if (!statusDot || !statusText) return;
+
+    const isOnline = navigator.onLine;
+    const catastroCount = (window.loadedAllEquipments && window.loadedAllEquipments.length) || 0;
+
+    if (isOnline) {
+        if (catastroCount > 0) {
+            statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            statusText.textContent = `En Línea | Catastro: ${catastroCount}`;
+            if (statusIndicator) statusIndicator.title = `Conexión activa. Catastro cargado con ${catastroCount} equipos.`;
+        } else {
+            statusDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+            statusText.textContent = 'En Línea | Catastro Vacío';
+            if (statusIndicator) statusIndicator.title = 'Conexión activa, pero el catastro de equipos está vacío en la base de datos.';
+        }
+    } else {
+        statusDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-pulse';
+        statusText.textContent = 'Sin Conexión';
+        if (statusIndicator) statusIndicator.title = 'No hay conexión a Internet. El sistema funciona en modo local/fuera de línea.';
+    }
+}
+
+async function clearDatabase() {
+    if (currentUserRole !== 'admin') {
+        showToast("Acción no autorizada. Solo administradores.", "error");
+        return;
+    }
+
+    const confirmClear = confirm("¿Está seguro de que desea eliminar TODO el catastro de equipos en Supabase? Esta acción es irreversible y borrará todos los registros de inventario cargados.");
+    if (!confirmClear) return;
+
+    try {
+        showToast("Eliminando catastro de equipos...", "info");
+        
+        const { error } = await supabase
+            .from('catastro_equipos')
+            .delete()
+            .neq('id', 0);
+
+        if (error) throw error;
+
+        loadedAllEquipments = [];
+        
+        // Actualizar interfaz con el badge vacío
+        const badge = document.getElementById('excel-status-badge');
+        if (badge) {
+            badge.innerHTML = `
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-450 border border-amber-200/50 dark:border-amber-800 text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Catastro Vacío: No hay equipos registrados en la base de datos.
+                </div>
+            `;
+        }
+
+        const exportBtn = document.getElementById('excel-export-btn');
+        if (exportBtn) exportBtn.classList.add('hidden');
+
+        // Refrescar tablas y métricas
+        renderTable();
+        updateStats();
+        if (activeTab === 'metrics') {
+            renderMetrics();
+        }
+        
+        updateStatusIndicator();
+        showToast("Catastro de equipos vaciado correctamente.", "success");
+    } catch (e) {
+        console.error("Error al vaciar catastro:", e);
+        showToast("Error al vaciar catastro: " + (e.message || e), "error");
+    }
+}
+
+// Event Listeners para detección de conectividad
+window.addEventListener('online', updateStatusIndicator);
+window.addEventListener('offline', updateStatusIndicator);
+
+// Exportar funciones globales
+window.clearDatabase = clearDatabase;
+window.updateStatusIndicator = updateStatusIndicator;

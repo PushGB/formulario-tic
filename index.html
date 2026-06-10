@@ -138,6 +138,12 @@
                                 <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Salir</span>
                             </button>
                             <div id="auth-divider" class="hidden h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+                            <!-- Indicador de Estado (Online & Cargado) -->
+                            <div id="status-indicator" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/50 dark:border-slate-800/50 text-xs font-semibold select-none cursor-help" title="Estado de la conexión y catastro">
+                                <span id="status-dot" class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                <span id="status-text" class="text-[10px] text-slate-500 dark:text-slate-400 hidden md:inline">Verificando...</span>
+                            </div>
+                            <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
                             <button onclick="toggleTheme()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors" title="Cambiar Tema">
                                 <span id="theme-toggle-icon"><i data-lucide="moon" class="w-4.5 h-4.5"></i></span>
                             </button>
@@ -166,6 +172,9 @@
                             <i data-lucide="upload" class="w-4 h-4"></i> Cargar Catastro Excel
                             <input type="file" id="excel-file-input" class="hidden" accept=".xlsx" onchange="handleExcelUpload(event)">
                         </label>
+                        <button id="admin-clear-db-btn" onclick="clearDatabase()" class="hidden bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-455 border border-rose-600/20 px-4 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> Vaciar Catastro
+                        </button>
                         <button id="excel-export-btn" onclick="exportUpdatedExcel()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px]">
                             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Catastro Actualizado
                         </button>

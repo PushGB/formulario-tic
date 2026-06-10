@@ -111,7 +111,82 @@ function hideLoginOverlay() {
 }
 
 async function checkAuthSession() {
-    // 1. Intentar restaurar sesión local desde sessionStorage (Modo offline/recarga rápida)
+    // 1. Si hay Supabase configurado, intentar autenticación remota y configurar listener reactivo
+    if (supabase) {
+        try {
+            // Obtener la sesión inicial de forma asíncrona para comprobar conectividad
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) throw error;
+
+            // Configurar el listener reactivo para que maneje la sesión de Supabase Auth en tiempo real
+            supabase.auth.onAuthStateChange(async (event, currentSession) => {
+                console.log("Supabase Auth Event:", event, currentSession?.user?.email);
+                
+                if (currentSession) {
+                    // Evitar recargar y toasts si ya teníamos cargado al mismo usuario
+                    const currentSessionUser = sessionStorage.getItem('tic_auth_user');
+                    let alreadyLoaded = false;
+                    if (currentSessionUser) {
+                        try {
+                            const parsed = JSON.parse(currentSessionUser);
+                            if (parsed.email === currentSession.user.email) {
+                                alreadyLoaded = true;
+                            }
+                        } catch (e) {}
+                    }
+
+                    hideLoginOverlay();
+                    await fetchUserRole(currentSession.user);
+                    
+                    // Respaldar sesión en sessionStorage para soporte offline/recarga rápida
+                    sessionStorage.setItem('tic_auth_user', JSON.stringify({
+                        email: currentSession.user.email,
+                        role: currentUserRole
+                    }));
+                    
+                    applyRolePermissions();
+                    
+                    if (!alreadyLoaded) {
+                        showToast(`Sesión iniciada (Nube): ${currentSession.user.email}`, "success");
+                    }
+                    
+                    await loadSubmissions();
+                    lucide.createIcons();
+                } else {
+                    // Si no hay sesión remota, pero el navegador está offline, intentar fallback a sessionStorage
+                    if (!navigator.onLine) {
+                        const localUser = sessionStorage.getItem('tic_auth_user');
+                        if (localUser) {
+                            try {
+                                const user = JSON.parse(localUser);
+                                currentUserRole = user.role;
+                                hideLoginOverlay();
+                                applyRolePermissions();
+                                showToast(`Sesión restaurada (Modo Local): ${user.email}`, "success");
+                                await loadSubmissions();
+                                return;
+                            } catch (e) {}
+                        }
+                    }
+                    
+                    // Si no hay sesión remota y estamos online (o no hay fallback local), limpiar y forzar login
+                    sessionStorage.removeItem('tic_auth_user');
+                    showLoginOverlay();
+                    submissions = [];
+                    renderTable();
+                }
+            });
+
+            // Si hay sesión inicial válida, delegamos en el listener y salimos
+            if (session) {
+                return;
+            }
+        } catch (err) {
+            console.warn("Supabase no disponible o error de conexión. Usando modo offline:", err.message);
+        }
+    }
+    
+    // 2. Fallback offline: si Supabase falló o no está inicializado, intentar usar sessionStorage
     const localUser = sessionStorage.getItem('tic_auth_user');
     if (localUser) {
         try {
@@ -119,62 +194,16 @@ async function checkAuthSession() {
             currentUserRole = user.role;
             hideLoginOverlay();
             applyRolePermissions();
-            showToast(`Sesión restaurada: ${user.email}`, "success");
+            showToast(`Sesión restaurada (Modo Offline): ${user.email}`, "success");
             await loadSubmissions();
             return;
         } catch (e) {
-            console.error("Error al parsear usuario local:", e);
+            console.error("Error al parsear usuario local offline:", e);
             sessionStorage.removeItem('tic_auth_user');
         }
     }
     
-    // 2. Si no hay sesión local y hay Supabase configurado, suscribirse a eventos de auth reactivamente
-    if (supabase) {
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Supabase Auth Event:", event, session?.user?.email);
-            
-            if (session) {
-                // Verificar si ya habíamos cargado este usuario para evitar toasts redundantes al recargar
-                const currentSessionUser = sessionStorage.getItem('tic_auth_user');
-                let alreadyLoaded = false;
-                if (currentSessionUser) {
-                    try {
-                        const parsed = JSON.parse(currentSessionUser);
-                        if (parsed.email === session.user.email) {
-                            alreadyLoaded = true;
-                        }
-                    } catch (e) {}
-                }
-
-                hideLoginOverlay();
-                await fetchUserRole(session.user);
-                
-                // Guardar sesión en sessionStorage para soporte offline y recargas rápidas
-                sessionStorage.setItem('tic_auth_user', JSON.stringify({
-                    email: session.user.email,
-                    role: currentUserRole
-                }));
-                
-                applyRolePermissions();
-                
-                if (!alreadyLoaded) {
-                    showToast(`Sesión iniciada (Nube): ${session.user.email}`, "success");
-                }
-                
-                await loadSubmissions();
-                lucide.createIcons();
-            } else {
-                // Sesión no iniciada o cerrada
-                sessionStorage.removeItem('tic_auth_user');
-                showLoginOverlay();
-                submissions = [];
-                renderTable();
-            }
-        });
-        return;
-    }
-    
-    // 3. Si no hay sesión local ni Supabase, mostrar el overlay de login y deshabilitar navegación
+    // 3. Si no hay sesión local ni en la nube, mostrar login
     showLoginOverlay();
     submissions = [];
     renderTable();

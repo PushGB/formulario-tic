@@ -234,43 +234,90 @@ async function handleLogin(event) {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value;
     const errorMsg = document.getElementById('login-error-msg');
-    
+    const loginBtn = event.target.querySelector('button[type="submit"]');
+
     if (errorMsg) errorMsg.classList.add('hidden');
-    
-    // 1. Verificación local / offline en localStorage
-    initLocalUsersStorage();
-    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
-    const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
-    
-    if (matchedUser) {
-        currentUserRole = matchedUser.role;
-        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
-        hideLoginOverlay();
-        applyRolePermissions();
-        showToast(`Sesión iniciada como ${matchedUser.role === 'admin' ? 'Administrador' : 'Técnico'} (Local).`, "success");
-        await loadSubmissions();
-        lucide.createIcons();
-        return;
-    }
-    
-    // 2. Si no coincide localmente, intentar con Supabase si está configurado
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.innerText = 'Ingresando...'; }
+
+    // 1. PRIMERO: intentar con Supabase Auth (fuente de verdad)
     if (supabase) {
         try {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
+            // onAuthStateChange en checkAuthSession manejará el resto
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Ingresar'; }
+            return;
         } catch (err) {
-            console.error("Error de autenticación remota:", err.message);
-            if (errorMsg) {
-                errorMsg.innerText = "Credenciales inválidas. Intente de nuevo.";
-                errorMsg.classList.remove('hidden');
+            // Solo si el error NO es de credenciales, intentar local
+            const isCredentialError = err.message.toLowerCase().includes('invalid') ||
+                err.message.toLowerCase().includes('credentials') ||
+                err.message.toLowerCase().includes('email') ||
+                err.message.toLowerCase().includes('password');
+
+            if (isCredentialError) {
+                // Intentar fallback local (modo offline)
+                initLocalUsersStorage();
+                const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+                const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
+                if (matchedUser) {
+                    currentUserRole = matchedUser.role;
+                    sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+                    hideLoginOverlay();
+                    applyRolePermissions();
+                    showToast(`Sesión iniciada (Modo Offline).`, 'success');
+                    await loadSubmissions();
+                    lucide.createIcons();
+                    if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Ingresar'; }
+                    return;
+                }
+                if (errorMsg) {
+                    errorMsg.innerText = 'Correo o contraseña incorrectos.';
+                    errorMsg.classList.remove('hidden');
+                }
+            } else {
+                // Error de red: intentar local
+                initLocalUsersStorage();
+                const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+                const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
+                if (matchedUser) {
+                    currentUserRole = matchedUser.role;
+                    sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+                    hideLoginOverlay();
+                    applyRolePermissions();
+                    showToast(`Sesión iniciada (Sin conexión — modo local).`, 'success');
+                    await loadSubmissions();
+                    lucide.createIcons();
+                    if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Ingresar'; }
+                    return;
+                }
+                if (errorMsg) {
+                    errorMsg.innerText = 'Sin conexión y credenciales locales no encontradas.';
+                    errorMsg.classList.remove('hidden');
+                }
             }
         }
     } else {
-        if (errorMsg) {
-            errorMsg.innerText = "Credenciales inválidas para el modo local.";
-            errorMsg.classList.remove('hidden');
+        // Sin Supabase configurado: solo modo local
+        initLocalUsersStorage();
+        const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+        const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
+        if (matchedUser) {
+            currentUserRole = matchedUser.role;
+            sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+            hideLoginOverlay();
+            applyRolePermissions();
+            showToast(`Sesión iniciada (Modo Local).`, 'success');
+            await loadSubmissions();
+            lucide.createIcons();
+        } else {
+            if (errorMsg) {
+                errorMsg.innerText = 'Credenciales incorrectas (modo local).';
+                errorMsg.classList.remove('hidden');
+            }
         }
     }
+
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Ingresar'; }
 }
 
 async function handleLogout() {
@@ -291,55 +338,74 @@ async function handleLogout() {
     renderTable();
 }
 
-// --- GESTIÓN DE ACCESOS Y USUARIOS (SUPABASE AUTH + FALLBACK LOCAL) ---
+// --- GESTIÓN DE ACCESOS Y USUARIOS (VIA VERCEL API ROUTE — SERVICE KEY SOLO SERVER-SIDE) ---
 
-// Inicializar listado local de usuarios en localStorage si no existe (solo modo offline)
+// Helper: obtener el JWT de la sesión actual para autenticar las llamadas al API route
+async function _getSessionToken() {
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+}
+
+// Helper: llamar al API route seguro /api/manage-users
+async function _callManageUsers(payload) {
+    const token = await _getSessionToken();
+    if (!token) throw new Error('No hay sesión activa. Inicia sesión para continuar.');
+
+    const resp = await fetch('/api/manage-users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || 'Error en el servidor.');
+    return result;
+}
+
+// Inicializar usuarios por defecto en localStorage (solo para modo offline)
 function initLocalUsersStorage() {
-    let localUsers = localStorage.getItem('tic_local_users');
-    if (!localUsers) {
-        const defaultUsers = [
+    if (!localStorage.getItem('tic_local_users')) {
+        localStorage.setItem('tic_local_users', JSON.stringify([
             { email: 'admin@ispch.cl', password: 'Admin.1234', role: 'admin' },
-            { email: 'tecnico@ispch.cl', password: 'Tecnico.1234', role: 'tecnico' }
-        ];
-        localStorage.setItem('tic_local_users', JSON.stringify(defaultUsers));
+        ]));
     }
 }
 
-// Renderizar la tabla de usuarios - lee desde Supabase user_roles si está disponible
+// Renderizar tabla de usuarios — usa /api/manage-users con action=list
 async function renderUsersTab() {
     const tbody = document.getElementById('local-users-list');
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="3" class="py-6 text-center text-slate-400 text-xs">Cargando usuarios...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="py-6 text-center text-slate-400 text-xs"><div class="flex items-center justify-center gap-2"><svg class="animate-spin w-4 h-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Cargando usuarios...</div></td></tr>`;
 
     let currentAuthEmail = '';
-    const localSession = sessionStorage.getItem('tic_auth_user');
-    if (localSession) {
-        try { currentAuthEmail = JSON.parse(localSession).email.toLowerCase(); } catch(e) {}
-    }
+    try {
+        const s = sessionStorage.getItem('tic_auth_user');
+        if (s) currentAuthEmail = JSON.parse(s).email?.toLowerCase() || '';
+        if (!currentAuthEmail && supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            currentAuthEmail = session?.user?.email?.toLowerCase() || '';
+        }
+    } catch(e) {}
 
     let users = [];
+    let source = 'api';
 
-    // 1. Intentar cargar desde Supabase (fuente de verdad)
-    if (supabase) {
-        try {
-            const { data, error } = await supabase
-                .from('user_roles')
-                .select('email, role, created_at')
-                .order('created_at', { ascending: true });
-            if (!error && data) {
-                users = data.map(u => ({ email: u.email, role: u.role, source: 'supabase' }));
-            }
-        } catch (e) {
-            console.warn('No se pudo cargar usuarios desde Supabase:', e.message);
-        }
-    }
-
-    // 2. Fallback a localStorage si Supabase no devolvió nada
-    if (users.length === 0) {
+    try {
+        const result = await _callManageUsers({ action: 'list' });
+        users = result.users || [];
+    } catch (err) {
+        console.warn('API no disponible, usando localStorage:', err.message);
+        // Fallback offline
         initLocalUsersStorage();
-        const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
-        users = localUsers.map(u => ({ email: u.email, role: u.role, source: 'local' }));
+        users = JSON.parse(localStorage.getItem('tic_local_users') || '[]').map(u => ({
+            email: u.email, role: u.role
+        }));
+        source = 'local';
     }
 
     tbody.innerHTML = '';
@@ -349,25 +415,28 @@ async function renderUsersTab() {
         return;
     }
 
+    // Banner si estamos en modo offline
+    if (source === 'local') {
+        const banner = document.createElement('tr');
+        banner.innerHTML = `<td colspan="3" class="py-2 px-4 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-xs text-center">⚠️ Mostrando usuarios locales — sin conexión al servidor</td>`;
+        tbody.appendChild(banner);
+    }
+
     users.forEach(u => {
         const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850/60";
+        tr.className = 'hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850/60';
 
         const roleBadge = u.role === 'admin'
             ? '<span class="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold font-mono text-[9px] uppercase tracking-wider">Administrador</span>'
             : '<span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold font-mono text-[9px] uppercase tracking-wider">Técnico</span>';
 
-        const sourceBadge = u.source === 'local'
-            ? '<span class="text-[9px] text-amber-500 font-mono ml-1" title="Usuario local (solo este navegador)">[local]</span>'
-            : '';
-
-        const isSelf = u.email.toLowerCase() === currentAuthEmail;
+        const isSelf = u.email?.toLowerCase() === currentAuthEmail;
         const deleteButton = isSelf
             ? '<span class="text-[9px] text-slate-400 font-medium italic">Tu Cuenta</span>'
             : `<button type="button" onclick="deleteUser('${escapeHTML(u.email)}')" class="p-1.5 text-rose-500 hover:text-rose-750 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Eliminar Cuenta"><i data-lucide="user-minus" class="w-4 h-4"></i></button>`;
 
         tr.innerHTML = `
-            <td class="py-3 px-4 font-medium text-slate-800 dark:text-slate-200">${escapeHTML(u.email)}${sourceBadge}</td>
+            <td class="py-3 px-4 font-medium text-slate-800 dark:text-slate-200">${escapeHTML(u.email)}</td>
             <td class="py-3 px-4">${roleBadge}</td>
             <td class="py-3 px-4 text-center">
                 <div class="flex items-center justify-center gap-2">
@@ -384,178 +453,54 @@ async function renderUsersTab() {
     lucide.createIcons();
 }
 
-// Crear usuario en Supabase Auth (con admin API vía fetch) + fallback local
+// Crear usuario — llama al API route seguro
 async function createUser(event) {
     event.preventDefault();
     const email = document.getElementById('new-user-email').value.trim().toLowerCase();
     const password = document.getElementById('new-user-password').value;
     const role = document.getElementById('new-user-role').value;
 
-    if (!email || !password || !role) {
-        showToast("Por favor complete todos los campos.", "error");
-        return;
-    }
-    if (password.length < 6) {
-        showToast("La contraseña debe tener al menos 6 caracteres.", "error");
-        return;
-    }
+    if (!email || !password || !role) { showToast('Por favor complete todos los campos.', 'error'); return; }
+    if (password.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres.', 'error'); return; }
 
     const submitBtn = event.target.querySelector('button[type="submit"]');
     if (submitBtn) { submitBtn.disabled = true; submitBtn.innerText = 'Creando...'; }
 
-    // 1. Intentar crear en Supabase Auth via Admin API
-    if (supabase) {
-        try {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-            if (supabaseUrl && serviceKey) {
-                // Crear usuario en Supabase Auth con service_role
-                const resp = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': serviceKey,
-                        'Authorization': `Bearer ${serviceKey}`
-                    },
-                    body: JSON.stringify({
-                        email,
-                        password,
-                        email_confirm: true,
-                        user_metadata: { role }
-                    })
-                });
-
-                const result = await resp.json();
-
-                if (!resp.ok) {
-                    const errMsg = result?.msg || result?.message || result?.error_description || 'Error al crear usuario.';
-                    throw new Error(errMsg);
-                }
-
-                const newUserId = result.id;
-
-                // Guardar rol en la tabla user_roles
-                const { error: roleError } = await supabase
-                    .from('user_roles')
-                    .upsert({ user_id: newUserId, email, role }, { onConflict: 'user_id' });
-
-                if (roleError) {
-                    console.warn('Usuario creado pero error al guardar rol:', roleError.message);
-                }
-
-                document.getElementById('create-user-form').reset();
-                showToast(`✅ Cuenta creada en la nube: ${email} (${role === 'admin' ? 'Administrador' : 'Técnico'})`, "success");
-                await renderUsersTab();
-
-            } else {
-                throw new Error('Service role key no configurado. Usando modo local.');
-            }
-        } catch (err) {
-            console.error("Error al crear usuario en Supabase:", err.message);
-
-            // Si el error es que ya existe, informar directamente
-            if (err.message.toLowerCase().includes('already') || err.message.toLowerCase().includes('existe') || err.message.toLowerCase().includes('registered')) {
-                showToast("Este correo ya tiene una cuenta registrada.", "error");
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Crear Cuenta'; lucide.createIcons(); }
-                return;
-            }
-
-            // Fallback: guardar solo local con aviso
-            showToast(`⚠️ Guardado solo local (${err.message.substring(0, 60)}). El usuario solo podrá entrar desde este navegador.`, "error");
-            _createUserLocal(email, password, role);
+    try {
+        await _callManageUsers({ action: 'create', email, password, role });
+        document.getElementById('create-user-form').reset();
+        showToast(`✅ Cuenta creada: ${email} (${role === 'admin' ? 'Administrador' : 'Técnico'})`, 'success');
+        await renderUsersTab();
+    } catch (err) {
+        const msg = err.message || '';
+        if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('registrado') || msg.toLowerCase().includes('existe')) {
+            showToast('Este correo ya tiene una cuenta registrada.', 'error');
+        } else {
+            showToast(`Error: ${msg}`, 'error');
         }
-    } else {
-        // Sin Supabase: modo completamente local
-        _createUserLocal(email, password, role);
-        showToast(`⚠️ Cuenta creada solo localmente. El usuario solo puede ingresar desde este navegador.`, "success");
     }
 
     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Crear Cuenta'; lucide.createIcons(); }
 }
 
-// Crear usuario solo en localStorage (modo offline/fallback)
-function _createUserLocal(email, password, role) {
-    initLocalUsersStorage();
-    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
-    const exists = localUsers.some(u => u.email.toLowerCase() === email);
-    if (exists) {
-        showToast("Este correo ya existe localmente.", "error");
-        return;
-    }
-    localUsers.push({ email, password, role });
-    localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
-    document.getElementById('create-user-form')?.reset();
-    renderUsersTab();
-}
-
-// Eliminar usuario de Supabase Auth + localStorage
+// Eliminar usuario — llama al API route seguro
 async function deleteUser(email) {
-    if (!confirm(`¿Está seguro de que desea eliminar la cuenta: ${email}?`)) return;
+    if (!confirm(`¿Eliminar la cuenta ${email}?`)) return;
 
-    // Protección: no eliminar el último admin
-    initLocalUsersStorage();
-    let localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
-    const targetLocal = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (targetLocal && targetLocal.role === 'admin') {
-        const adminCount = localUsers.filter(u => u.role === 'admin').length;
-        if (adminCount <= 1) {
-            showToast("No se puede eliminar el único administrador.", "error");
-            return;
-        }
+    try {
+        await _callManageUsers({ action: 'delete', email });
+        showToast(`Cuenta eliminada: ${email}`, 'success');
+        await renderUsersTab();
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
     }
-
-    let deletedFromSupabase = false;
-
-    if (supabase) {
-        try {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-            if (supabaseUrl && serviceKey) {
-                // Buscar user_id en user_roles
-                const { data: roleData } = await supabase
-                    .from('user_roles')
-                    .select('user_id')
-                    .eq('email', email.toLowerCase())
-                    .single();
-
-                if (roleData?.user_id) {
-                    const resp = await fetch(`${supabaseUrl}/auth/v1/admin/users/${roleData.user_id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'apikey': serviceKey,
-                            'Authorization': `Bearer ${serviceKey}`
-                        }
-                    });
-                    if (resp.ok) {
-                        deletedFromSupabase = true;
-                    }
-                }
-                // Eliminar de user_roles también (CASCADE debería hacerlo, pero por seguridad)
-                await supabase.from('user_roles').delete().eq('email', email.toLowerCase());
-            }
-        } catch (e) {
-            console.warn('No se pudo eliminar de Supabase:', e.message);
-        }
-    }
-
-    // Limpiar también en localStorage
-    localUsers = localUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase());
-    localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
-
-    showToast(deletedFromSupabase
-        ? `Cuenta eliminada: ${email}`
-        : `Cuenta eliminada localmente: ${email}`, "success");
-    await renderUsersTab();
 }
 
-// Abrir el modal de cambio de contraseña
+// Abrir modal cambio de contraseña
 function openChangePassModal(email) {
     const modal = document.getElementById('change-pass-modal');
     const displayEmail = document.getElementById('change-pass-email-display');
     const hiddenEmail = document.getElementById('change-pass-email-hidden');
-
     if (modal && displayEmail && hiddenEmail) {
         displayEmail.innerText = email;
         hiddenEmail.value = email;
@@ -564,72 +509,28 @@ function openChangePassModal(email) {
     }
 }
 
-// Cerrar el modal de cambio de contraseña
+// Cerrar modal cambio de contraseña
 function closeChangePassModal() {
     const modal = document.getElementById('change-pass-modal');
     if (modal) modal.classList.add('hidden');
 }
 
-// Cambiar contraseña en Supabase Auth + localStorage
+// Cambiar contraseña — llama al API route seguro
 async function saveUserPassword(event) {
     event.preventDefault();
     const email = document.getElementById('change-pass-email-hidden').value;
     const newPassword = document.getElementById('change-pass-new-password').value;
 
-    if (!email || !newPassword) {
-        showToast("La contraseña no puede estar vacía.", "error");
-        return;
+    if (!email || !newPassword) { showToast('La contraseña no puede estar vacía.', 'error'); return; }
+    if (newPassword.length < 6) { showToast('Mínimo 6 caracteres.', 'error'); return; }
+
+    try {
+        await _callManageUsers({ action: 'update-password', email, password: newPassword });
+        showToast(`✅ Contraseña actualizada para ${email}.`, 'success');
+        closeChangePassModal();
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
     }
-    if (newPassword.length < 6) {
-        showToast("La contraseña debe tener al menos 6 caracteres.", "error");
-        return;
-    }
-
-    let updatedInSupabase = false;
-
-    if (supabase) {
-        try {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-            if (supabaseUrl && serviceKey) {
-                const { data: roleData } = await supabase
-                    .from('user_roles')
-                    .select('user_id')
-                    .eq('email', email.toLowerCase())
-                    .single();
-
-                if (roleData?.user_id) {
-                    const resp = await fetch(`${supabaseUrl}/auth/v1/admin/users/${roleData.user_id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': serviceKey,
-                            'Authorization': `Bearer ${serviceKey}`
-                        },
-                        body: JSON.stringify({ password: newPassword })
-                    });
-                    if (resp.ok) updatedInSupabase = true;
-                }
-            }
-        } catch (e) {
-            console.warn('No se pudo actualizar contraseña en Supabase:', e.message);
-        }
-    }
-
-    // Actualizar también en localStorage
-    initLocalUsersStorage();
-    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
-    const userIdx = localUsers.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-    if (userIdx !== -1) {
-        localUsers[userIdx].password = newPassword;
-        localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
-    }
-
-    showToast(updatedInSupabase
-        ? `✅ Contraseña actualizada en la nube para ${email}.`
-        : `Contraseña actualizada localmente para ${email}.`, "success");
-    closeChangePassModal();
 }
 
 

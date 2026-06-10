@@ -1,6 +1,9 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-console.log("=== SOPORTE TIC APP v4.1 LOADED ===");
+// =============================================================================
+// SOPORTE TIC APP v4.2 — Seguridad mejorada, gestión web via Vercel API routes
+// =============================================================================
+
 
 // Inicializar Supabase Client (Producción con variables de entorno)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -27,7 +30,8 @@ function escapeHTML(str) {
     });
 }
 
-// Inicialización de Variables Globales y Gráficos
+// Inicialización de Variables Globales
+
 let submissions = [];
 let activeSubmissionId = null;
 let activeTab = 'dashboard';
@@ -75,7 +79,7 @@ function hideLoginOverlay() {
 }
 
 async function checkAuthSession() {
-    // 1. Intentar restaurar sesión local desde sessionStorage
+    // 1. Intentar restaurar sesión local desde sessionStorage (Modo offline/recarga rápida)
     const localUser = sessionStorage.getItem('tic_auth_user');
     if (localUser) {
         try {
@@ -92,52 +96,59 @@ async function checkAuthSession() {
         }
     }
     
-    // 2. Si no hay sesión local y hay Supabase configurado, intentar autenticación remota
+    // 2. Si no hay sesión local y hay Supabase configurado, suscribirse a eventos de auth reactivamente
     if (supabase) {
-        try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) throw error;
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Supabase Auth Event:", event, session?.user?.email);
             
             if (session) {
+                // Verificar si ya habíamos cargado este usuario para evitar toasts redundantes al recargar
+                const currentSessionUser = sessionStorage.getItem('tic_auth_user');
+                let alreadyLoaded = false;
+                if (currentSessionUser) {
+                    try {
+                        const parsed = JSON.parse(currentSessionUser);
+                        if (parsed.email === session.user.email) {
+                            alreadyLoaded = true;
+                        }
+                    } catch (e) {}
+                }
+
                 hideLoginOverlay();
                 await fetchUserRole(session.user);
-                applyRolePermissions();
-                showToast(`Sesión iniciada (Nube): ${session.user.email}`, "success");
-                await loadSubmissions();
                 
-                // Escuchar cambios de estado en auth
-                supabase.auth.onAuthStateChange(async (event, newSession) => {
-                    if (event === 'SIGNED_IN' && newSession) {
-                        hideLoginOverlay();
-                        await fetchUserRole(newSession.user);
-                        applyRolePermissions();
-                        await loadSubmissions();
-                        lucide.createIcons();
-                    } else if (event === 'SIGNED_OUT') {
-                        showLoginOverlay();
-                    }
-                });
-                return;
+                // Guardar sesión en sessionStorage para soporte offline y recargas rápidas
+                sessionStorage.setItem('tic_auth_user', JSON.stringify({
+                    email: session.user.email,
+                    role: currentUserRole
+                }));
+                
+                applyRolePermissions();
+                
+                if (!alreadyLoaded) {
+                    showToast(`Sesión iniciada (Nube): ${session.user.email}`, "success");
+                }
+                
+                await loadSubmissions();
+                lucide.createIcons();
+            } else {
+                // Sesión no iniciada o cerrada
+                sessionStorage.removeItem('tic_auth_user');
+                showLoginOverlay();
+                submissions = [];
+                renderTable();
             }
-        } catch (err) {
-            console.error("Error al obtener sesión de Supabase:", err.message);
-        }
+        });
+        return;
     }
     
-    // 3. Si no hay sesión local ni remota, mostrar el overlay de login y deshabilitar navegación
+    // 3. Si no hay sesión local ni Supabase, mostrar el overlay de login y deshabilitar navegación
     showLoginOverlay();
     submissions = [];
     renderTable();
 }
 
-async function onUserAuthenticated(user) {
-    hideLoginOverlay();
-    showToast(`Sesión iniciada: ${user.email}`, "success");
-    await fetchUserRole(user);
-    applyRolePermissions();
-    await loadSubmissions();
-    lucide.createIcons();
-}
+
 
 async function fetchUserRole(user) {
     if (!supabase) {
@@ -155,7 +166,6 @@ async function fetchUserRole(user) {
             currentUserRole = 'tecnico'; // Rol por defecto seguro si hay error
         } else if (data) {
             currentUserRole = data.role;
-            console.log(`Rol cargado para ${user.email}: ${currentUserRole}`);
         } else {
             currentUserRole = 'tecnico';
         }
@@ -170,24 +180,23 @@ function applyRolePermissions() {
     const exportBtn = document.getElementById('excel-export-btn');
     const navUsers = document.getElementById('nav-users');
     const clearDbBtn = document.getElementById('admin-clear-db-btn');
-    
+
     if (currentUserRole === 'tecnico') {
         if (uploadLabel) uploadLabel.classList.add('hidden');
         if (exportBtn) exportBtn.classList.add('hidden');
         if (navUsers) navUsers.classList.add('hidden');
         if (clearDbBtn) clearDbBtn.classList.add('hidden');
-        if (activeTab === 'users') {
-            switchTab('dashboard');
-        }
+        if (activeTab === 'users') switchTab('dashboard');
     } else if (currentUserRole === 'admin') {
         if (uploadLabel) uploadLabel.classList.remove('hidden');
         if (clearDbBtn) clearDbBtn.classList.remove('hidden');
-        if (window.uploadedWorkbook || (window.loadedAllEquipments && window.loadedAllEquipments.length > 0)) {
+        if (navUsers) navUsers.classList.remove('hidden');
+        // Usar las variables del módulo directamente (no window.*)
+        if (uploadedWorkbook || loadedAllEquipments.length > 0) {
             if (exportBtn) exportBtn.classList.remove('hidden');
         } else {
             if (exportBtn) exportBtn.classList.add('hidden');
         }
-        if (navUsers) navUsers.classList.remove('hidden');
     }
 }
 
@@ -390,7 +399,8 @@ async function renderUsersTab() {
             const { data: { session } } = await supabase.auth.getSession();
             currentAuthEmail = session?.user?.email?.toLowerCase() || '';
         }
-    } catch(e) {}
+    } catch(e) { console.warn('Error al obtener email de sesión:', e?.message || e); }
+
 
     let users = [];
     let source = 'api';
@@ -604,7 +614,6 @@ async function uploadSignaturesToStorage(id, firmas) {
                         .upload(filePath, blob, { upsert: true });
                     if (error) throw error;
                     updatedFirmas[role] = filePath;
-                    console.log(`Firma ${role} subida exitosamente:`, filePath);
                 } catch (err) {
                     console.error(`Error al subir firma ${role}:`, err.message);
                 }
@@ -680,13 +689,13 @@ window.addEventListener('load', () => {
     // Verificar sesión e iniciar carga de datos
     checkAuthSession();
 
+    // Inicializar sincronización en tiempo real (Supabase Realtime)
+    initRealtime();
+
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
             .then(reg => {
-                console.log('[PWA] Service Worker registrado con éxito:', reg.scope);
-                
-                // Si hay un service worker esperando, forzar que se active
                 if (reg.waiting) {
                     reg.waiting.postMessage({ action: 'skipWaiting' });
                 }
@@ -696,7 +705,6 @@ window.addEventListener('load', () => {
                     if (newWorker) {
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                console.log('[PWA] Nuevo service worker disponible, activando...');
                                 newWorker.postMessage({ action: 'skipWaiting' });
                             }
                         });
@@ -723,12 +731,9 @@ function initRealtime() {
         supabase
             .channel('realtime-solicitudes-tic')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_tic' }, payload => {
-                console.log('[Realtime] Cambio detectado en solicitudes_tic:', payload);
-                // Recargar solicitudes en segundo plano silenciosamente
                 loadSubmissionsBackground();
             })
             .subscribe(status => {
-                console.log(`[Realtime] Estado de suscripción Realtime: ${status}`);
             });
     }
 }
@@ -2526,7 +2531,6 @@ async function loadCatastroFromSupabase() {
             const exportBtn = document.getElementById('excel-export-btn');
             if (exportBtn) exportBtn.classList.remove('hidden');
             
-            console.log(`Catastro cargado con éxito desde Supabase: ${loadedAllEquipments.length} equipos.`);
             
             // Forzar actualización de UI con los nuevos datos cargados
             renderTable();
@@ -2606,7 +2610,6 @@ async function saveCatastroToSupabase(equipments) {
             if (error) throw error;
             successful += batch.length;
         }
-        console.log(`Sincronizados ${successful} equipos con Supabase.`);
         showToast(`Sincronización de catastro exitosa: ${successful} equipos guardados.`, "success");
         updateStatusIndicator();
     } catch (e) {
@@ -2660,7 +2663,6 @@ async function saveSubmissionsToSupabase(subs) {
             if (error) throw error;
             successful += batch.length;
         }
-        console.log(`Sincronizados ${successful} registros importados con Supabase.`);
         showToast(`Sincronización de registros exitosa: ${successful} cargados.`, "success");
     } catch (e) {
         console.error("Error al guardar registros en Supabase:", e.message);
@@ -2688,7 +2690,6 @@ async function preloadExcelData() {
             const data = new Uint8Array(buffer);
             uploadedWorkbook = XLSX.read(data, { type: 'array' });
             processWorkbookData(false);
-            console.log("Excel catastral precargado de forma automática.");
         })
         .catch(err => {
             console.warn("Precarga automática de Excel omitida (puede deberse a abrir mediante file:// o archivo inexistente):", err.message);
@@ -3914,7 +3915,7 @@ function detectDuplicatesAndInconsistencies() {
 }
 
 // =======================================================================
-// NUEVAS FUNCIONES DE HISTORIAL, PREVISUALIZACIÓN, PDF Y VALIDACIONES
+// HISTORIAL, PREVISUALIZACIÓN, PDF Y VALIDACIONES
 // =======================================================================
 
 // Exportar un registro a PDF usando html2pdf.js local
@@ -4562,7 +4563,6 @@ async function forceAppUpdate() {
             for (let registration of registrations) {
                 await registration.unregister();
             }
-            console.log("Service workers desregistrados.");
         } catch (e) {
             console.error("Error al desregistrar service worker:", e);
         }
@@ -4575,7 +4575,6 @@ async function forceAppUpdate() {
             for (let key of keys) {
                 await caches.delete(key);
             }
-            console.log("Caché borrada.");
         } catch (e) {
             console.error("Error al borrar caché:", e);
         }

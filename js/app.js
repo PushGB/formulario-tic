@@ -4697,21 +4697,33 @@ async function clearDatabase() {
         return;
     }
 
-    const confirmClear = confirm("¿Está seguro de que desea eliminar TODO el catastro de equipos en Supabase? Esta acción es irreversible y borrará todos los registros de inventario cargados.");
+    const confirmClear = confirm("¿Está seguro de que desea limpiar COMPLETAMENTE la base de datos? Se eliminará tanto el catastro de equipos como TODAS las solicitudes creadas. Esta acción es irreversible.");
     if (!confirmClear) return;
 
     try {
-        showToast("Eliminando catastro de equipos...", "info");
+        showToast("Limpiando base de datos...", "info");
         
-        const { error } = await supabase
+        // 1. Eliminar catastro de equipos
+        const { error: catastroError } = await supabase
             .from('catastro_equipos')
             .delete()
             .neq('id', 0);
 
-        if (error) throw error;
-
+        if (catastroError) throw catastroError;
         loadedAllEquipments = [];
+
+        // 2. Eliminar solicitudes de TIC
+        const { error: solicitudesError } = await supabase
+            .from('solicitudes_tic')
+            .delete()
+            .neq('id', '');
+
+        if (solicitudesError) throw solicitudesError;
+        submissions = [];
         
+        // 3. Limpiar caché local
+        localStorage.removeItem('tic_equip_submissions');
+
         // Actualizar interfaz con el badge vacío
         const badge = document.getElementById('excel-status-badge');
         if (badge) {
@@ -4734,10 +4746,10 @@ async function clearDatabase() {
         }
         
         updateStatusIndicator();
-        showToast("Catastro de equipos vaciado correctamente.", "success");
+        showToast("Base de datos y caché local vaciadas por completo.", "success");
     } catch (e) {
-        console.error("Error al vaciar catastro:", e);
-        showToast("Error al vaciar catastro: " + (e.message || e), "error");
+        console.error("Error al limpiar base de datos:", e);
+        showToast("Error al limpiar base de datos: " + (e.message || e), "error");
     }
 }
 

@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import Chart from 'chart.js/auto';
 
 console.log("=== SOPORTE TIC APP v4.1 LOADED ===");
 
@@ -33,8 +32,6 @@ let submissions = [];
 let activeSubmissionId = null;
 let activeTab = 'dashboard';
 let activeFilterType = 'All';
-let chartDeptsInstance = null;
-let chartTypesInstance = null;
 const pendingDeletes = new Set();
 const pendingUpserts = new Set();
 let currentUserRole = 'admin'; // 'admin' o 'tecnico' (por defecto 'admin' en modo local)
@@ -56,7 +53,7 @@ function showLoginOverlay() {
     if (divider) divider.classList.add('hidden');
     
     // Deshabilitar botones de navegación
-    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
     });
@@ -71,7 +68,7 @@ function hideLoginOverlay() {
     if (divider) divider.classList.remove('hidden');
     
     // Habilitar botones de navegación
-    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = false;
     });
@@ -675,9 +672,7 @@ async function loadSubmissionsBackground() {
                 localStorage.setItem('tic_equip_submissions', JSON.stringify(submissions));
                 updateStats();
                 renderTable();
-                if (activeTab === 'metrics') {
-                    renderMetrics();
-                }
+
             }
         } catch (e) {
             console.error("Error al actualizar solicitudes de fondo:", e.message);
@@ -968,10 +963,7 @@ async function loadSubmissions() {
                 updateStats();
                 renderTable();
                 
-                // Si estamos en la pestaña de métricas, volver a renderizar
-                if (activeTab === 'metrics') {
-                    renderMetrics();
-                }
+
                 
                 // Actualizar la interfaz si hay badge de Excel
                 const badge = document.getElementById('excel-status-badge');
@@ -1011,7 +1003,7 @@ function switchTab(tabId) {
     }
     activeTab = tabId;
     
-    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-metrics', 'tab-history', 'tab-users'];
+    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-history', 'tab-users'];
     tabs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -1023,7 +1015,6 @@ function switchTab(tabId) {
     // Estilos de botones de navegación
     const btnDash = document.getElementById('nav-dashboard');
     const btnForm = document.getElementById('nav-form');
-    const btnMetrics = document.getElementById('nav-metrics');
     const btnHistory = document.getElementById('nav-history');
     const btnUsers = document.getElementById('nav-users');
     
@@ -1032,7 +1023,6 @@ function switchTab(tabId) {
     
     if (btnDash) btnDash.className = inactiveClass;
     if (btnForm) btnForm.className = inactiveClass;
-    if (btnMetrics) btnMetrics.className = inactiveClass;
     if (btnHistory) btnHistory.className = inactiveClass;
     if (btnUsers) btnUsers.className = inactiveClass;
 
@@ -1046,10 +1036,6 @@ function switchTab(tabId) {
         if (btnForm) btnForm.className = activeClass;
         // Redimensionar canvases de firma al visualizar
         setTimeout(resizeAllCanvases, 50);
-    } else if (tabId === 'metrics') {
-        targetEl = document.getElementById('tab-metrics');
-        if (btnMetrics) btnMetrics.className = activeClass;
-        renderMetrics();
     } else if (tabId === 'history') {
         targetEl = document.getElementById('tab-history');
         if (btnHistory) btnHistory.className = activeClass;
@@ -2465,9 +2451,7 @@ async function loadCatastroFromSupabase() {
             // Forzar actualización de UI con los nuevos datos cargados
             renderTable();
             updateStats();
-            if (activeTab === 'metrics') {
-                renderMetrics();
-            }
+
             
             updateStatusIndicator();
             return true;
@@ -2488,9 +2472,7 @@ async function loadCatastroFromSupabase() {
             
             renderTable();
             updateStats();
-            if (activeTab === 'metrics') {
-                renderMetrics();
-            }
+
         }
     } catch (e) {
         console.error("Error al cargar catastro desde Supabase:", e.message);
@@ -2855,9 +2837,6 @@ function processWorkbookData(isManualUpload = false) {
     // Forzar actualización de UI con los nuevos datos cargados
     renderTable();
     updateStats();
-    if (activeTab === 'metrics') {
-        renderMetrics();
-    }
 }
 
 // Mostrar sugerencias de auto-completado en base a la consulta de búsqueda (Local + Supabase Cloud)
@@ -3291,271 +3270,7 @@ function splitEquipmentIfCombined(rawEq) {
     return results;
 }
 
-// Función para calcular y renderizar las métricas de avance del catastro
-function renderMetrics() {
-    // 1. Obtener listado de series catastradas en submissions locales para actualización en tiempo real
-    const localCatastradosSet = new Set();
-    submissions.forEach(sub => {
-        if (sub.equipamiento) {
-            sub.equipamiento.forEach(eq => {
-                if (eq.serie) {
-                    localCatastradosSet.add(String(eq.serie).trim().toLowerCase());
-                }
-            });
-        }
-    });
 
-    // 2. Obtener totales
-    const totalComps = loadedAllEquipments.filter(e => e.sheet === 'Computadores').length;
-    const totalPrinters = loadedAllEquipments.filter(e => e.sheet === 'Impresoras-Scanner').length;
-    const totalUniverse = totalComps + totalPrinters;
-
-    // Contar cuántos están catastrados (ya sea marcado en el Excel o en las submissions locales activas)
-    const isEqCatastrado = (e) => {
-        const estadoLower = String(e.estado || '').toLowerCase();
-        const isCatExcel = estadoLower.includes('catastrado');
-        const isCatLocal = e.serie && localCatastradosSet.has(String(e.serie).trim().toLowerCase());
-        return isCatExcel || isCatLocal;
-    };
-
-    const catastradosComps = loadedAllEquipments.filter(e => e.sheet === 'Computadores' && isEqCatastrado(e)).length;
-    const catastradosPrinters = loadedAllEquipments.filter(e => e.sheet === 'Impresoras-Scanner' && isEqCatastrado(e)).length;
-    const catastradosTotal = catastradosComps + catastradosPrinters;
-
-    // Porcentajes
-    const percentTotal = totalUniverse > 0 ? Math.round((catastradosTotal / totalUniverse) * 100) : 0;
-    const percentComps = totalComps > 0 ? Math.round((catastradosComps / totalComps) * 100) : 0;
-    const percentPrinters = totalPrinters > 0 ? Math.round((catastradosPrinters / totalPrinters) * 100) : 0;
-
-    // Formularios con al menos una firma digital registrada
-    const totalSignedForms = submissions.filter(sub => {
-        return (sub.firmas && (sub.firmas.tic || sub.firmas.emisor || sub.firmas.receptor));
-    }).length;
-
-    // Actualizar elementos principales en el DOM
-    const elPercent = document.getElementById('metric-percent');
-    const elPercentBar = document.getElementById('metric-percent-bar');
-    if (elPercent) elPercent.innerText = `${percentTotal}%`;
-    if (elPercentBar) elPercentBar.style.width = `${percentTotal}%`;
-
-    const elCompsCatastrados = document.getElementById('metric-comps-catastrados');
-    const elCompsTotal = document.getElementById('metric-comps-total');
-    const elCompsBar = document.getElementById('metric-comps-bar');
-    if (elCompsCatastrados) elCompsCatastrados.innerText = catastradosComps;
-    if (elCompsTotal) elCompsTotal.innerText = totalComps;
-    if (elCompsBar) elCompsBar.style.width = `${percentComps}%`;
-
-    const elPrintersCatastrados = document.getElementById('metric-printers-catastrados');
-    const elPrintersTotal = document.getElementById('metric-printers-total');
-    const elPrintersBar = document.getElementById('metric-printers-bar');
-    if (elPrintersCatastrados) elPrintersCatastrados.innerText = catastradosPrinters;
-    if (elPrintersTotal) elPrintersTotal.innerText = totalPrinters;
-    if (elPrintersBar) elPrintersBar.style.width = `${percentPrinters}%`;
-
-    const elFormsTotal = document.getElementById('metric-forms-total');
-    if (elFormsTotal) elFormsTotal.innerText = totalSignedForms;
-
-    // 3. Avance por Unidad / Departamento (Top 5)
-    const deptsMap = {};
-    loadedAllEquipments.forEach(e => {
-        let dept = String(e.depto || 'SIN DEPARTAMENTO').trim().toUpperCase();
-        if (dept === 'UNDEFINED' || dept === '') dept = 'SIN DEPARTAMENTO';
-        
-        if (!deptsMap[dept]) {
-            deptsMap[dept] = { total: 0, catastrado: 0 };
-        }
-        deptsMap[dept].total++;
-        if (isEqCatastrado(e)) {
-            deptsMap[dept].catastrado++;
-        }
-    });
-
-    const topDepts = Object.keys(deptsMap)
-        .map(name => ({ name, ...deptsMap[name] }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5);
-
-    const deptsContainer = document.getElementById('metric-dept-list');
-    if (deptsContainer) {
-        deptsContainer.innerHTML = '';
-        if (topDepts.length === 0) {
-            deptsContainer.innerHTML = '<div class="p-4 text-center text-slate-400 dark:text-slate-500 text-xs">No hay datos de departamentos disponibles. Cargue un Excel.</div>';
-        } else {
-            topDepts.forEach(dept => {
-                const pct = dept.total > 0 ? Math.round((dept.catastrado / dept.total) * 100) : 0;
-                const div = document.createElement('div');
-                div.className = "space-y-1.5";
-                div.innerHTML = `
-                    <div class="flex justify-between items-center text-xs font-semibold">
-                        <span class="text-slate-700 dark:text-slate-300 truncate max-w-[200px]" title="${escapeHTML(dept.name)}">${escapeHTML(dept.name)}</span>
-                        <span class="text-slate-500 dark:text-slate-400 font-mono">${dept.catastrado} / ${dept.total} (${pct}%)</span>
-                    </div>
-                    <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                        <div class="bg-indigo-650 dark:bg-indigo-500 h-full rounded-full transition-all duration-500" style="width: ${pct}%;"></div>
-                    </div>
-                `;
-                deptsContainer.appendChild(div);
-            });
-        }
-    }
-
-    // 4. Distribución por Tipo de Equipo y Propiedad
-    const typesMap = {};
-    loadedAllEquipments.forEach(e => {
-        let t = String(e.tipo || 'OTRO').trim().toUpperCase();
-        if (t === 'UNDEFINED' || t === '') t = 'OTRO';
-        
-        if (t === 'PC' || t.includes('DESKTOP') || t.includes('TORRE')) t = 'PC';
-        else if (t.includes('NOTEBOOK') || t.includes('LAPTOP')) t = 'NOTEBOOK';
-        else if (t.includes('AIO') || t.includes('ALL IN ONE') || t.includes('ALL-IN-ONE')) t = 'ALL IN ONE';
-        else if (t.includes('IMPRESORA')) t = 'IMPRESORA';
-        else if (t.includes('SCANNER')) t = 'SCANNER';
-        else if (t.includes('PANTALLA') || t.includes('MONITOR')) t = 'MONITOR';
-
-        if (!typesMap[t]) {
-            typesMap[t] = { total: 0, arriendo: 0, isp: 0, catastrado: 0 };
-        }
-        typesMap[t].total++;
-        
-        const isArriendo = String(e.propiedad || '').toLowerCase().includes('arriendo');
-        if (isArriendo) typesMap[t].arriendo++;
-        else typesMap[t].isp++;
-
-        if (isEqCatastrado(e)) {
-            typesMap[t].catastrado++;
-        }
-    });
-
-    const typesContainer = document.getElementById('metric-types-list');
-    if (typesContainer) {
-        typesContainer.innerHTML = '';
-        const sortedTypes = Object.keys(typesMap)
-            .map(name => ({ name, ...typesMap[name] }))
-            .sort((a, b) => b.total - a.total);
-
-        if (sortedTypes.length === 0) {
-            typesContainer.innerHTML = '<div class="p-4 text-center text-slate-400 dark:text-slate-500 text-xs">No hay datos de tipos de equipos disponibles. Cargue un Excel.</div>';
-        } else {
-            sortedTypes.forEach(t => {
-                const pct = t.total > 0 ? Math.round((t.catastrado / t.total) * 100) : 0;
-                const div = document.createElement('div');
-                div.className = "flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/20 border border-slate-100/50 dark:border-slate-800/40 text-xs";
-                div.innerHTML = `
-                    <div>
-                        <span class="font-bold text-slate-700 dark:text-slate-300 block">${escapeHTML(t.name)}</span>
-                        <span class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block font-medium">Arriendo: ${t.arriendo} | Propio: ${t.isp}</span>
-                    </div>
-                    <div class="text-right">
-                        <span class="font-extrabold text-slate-800 dark:text-slate-150 block text-sm">${t.catastrado} <span class="text-slate-400 text-xs font-normal">/ ${t.total}</span></span>
-                        <span class="text-[10px] text-emerald-600 dark:text-emerald-450 font-semibold block mt-0.5">${pct}% Listo</span>
-                    </div>
-                `;
-                typesContainer.appendChild(div);
-            });
-        }
-
-        // =======================================================================
-        // RENDERIZAR GRÁFICOS INTERACTIVOS (CHART.JS)
-        // =======================================================================
-        const isDark = document.documentElement.classList.contains('dark');
-        const textColor = isDark ? '#94a3b8' : '#475569';
-        const gridColor = isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(71, 85, 105, 0.08)';
-
-        // A. Gráfico de Barras - Departamentos (Horizontal)
-        if (chartDeptsInstance) chartDeptsInstance.destroy();
-        
-        const canvasDepts = document.getElementById('chart-depts');
-        if (canvasDepts && topDepts.length > 0) {
-            chartDeptsInstance = new Chart(canvasDepts.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: topDepts.map(d => d.name),
-                    datasets: [
-                        {
-                            label: 'Catastrados',
-                            data: topDepts.map(d => d.catastrado),
-                            backgroundColor: 'rgba(79, 70, 229, 0.85)',
-                            borderColor: '#4f46e5',
-                            borderWidth: 1.5,
-                            borderRadius: 6
-                        },
-                        {
-                            label: 'Pendientes',
-                            data: topDepts.map(d => d.total - d.catastrado),
-                            backgroundColor: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(241, 245, 249, 0.9)',
-                            borderColor: isDark ? '#475569' : '#cbd5e1',
-                            borderWidth: 1.5,
-                            borderRadius: 6
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: textColor, boxWidth: 12, font: { family: 'Inter', size: 11 } }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            stacked: true,
-                            grid: { color: gridColor },
-                            ticks: { color: textColor, font: { family: 'monospace', size: 10 } }
-                        },
-                        y: {
-                            stacked: true,
-                            grid: { display: false },
-                            ticks: { color: textColor, font: { family: 'Inter', size: 9, weight: '500' } }
-                        }
-                    }
-                }
-            });
-        }
-
-        // B. Gráfico de Dona - Distribución de Tipos
-        if (chartTypesInstance) chartTypesInstance.destroy();
-        
-        const canvasTypes = document.getElementById('chart-types');
-        if (canvasTypes && sortedTypes.length > 0) {
-            chartTypesInstance = new Chart(canvasTypes.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: sortedTypes.map(t => t.name),
-                    datasets: [{
-                        data: sortedTypes.map(t => t.total),
-                        backgroundColor: [
-                            'rgba(79, 70, 229, 0.85)',  // Indigo
-                            'rgba(59, 130, 246, 0.85)',  // Blue
-                            'rgba(139, 92, 246, 0.85)',  // Violet
-                            'rgba(16, 185, 129, 0.85)',  // Emerald
-                            'rgba(245, 158, 11, 0.85)',  // Amber
-                            'rgba(244, 63, 94, 0.85)'    // Rose
-                        ],
-                        borderColor: isDark ? '#0f172a' : '#ffffff',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: textColor, boxWidth: 12, font: { family: 'Inter', size: 11 } }
-                        }
-                    },
-                    cutout: '65%'
-                }
-            });
-        }
-    }
-    
-    // Ejecutar detección de duplicados y discrepancias
-    detectDuplicatesAndInconsistencies();
-}
 
 // Capitalizar correctamente nombres propios y departamentos
 function normalizeName(str) {
@@ -4738,12 +4453,10 @@ async function clearDatabase() {
         const exportBtn = document.getElementById('excel-export-btn');
         if (exportBtn) exportBtn.classList.add('hidden');
 
-        // Refrescar tablas y métricas
+        // Refrescar tablas y estadísticas
         renderTable();
         updateStats();
-        if (activeTab === 'metrics') {
-            renderMetrics();
-        }
+
         
         updateStatusIndicator();
         showToast("Base de datos y caché local vaciadas por completo.", "success");

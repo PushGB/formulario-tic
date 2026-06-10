@@ -88,6 +88,10 @@ function showLoginOverlay() {
     const divider = document.getElementById('auth-divider');
     if (divider) divider.classList.add('hidden');
     
+    // Ocultar email del usuario al mostrar login
+    const navUserInfo = document.getElementById('nav-user-info');
+    if (navUserInfo) navUserInfo.classList.add('hidden');
+
     // Deshabilitar botones de navegación
     ['nav-dashboard', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
@@ -108,6 +112,19 @@ function hideLoginOverlay() {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = false;
     });
+
+    // Mostrar email del usuario activo en el navbar
+    try {
+        const stored = sessionStorage.getItem('tic_auth_user');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            const emailEl = document.getElementById('nav-user-email');
+            if (emailEl && parsed.email) {
+                emailEl.textContent = parsed.email;
+                emailEl.parentElement.classList.remove('hidden');
+            }
+        }
+    } catch(e) {}
 }
 
 async function checkAuthSession() {
@@ -444,7 +461,11 @@ async function _getSessionToken() {
 // Helper: llamar al API route seguro /api/manage-users
 async function _callManageUsers(payload) {
     const token = await _getSessionToken();
-    if (!token) throw new Error('No hay sesión activa. Inicia sesión para continuar.');
+    if (!token) {
+        showToast('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
+        showLoginOverlay();
+        throw new Error('No hay sesión activa. Inicia sesión para continuar.');
+    }
 
     const resp = await fetch('/api/manage-users', {
         method: 'POST',
@@ -2312,7 +2333,6 @@ function drawSavedSignature(id, dataUrl) {
 }
 
 // Eliminar Registro
-// Eliminar Registro
 async function deleteSubmission(id) {
     if (!confirm("¿Está seguro de que desea eliminar permanentemente este registro de la nube y del historial local?")) {
         return;
@@ -2423,21 +2443,33 @@ function showToast(message, type = "success") {
     
     msgSpan.innerText = message;
     
+    // Ícono y color según el tipo de notificación
     if (type === 'success') {
-        iconSpan.innerHTML = '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-450"></i>';
+        iconSpan.innerHTML = '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>';
+    } else if (type === 'warning') {
+        iconSpan.innerHTML = '<i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400"></i>';
+    } else if (type === 'info') {
+        iconSpan.innerHTML = '<i data-lucide="info" class="w-5 h-5 text-sky-400"></i>';
     } else {
+        // 'error'
         iconSpan.innerHTML = '<i data-lucide="x-circle" class="w-5 h-5 text-rose-400"></i>';
     }
     
     lucide.createIcons();
     
+    // Duración: errores duran más, info menos
+    const duration = (type === 'error') ? 5000 : (type === 'warning') ? 4500 : 3500;
+
     toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
     toast.classList.add('translate-y-0', 'opacity-100');
     
-    setTimeout(() => {
+    // Cancelar timeout previo si hay uno activo
+    if (toast._hideTimeout) clearTimeout(toast._hideTimeout);
+    toast._hideTimeout = setTimeout(() => {
         toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
         toast.classList.remove('translate-y-0', 'opacity-100');
-    }, 3500);
+        toast._hideTimeout = null;
+    }, duration);
 }
 
 // ================= INTEGRACIÓN Y AUTOMATIZACIÓN CON EXCEL =================
@@ -2723,37 +2755,13 @@ async function saveCatastroToSupabase(equipments) {
 }
 
 // Guardar solicitudes importadas en Supabase
+// Refactor: ahora usa _mapSubmissionToDbRow para evitar duplicar el mapeo de campos
 async function saveSubmissionsToSupabase(subs) {
     if (!supabase || subs.length === 0) return;
     try {
         showToast("Sincronizando registros importados con la base de datos...", "info");
-        const dbRows = subs.map(s => ({
-            id: s.id,
-            fecha: s.fecha,
-            ticket: s.ticket,
-            funcionario_nombre: s.funcionario.nombre,
-            funcionario_rut: s.funcionario.rut,
-            funcionario_cargo: s.funcionario.cargo,
-            funcionario_depto: s.funcionario.depto,
-            tipo_solicitud: s.tipo_solicitud,
-            propiedad_equipamiento: s.propiedad_equipamiento,
-            equipamiento_categorias: s.equipamiento_categorias,
-            otros_detalles: s.otros_detalles,
-            traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
-            traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
-            traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
-            traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
-            traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
-            equipamiento: s.equipamiento,
-            accesorios: s.accesorios,
-            observaciones_generales: s.observaciones_generales,
-            firmas_tic_mode: s.firmas.tic_mode,
-            firmas_emisor_mode: s.firmas.emisor_mode,
-            firmas_receptor_mode: s.firmas.receptor_mode,
-            firma_tic: s.firmas.tic,
-            firma_emisor: s.firmas.emisor,
-            firma_receptor: s.firmas.receptor
-        }));
+        // Usar el helper centralizado para el mapeo de campos
+        const dbRows = subs.map(s => _mapSubmissionToDbRow(s, s.firmas || null));
 
         const batchSize = 50;
         let successful = 0;
@@ -4496,7 +4504,8 @@ function updateStatusIndicator() {
     if (!statusDot || !statusText) return;
 
     const isOnline = navigator.onLine;
-    const catastroCount = (window.loadedAllEquipments && window.loadedAllEquipments.length) || 0;
+    // Bug fix: usar la variable del módulo directamente, no window.*
+    const catastroCount = loadedAllEquipments.length || 0;
 
     if (isOnline) {
         if (catastroCount > 0) {

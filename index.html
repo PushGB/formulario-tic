@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
@@ -135,6 +135,11 @@
                             <button id="auth-logout-btn" onclick="handleLogout()" class="hidden px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-all border border-rose-500/20 flex items-center gap-1.5" title="Cerrar Sesión">
                                 <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Salir</span>
                             </button>
+                            <!-- Indicador de usuario activo -->
+                            <div id="nav-user-info" class="hidden items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200/50 dark:border-indigo-900/50">
+                                <i data-lucide="circle-user-round" class="w-3.5 h-3.5 text-indigo-500 flex-shrink-0"></i>
+                                <span id="nav-user-email" class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 max-w-[120px] truncate hidden lg:block"></span>
+                            </div>
                             <div id="auth-divider" class="hidden h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
                             <!-- Indicador de Estado (Online & Cargado) -->
                             <div id="status-indicator" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/50 dark:border-slate-800/50 text-xs font-semibold select-none cursor-help" title="Estado de la conexión y catastro">
@@ -380,6 +385,23 @@
                                     <!-- Rellenado dinámicamente -->
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HERRAMIENTAS DEL SISTEMA (Solo Admin) -->
+                <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800/85 shadow-md">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 dark:border-slate-800/60">
+                        <i data-lucide="settings-2" class="w-4 h-4 text-slate-400"></i> Herramientas del Sistema
+                    </h3>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="forceAppUpdate()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all hover:-translate-y-0.5 shadow-sm">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-indigo-500"></i>
+                            Forzar Actualización de la App
+                        </button>
+                        <div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 ml-1">
+                            <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                            <span>Limpia el caché del navegador y reinicia la app a la versión más reciente.</span>
                         </div>
                     </div>
                 </div>

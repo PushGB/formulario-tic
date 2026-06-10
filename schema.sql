@@ -62,18 +62,9 @@ BEGIN
     END LOOP;
 END $$;
 
--- Crear políticas de acceso para solicitudes_tic
-CREATE POLICY "Permitir lectura pública de solicitudes" 
-ON public.solicitudes_tic FOR SELECT TO public USING (true);
-
-CREATE POLICY "Permitir inserción pública de solicitudes" 
-ON public.solicitudes_tic FOR INSERT TO public WITH CHECK (true);
-
-CREATE POLICY "Permitir actualización pública de solicitudes" 
-ON public.solicitudes_tic FOR UPDATE TO public USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir borrado público de solicitudes" 
-ON public.solicitudes_tic FOR DELETE TO public USING (true);
+-- Crear política de acceso global para solicitudes_tic
+CREATE POLICY "Acceso total solicitudes" 
+ON public.solicitudes_tic FOR ALL TO public USING (true) WITH CHECK (true);
 
 
 -- 2. Crear la tabla de catálogo de equipamiento (catastro_equipos)
@@ -109,18 +100,9 @@ BEGIN
     END LOOP;
 END $$;
 
--- Crear políticas de acceso para catastro_equipos
-CREATE POLICY "Permitir lectura pública de catastro" 
-ON public.catastro_equipos FOR SELECT TO public USING (true);
-
-CREATE POLICY "Permitir inserción pública de catastro" 
-ON public.catastro_equipos FOR INSERT TO public WITH CHECK (true);
-
-CREATE POLICY "Permitir actualización pública de catastro" 
-ON public.catastro_equipos FOR UPDATE TO public USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir borrado público de catastro" 
-ON public.catastro_equipos FOR DELETE TO public USING (true);
+-- Crear política de acceso global para catastro_equipos
+CREATE POLICY "Acceso total catastro" 
+ON public.catastro_equipos FOR ALL TO public USING (true) WITH CHECK (true);
 
 
 -- 3. Habilitar Realtime para las tablas en Supabase

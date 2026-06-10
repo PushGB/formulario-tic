@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS public.solicitudes_tic (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Deshabilitar RLS para solicitudes_tic para acceso público completo
-ALTER TABLE public.solicitudes_tic DISABLE ROW LEVEL SECURITY;
+-- Habilitar RLS para solicitudes_tic
+ALTER TABLE public.solicitudes_tic ENABLE ROW LEVEL SECURITY;
 
 -- Eliminar políticas previas si existen
 DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.solicitudes_tic;
@@ -93,8 +93,8 @@ CREATE TABLE IF NOT EXISTS public.catastro_equipos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Deshabilitar RLS para catastro_equipos para acceso público completo
-ALTER TABLE public.catastro_equipos DISABLE ROW LEVEL SECURITY;
+-- Habilitar RLS para catastro_equipos
+ALTER TABLE public.catastro_equipos ENABLE ROW LEVEL SECURITY;
 
 -- Eliminar políticas previas si existen
 DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.catastro_equipos;
@@ -188,7 +188,7 @@ BEGIN
         WHERE user_id = auth.uid() AND role = 'admin'
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Función para verificar si es técnico
 CREATE OR REPLACE FUNCTION public.is_tecnico() RETURNS BOOLEAN AS $$
@@ -198,7 +198,7 @@ BEGIN
         WHERE user_id = auth.uid() AND role = 'tecnico'
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Trigger para crear rol por defecto al registrarse
 -- Por defecto, correos con la palabra 'admin' reciben rol 'admin', los demás 'tecnico'
@@ -216,7 +216,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -235,7 +235,7 @@ BEGIN
     END IF;
     RETURN encode(pgp_sym_encrypt(rut, 'ClaveSecretaTIC2026'), 'base64');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Función para desencriptar RUT
 CREATE OR REPLACE FUNCTION public.decrypt_rut(enc_rut TEXT) RETURNS TEXT AS $$
@@ -250,7 +250,7 @@ BEGIN
         RETURN enc_rut;
     END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Trigger para encriptar automáticamente el RUT en la tabla solicitudes_tic
 CREATE OR REPLACE FUNCTION public.trg_encrypt_solicitudes_rut() RETURNS TRIGGER AS $$
@@ -263,7 +263,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS solicitudes_encrypt_rut ON public.solicitudes_tic;
 CREATE OR REPLACE TRIGGER solicitudes_encrypt_rut
@@ -273,7 +273,8 @@ FOR EACH ROW EXECUTE FUNCTION public.trg_encrypt_solicitudes_rut();
 
 -- 5. Vista de Solicitudes Segura (Autodesencriptable)
 DROP VIEW IF EXISTS public.solicitudes_tic_secure CASCADE;
-CREATE OR REPLACE VIEW public.solicitudes_tic_secure AS
+CREATE OR REPLACE VIEW public.solicitudes_tic_secure 
+WITH (security_invoker = true) AS
 SELECT 
     id,
     fecha,
@@ -349,7 +350,7 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS solicitudes_auditoria ON public.solicitudes_tic;
 CREATE OR REPLACE TRIGGER solicitudes_auditoria
@@ -379,4 +380,23 @@ FOR SELECT TO public USING (bucket_id = 'firmas');
 
 CREATE POLICY "Permitir borrado de firmas a todos" ON storage.objects 
 FOR DELETE TO public USING (bucket_id = 'firmas');
+
+
+-- =======================================================================
+-- 8. LIMITAR EJECUCIÓN DIRECTA DE FUNCIONES CRÍTICAS (HAY QUE EVITAR ACCESO PÚBLICO)
+-- =======================================================================
+-- Revocar ejecución pública de todas las funciones security definer
+REVOKE EXECUTE ON FUNCTION public.encrypt_rut(TEXT) FROM public;
+REVOKE EXECUTE ON FUNCTION public.decrypt_rut(TEXT) FROM public;
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM public;
+REVOKE EXECUTE ON FUNCTION public.is_tecnico() FROM public;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM public;
+REVOKE EXECUTE ON FUNCTION public.trg_auditar_solicitudes() FROM public;
+REVOKE EXECUTE ON FUNCTION public.trg_encrypt_solicitudes_rut() FROM public;
+
+-- Otorgar ejecución solo a usuarios autenticados para las funciones que requiere la app
+GRANT EXECUTE ON FUNCTION public.decrypt_rut(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_tecnico() TO authenticated;
+
 

@@ -73,6 +73,9 @@ function cleanRowData(row, sourceSheet) {
     sheet: sourceSheet
   };
   
+  let codigoArriendo = '';
+  let contratoArriendo = '';
+  
   for (let key in row) {
     const norm = normalizeKey(key);
     const val = String(row[key] || '').trim();
@@ -88,7 +91,23 @@ function cleanRowData(row, sourceSheet) {
     else if (norm === 'unidaddepto') cleaned.depto = val;
     else if (norm === 'estado') cleaned.estado = val;
     else if (norm === 'observaciones') cleaned.observaciones = val;
+    
+    if (norm === 'codigoarriendo') codigoArriendo = val;
+    else if (norm === 'contratoarriendo') contratoArriendo = val;
   }
+  
+  // Normalización especial para el contrato Netnow 2023 u otros contratos con columnas traspuestas o placeholders
+  if (contratoArriendo.toLowerCase().includes('netnow') || (cleaned.serie === '7' && codigoArriendo)) {
+    if (codigoArriendo) {
+      const realSerie = codigoArriendo.toUpperCase();
+      const realInventario = (cleaned.serie && cleaned.serie !== '7' && cleaned.serie.toLowerCase() !== 'no entrego') ? cleaned.serie : '';
+      cleaned.serie = realSerie;
+      if (realInventario) {
+        cleaned.inventario = realInventario;
+      }
+    }
+  }
+  
   return cleaned;
 }
 

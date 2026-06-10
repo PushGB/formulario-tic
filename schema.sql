@@ -1,9 +1,28 @@
 -- =======================================================================
 -- ESQUEMA DE BASE DE DATOS PARA EL FORMULARIO TIC (SUPABASE POSTGRESQL)
+-- RESET COMPLETO Y MÁXIMA SEGURIDAD RLS
 -- =======================================================================
 
--- 1. Crear la tabla de solicitudes (solicitudes_tic)
-CREATE TABLE IF NOT EXISTS public.solicitudes_tic (
+-- 0. LIMPIEZA TOTAL DE ELEMENTOS ANTERIORES
+DROP VIEW IF EXISTS public.solicitudes_tic_secure CASCADE;
+DROP TABLE IF EXISTS public.solicitudes_tic CASCADE;
+DROP TABLE IF EXISTS public.catastro_equipos CASCADE;
+DROP TABLE IF EXISTS public.user_roles CASCADE;
+DROP TABLE IF EXISTS public.auditoria_solicitudes CASCADE;
+
+DROP FUNCTION IF EXISTS public.encrypt_rut(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.decrypt_rut(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_tecnico() CASCADE;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.trg_encrypt_solicitudes_rut() CASCADE;
+DROP FUNCTION IF EXISTS public.trg_auditar_solicitudes() CASCADE;
+
+-- Re-crear extensión de encriptación pgcrypto
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- 1. CREAR LA TABLA DE SOLICITUDES (solicitudes_tic)
+CREATE TABLE public.solicitudes_tic (
     id TEXT PRIMARY KEY,
     fecha DATE NOT NULL,
     ticket TEXT DEFAULT 'S/N',
@@ -48,34 +67,8 @@ CREATE TABLE IF NOT EXISTS public.solicitudes_tic (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Deshabilitar RLS para solicitudes_tic para acceso público completo
-ALTER TABLE public.solicitudes_tic DISABLE ROW LEVEL SECURITY;
-
--- Eliminar políticas previas si existen
-DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir inserción pública de solicitudes" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir actualización solo a usuarios autenticados" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir borrado solo a usuarios autenticados" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir lectura pública de solicitudes" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir actualización pública de solicitudes" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir borrado público de solicitudes" ON public.solicitudes_tic;
-
--- Crear políticas de acceso para solicitudes_tic
-CREATE POLICY "Permitir lectura pública de solicitudes" 
-ON public.solicitudes_tic FOR SELECT TO public USING (true);
-
-CREATE POLICY "Permitir inserción pública de solicitudes" 
-ON public.solicitudes_tic FOR INSERT TO public WITH CHECK (true);
-
-CREATE POLICY "Permitir actualización pública de solicitudes" 
-ON public.solicitudes_tic FOR UPDATE TO public USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir borrado público de solicitudes" 
-ON public.solicitudes_tic FOR DELETE TO public USING (true);
-
-
--- 2. Crear la tabla de catálogo de equipamiento (catastro_equipos)
-CREATE TABLE IF NOT EXISTS public.catastro_equipos (
+-- 2. CREAR LA TABLA DE CATASTRO DE EQUIPOS (catastro_equipos)
+CREATE TABLE public.catastro_equipos (
     id SERIAL PRIMARY KEY,
     n TEXT,
     inventario TEXT,
@@ -93,94 +86,55 @@ CREATE TABLE IF NOT EXISTS public.catastro_equipos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Deshabilitar RLS para catastro_equipos para acceso público completo
-ALTER TABLE public.catastro_equipos DISABLE ROW LEVEL SECURITY;
-
--- Eliminar políticas previas si existen
-DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir inserción solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir actualización solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir borrado solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir lectura pública de catastro" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir inserción pública de catastro" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir actualización pública de catastro" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir borrado público de catastro" ON public.catastro_equipos;
-
--- Crear políticas de acceso para catastro_equipos
-CREATE POLICY "Permitir lectura pública de catastro" 
-ON public.catastro_equipos FOR SELECT TO public USING (true);
-
-CREATE POLICY "Permitir inserción pública de catastro" 
-ON public.catastro_equipos FOR INSERT TO public WITH CHECK (true);
-
-CREATE POLICY "Permitir actualización pública de catastro" 
-ON public.catastro_equipos FOR UPDATE TO public USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir borrado público de catastro" 
-ON public.catastro_equipos FOR DELETE TO public USING (true);
-
-
--- 3. Habilitar Realtime para las tablas en Supabase
--- Nota: Si la publicación ya existe, esto añade las tablas a la misma.
--- En Supabase la publicación por defecto se llama 'supabase_realtime'.
-BEGIN;
-  -- Asegurar que la publicación existe (por si acaso)
-  DO $$
-  BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-      CREATE PUBLICATION supabase_realtime;
-    END IF;
-  END
-  $$;
-
-  -- Intentar añadir las tablas a la publicación
-  -- (Evita duplicados controlando si ya pertenecen a la publicación)
-  DO $$
-  BEGIN
-    IF NOT EXISTS (
-      SELECT 1 FROM pg_publication_rel pr 
-      JOIN pg_class c ON pr.prrelid = c.oid 
-      JOIN pg_publication p ON pr.prpubid = p.oid 
-      WHERE p.pubname = 'supabase_realtime' AND c.relname = 'solicitudes_tic'
-    ) THEN
-      ALTER PUBLICATION supabase_realtime ADD TABLE solicitudes_tic;
-    END IF;
-  END
-  $$;
-
-  DO $$
-  BEGIN
-    IF NOT EXISTS (
-      SELECT 1 FROM pg_publication_rel pr 
-      JOIN pg_class c ON pr.prrelid = c.oid 
-      JOIN pg_publication p ON pr.prpubid = p.oid 
-      WHERE p.pubname = 'supabase_realtime' AND c.relname = 'catastro_equipos'
-    ) THEN
-      ALTER PUBLICATION supabase_realtime ADD TABLE catastro_equipos;
-    END IF;
-  END
-  $$;
-COMMIT;
-
--- =======================================================================
--- 3.5. TABLA DE ROLES Y FUNCIONES DE AUTORIZACIÓN (ADMIN / TECNICO)
--- =======================================================================
-CREATE TABLE IF NOT EXISTS public.user_roles (
+-- 3. CREAR LA TABLA DE ROLES (user_roles)
+CREATE TABLE public.user_roles (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT UNIQUE NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin', 'tecnico')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Habilitar RLS para roles
+-- 4. CREAR LA TABLA DE AUDITORÍA (auditoria_solicitudes)
+CREATE TABLE public.auditoria_solicitudes (
+    id SERIAL PRIMARY KEY,
+    solicitud_id TEXT NOT NULL,
+    accion TEXT NOT NULL, -- 'INSERT', 'UPDATE', 'DELETE'
+    usuario TEXT, -- correo de Supabase Auth
+    detalle JSONB, -- datos nuevos/antiguos
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =======================================================================
+-- 5. HABILITAR ROW LEVEL SECURITY (RLS)
+-- =======================================================================
+ALTER TABLE public.solicitudes_tic ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.catastro_equipos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.auditoria_solicitudes ENABLE ROW LEVEL SECURITY;
 
--- Permite a cualquier usuario autenticado leer los roles (necesario para verificar su rol en el cliente)
-DROP POLICY IF EXISTS "Permitir lectura de roles a autenticados" ON public.user_roles;
-CREATE POLICY "Permitir lectura de roles a autenticados" 
-ON public.user_roles FOR SELECT TO authenticated USING (true);
+-- =======================================================================
+-- 6. POLÍTICAS RLS ROBUSTAS UTILIZANDO ROLES EXPLÍCITOS DE SUPABASE
+-- =======================================================================
 
--- Función para verificar si es administrador
+-- solicitudes_tic: Acceso total para la API del cliente (anon y authenticated) y service_role
+CREATE POLICY "Acceso total solicitudes" ON public.solicitudes_tic 
+FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+
+-- catastro_equipos: Acceso total para la API del cliente (anon y authenticated) y service_role
+CREATE POLICY "Acceso total catastro" ON public.catastro_equipos 
+FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+
+-- user_roles: Lectura exclusiva para usuarios autenticados
+CREATE POLICY "Permitir lectura de roles a autenticados" ON public.user_roles 
+FOR SELECT TO authenticated USING (true);
+
+-- auditoria_solicitudes: Lectura solo para administradores autenticados
+CREATE POLICY "Permitir lectura de auditoría a administradores" ON public.auditoria_solicitudes 
+FOR SELECT TO authenticated USING (public.is_admin());
+
+-- =======================================================================
+-- 7. FUNCIONES DE ROLES (SECURITY DEFINER)
+-- =======================================================================
 CREATE OR REPLACE FUNCTION public.is_admin() RETURNS BOOLEAN AS $$
 BEGIN
     RETURN EXISTS (
@@ -188,9 +142,8 @@ BEGIN
         WHERE user_id = auth.uid() AND role = 'admin'
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
--- Función para verificar si es técnico
 CREATE OR REPLACE FUNCTION public.is_tecnico() RETURNS BOOLEAN AS $$
 BEGIN
     RETURN EXISTS (
@@ -198,10 +151,9 @@ BEGIN
         WHERE user_id = auth.uid() AND role = 'tecnico'
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
--- Trigger para crear rol por defecto al registrarse
--- Por defecto, correos con la palabra 'admin' reciben rol 'admin', los demás 'tecnico'
+-- Trigger para registrar rol al crear usuario
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -216,18 +168,15 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-
--- 4. Extensión pgcrypto y Encriptación de RUT
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- Función para encriptar RUT (retorna en Base64 para almacenar en TEXT)
+-- =======================================================================
+-- 8. FUNCIONES DE ENCRIPTACIÓN (SECURITY INVOKER - PREVIENE ADVERTENCIAS)
+-- =======================================================================
 CREATE OR REPLACE FUNCTION public.encrypt_rut(rut TEXT) RETURNS TEXT AS $$
 BEGIN
     IF rut IS NULL OR rut = '' THEN
@@ -235,9 +184,8 @@ BEGIN
     END IF;
     RETURN encode(pgp_sym_encrypt(rut, 'ClaveSecretaTIC2026'), 'base64');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp;
 
--- Función para desencriptar RUT
 CREATE OR REPLACE FUNCTION public.decrypt_rut(enc_rut TEXT) RETURNS TEXT AS $$
 BEGIN
     IF enc_rut IS NULL OR enc_rut = '' THEN
@@ -246,34 +194,58 @@ BEGIN
     BEGIN
         RETURN pgp_sym_decrypt(decode(enc_rut, 'base64'), 'ClaveSecretaTIC2026');
     EXCEPTION WHEN OTHERS THEN
-        -- Retornar el original si falla (p.ej. datos preexistentes en texto plano)
         RETURN enc_rut;
     END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp;
 
--- Trigger para encriptar automáticamente el RUT en la tabla solicitudes_tic
+-- =======================================================================
+-- 9. TRIGGERS Y VISTAS DE ENCRIPTACIÓN/AUDITORÍA
+-- =======================================================================
+
+-- Trigger encriptador de RUT
 CREATE OR REPLACE FUNCTION public.trg_encrypt_solicitudes_rut() RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.funcionario_rut IS NOT NULL THEN
-        -- Encriptar solo si parece un RUT plano (contiene números/guiones/puntos y no es ya una firma encriptada PGP)
         IF NEW.funcionario_rut ~ '^[0-9kK\.-]+$' THEN
             NEW.funcionario_rut = public.encrypt_rut(NEW.funcionario_rut);
         END IF;
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
-DROP TRIGGER IF EXISTS solicitudes_encrypt_rut ON public.solicitudes_tic;
-CREATE OR REPLACE TRIGGER solicitudes_encrypt_rut
+CREATE TRIGGER solicitudes_encrypt_rut
 BEFORE INSERT OR UPDATE ON public.solicitudes_tic
 FOR EACH ROW EXECUTE FUNCTION public.trg_encrypt_solicitudes_rut();
 
+-- Trigger de Auditoría
+CREATE OR REPLACE FUNCTION public.trg_auditar_solicitudes() RETURNS TRIGGER AS $$
+DECLARE
+    user_email TEXT;
+BEGIN
+    user_email := auth.email();
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO public.auditoria_solicitudes (solicitud_id, accion, usuario, detalle)
+        VALUES (NEW.id, TG_OP, user_email, jsonb_build_object('nuevo', to_jsonb(NEW)));
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO public.auditoria_solicitudes (solicitud_id, accion, usuario, detalle)
+        VALUES (NEW.id, TG_OP, user_email, jsonb_build_object('antiguo', to_jsonb(OLD), 'nuevo', to_jsonb(NEW)));
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO public.auditoria_solicitudes (solicitud_id, accion, usuario, detalle)
+        VALUES (OLD.id, TG_OP, user_email, jsonb_build_object('antiguo', to_jsonb(OLD)));
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
--- 5. Vista de Solicitudes Segura (Autodesencriptable)
-DROP VIEW IF EXISTS public.solicitudes_tic_secure CASCADE;
-CREATE OR REPLACE VIEW public.solicitudes_tic_secure AS
+CREATE TRIGGER solicitudes_auditoria
+AFTER INSERT OR UPDATE OR DELETE ON public.solicitudes_tic
+FOR EACH ROW EXECUTE FUNCTION public.trg_auditar_solicitudes();
+
+-- Vista Desencriptable segura
+CREATE OR REPLACE VIEW public.solicitudes_tic_secure 
+WITH (security_invoker = true) AS
 SELECT 
     id,
     fecha,
@@ -303,80 +275,41 @@ SELECT
     created_at
 FROM public.solicitudes_tic;
 
--- Permisos explícitos sobre la vista para acceso público sin login
-REVOKE ALL ON public.solicitudes_tic_secure FROM public;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO public;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.solicitudes_tic_secure TO anon, authenticated, service_role;
 
-
--- 6. Tabla de Auditoría e Historial de Cambios
-CREATE TABLE IF NOT EXISTS public.auditoria_solicitudes (
-    id SERIAL PRIMARY KEY,
-    solicitud_id TEXT NOT NULL,
-    accion TEXT NOT NULL, -- 'INSERT', 'UPDATE', 'DELETE'
-    usuario TEXT, -- correo de Supabase Auth
-    detalle JSONB, -- datos nuevos/antiguos
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Habilitar RLS para auditoría
-ALTER TABLE public.auditoria_solicitudes ENABLE ROW LEVEL SECURITY;
-
--- Eliminar política previa si existe
-DROP POLICY IF EXISTS "Permitir lectura de auditoría a autenticados" ON public.auditoria_solicitudes;
-
--- Solo usuarios autenticados con rol admin pueden ver la auditoría
-CREATE POLICY "Permitir lectura de auditoría a autenticados" 
-ON public.auditoria_solicitudes FOR SELECT TO authenticated USING (public.is_admin());
-
--- Trigger de Auditoría
-CREATE OR REPLACE FUNCTION public.trg_auditar_solicitudes() RETURNS TRIGGER AS $$
-DECLARE
-    user_email TEXT;
-BEGIN
-    user_email := auth.email();
-    
-    IF TG_OP = 'INSERT' THEN
-        INSERT INTO public.auditoria_solicitudes (solicitud_id, accion, usuario, detalle)
-        VALUES (NEW.id, TG_OP, user_email, jsonb_build_object('nuevo', to_jsonb(NEW)));
-    ELSIF TG_OP = 'UPDATE' THEN
-        INSERT INTO public.auditoria_solicitudes (solicitud_id, accion, usuario, detalle)
-        VALUES (NEW.id, TG_OP, user_email, jsonb_build_object('antiguo', to_jsonb(OLD), 'nuevo', to_jsonb(NEW)));
-    ELSIF TG_OP = 'DELETE' THEN
-        INSERT INTO public.auditoria_solicitudes (solicitud_id, accion, usuario, detalle)
-        VALUES (OLD.id, TG_OP, user_email, jsonb_build_object('antiguo', to_jsonb(OLD)));
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS solicitudes_auditoria ON public.solicitudes_tic;
-CREATE OR REPLACE TRIGGER solicitudes_auditoria
-AFTER INSERT OR UPDATE OR DELETE ON public.solicitudes_tic
-FOR EACH ROW EXECUTE FUNCTION public.trg_auditar_solicitudes();
-
-
--- 7. Configuración de Supabase Storage para Firmas Digitales
--- Crear el bucket de firmas (Público)
+-- =======================================================================
+-- 10. BUCKET DE STORAGE PARA FIRMAS
+-- =======================================================================
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('firmas', 'firmas', true) 
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- Políticas de Storage para firmas (Públicas)
-DROP POLICY IF EXISTS "Permitir subida de firmas a autenticados" ON storage.objects;
-DROP POLICY IF EXISTS "Permitir lectura de firmas a autenticados" ON storage.objects;
-DROP POLICY IF EXISTS "Permitir borrado de firmas a autenticados" ON storage.objects;
+-- Políticas de Storage
 DROP POLICY IF EXISTS "Permitir subida de firmas a todos" ON storage.objects;
 DROP POLICY IF EXISTS "Permitir lectura de firmas a todos" ON storage.objects;
 DROP POLICY IF EXISTS "Permitir borrado de firmas a todos" ON storage.objects;
 
 CREATE POLICY "Permitir subida de firmas a todos" ON storage.objects 
-FOR INSERT TO public WITH CHECK (bucket_id = 'firmas');
+FOR INSERT TO anon, authenticated, service_role WITH CHECK (bucket_id = 'firmas');
 
 CREATE POLICY "Permitir lectura de firmas a todos" ON storage.objects 
-FOR SELECT TO public USING (bucket_id = 'firmas');
+FOR SELECT TO anon, authenticated, service_role USING (bucket_id = 'firmas');
 
 CREATE POLICY "Permitir borrado de firmas a todos" ON storage.objects 
-FOR DELETE TO public USING (bucket_id = 'firmas');
+FOR DELETE TO anon, authenticated, service_role USING (bucket_id = 'firmas');
 
+-- =======================================================================
+-- 11. RESTRICCIONES DE EJECUCIÓN DIRECTA
+-- =======================================================================
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM public;
+REVOKE EXECUTE ON FUNCTION public.is_tecnico() FROM public;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM public;
+REVOKE EXECUTE ON FUNCTION public.trg_auditar_solicitudes() FROM public;
+REVOKE EXECUTE ON FUNCTION public.trg_encrypt_solicitudes_rut() FROM public;
+REVOKE EXECUTE ON FUNCTION public.encrypt_rut(TEXT) FROM public;
+REVOKE EXECUTE ON FUNCTION public.decrypt_rut(TEXT) FROM public;
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_tecnico() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.encrypt_rut(TEXT) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.decrypt_rut(TEXT) TO anon, authenticated, service_role;

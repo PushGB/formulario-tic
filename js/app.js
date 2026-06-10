@@ -1899,6 +1899,9 @@ function cleanRowData(row, sourceSheet) {
         _originalRow: row // Referencia original
     };
     
+    let codigoArriendo = '';
+    let contratoArriendo = '';
+    
     for (let key in row) {
         const norm = normalizeKey(key);
         const val = String(row[key] || '').trim();
@@ -1914,7 +1917,23 @@ function cleanRowData(row, sourceSheet) {
         else if (norm === 'unidaddepto') cleaned.depto = normalizeName(val);
         else if (norm === 'estado') cleaned.estado = normalizeName(val);
         else if (norm === 'observaciones') cleaned.observaciones = val;
+        
+        if (norm === 'codigoarriendo') codigoArriendo = val;
+        else if (norm === 'contratoarriendo') contratoArriendo = val;
     }
+    
+    // Normalización especial para el contrato Netnow 2023 u otros contratos con columnas traspuestas o placeholders
+    if (contratoArriendo.toLowerCase().includes('netnow') || (cleaned.serie === '7' && codigoArriendo)) {
+        if (codigoArriendo) {
+            const realSerie = codigoArriendo.toUpperCase();
+            const realInventario = (cleaned.serie && cleaned.serie !== '7' && cleaned.serie.toLowerCase() !== 'no entrego') ? cleaned.serie : '';
+            cleaned.serie = realSerie;
+            if (realInventario) {
+                cleaned.inventario = realInventario;
+            }
+        }
+    }
+    
     cleaned.sheet = sourceSheet;
     return cleaned;
 }
@@ -2065,21 +2084,33 @@ async function saveCatastroToSupabase(equipments) {
         const batchSize = 100;
         let successful = 0;
         
-        const dbRows = equipments.map(e => ({
-            n: e.n || '',
-            inventario: e.inventario || '',
-            serie: String(e.serie || '').trim(),
-            tipo: e.tipo || '',
-            marca: e.marca || '',
-            modelo: e.modelo || '',
-            propiedad: e.propiedad || '',
-            funcionario: e.funcionario || '',
-            mail: e.mail || '',
-            depto: e.depto || '',
-            estado: e.estado || 'Disponible',
-            observaciones: e.observaciones || '',
-            sheet: e.sheet || 'Computadores'
-        })).filter(e => e.serie.length > 0);
+        const seen = new Set();
+        const dbRows = [];
+        
+        equipments.forEach(e => {
+            const serie = String(e.serie || '').trim();
+            if (serie.length === 0) return;
+            
+            const lowerSerie = serie.toLowerCase();
+            if (seen.has(lowerSerie)) return;
+            seen.add(lowerSerie);
+            
+            dbRows.push({
+                n: e.n || '',
+                inventario: e.inventario || '',
+                serie: serie,
+                tipo: e.tipo || '',
+                marca: e.marca || '',
+                modelo: e.modelo || '',
+                propiedad: e.propiedad || '',
+                funcionario: e.funcionario || '',
+                mail: e.mail || '',
+                depto: e.depto || '',
+                estado: e.estado || 'Disponible',
+                observaciones: e.observaciones || '',
+                sheet: e.sheet || 'Computadores'
+            });
+        });
 
         for (let i = 0; i < dbRows.length; i += batchSize) {
             const batch = dbRows.slice(i, i + batchSize);
@@ -2093,8 +2124,8 @@ async function saveCatastroToSupabase(equipments) {
         console.log(`Sincronizados ${successful} equipos con Supabase.`);
         showToast(`Sincronización de catastro exitosa: ${successful} equipos guardados.`, "success");
     } catch (e) {
-        console.error("Error al sincronizar catastro con Supabase:", e.message);
-        showToast("Error al guardar el catastro en la base de datos.", "error");
+        console.error("Error al sincronizar catastro con Supabase:", e);
+        showToast("Error de base de datos: " + (e.message || JSON.stringify(e) || e), "error");
     }
 }
 

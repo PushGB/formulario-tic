@@ -51,14 +51,16 @@ CREATE TABLE IF NOT EXISTS public.solicitudes_tic (
 -- Habilitar RLS para solicitudes_tic
 ALTER TABLE public.solicitudes_tic ENABLE ROW LEVEL SECURITY;
 
--- Eliminar políticas previas si existen
-DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir inserción pública de solicitudes" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir actualización solo a usuarios autenticados" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir borrado solo a usuarios autenticados" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir lectura pública de solicitudes" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir actualización pública de solicitudes" ON public.solicitudes_tic;
-DROP POLICY IF EXISTS "Permitir borrado público de solicitudes" ON public.solicitudes_tic;
+-- Eliminar dinámicamente cualquier política previa en solicitudes_tic
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'solicitudes_tic'
+    LOOP
+        EXECUTE format('DROP POLICY %I ON public.solicitudes_tic', r.policyname);
+    END LOOP;
+END $$;
 
 -- Crear políticas de acceso para solicitudes_tic
 CREATE POLICY "Permitir lectura pública de solicitudes" 
@@ -96,15 +98,16 @@ CREATE TABLE IF NOT EXISTS public.catastro_equipos (
 -- Habilitar RLS para catastro_equipos
 ALTER TABLE public.catastro_equipos ENABLE ROW LEVEL SECURITY;
 
--- Eliminar políticas previas si existen
-DROP POLICY IF EXISTS "Permitir lectura solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir inserción solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir actualización solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir borrado solo a usuarios autenticados" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir lectura pública de catastro" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir inserción pública de catastro" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir actualización pública de catastro" ON public.catastro_equipos;
-DROP POLICY IF EXISTS "Permitir borrado público de catastro" ON public.catastro_equipos;
+-- Eliminar dinámicamente cualquier política previa en catastro_equipos
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'catastro_equipos'
+    LOOP
+        EXECUTE format('DROP POLICY %I ON public.catastro_equipos', r.policyname);
+    END LOOP;
+END $$;
 
 -- Crear políticas de acceso para catastro_equipos
 CREATE POLICY "Permitir lectura pública de catastro" 

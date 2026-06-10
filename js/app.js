@@ -1692,7 +1692,7 @@ function getCoords(e, canvas, isTouch) {
 }
 
 // Guardar/Crear Registro
-function saveForm(event) {
+async function saveForm(event) {
     event.preventDefault();
     
     const tipoSolicitudRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
@@ -1860,69 +1860,110 @@ function saveForm(event) {
         }
     };
 
-    if (activeSubmissionId) {
-        // Editar Registro Existente
-        const idx = submissions.findIndex(s => s.id === activeSubmissionId);
-        if (idx !== -1) {
-            submissions[idx] = submissionData;
-            showToast("Registro actualizado localmente.", "success");
-        }
-    } else {
-        // Crear Nuevo Registro
-        submissions.unshift(submissionData);
-        showToast("Nuevo registro guardado localmente.", "success");
+    // Cambiar botón a estado "Guardando..."
+    const saveBtn = document.getElementById('save-btn-form');
+    let originalBtnText = '';
+    if (saveBtn) {
+        originalBtnText = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<span class="flex items-center justify-center gap-2">
+            <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg> Guardando...
+        </span>`;
     }
 
-    saveSubmissionsToStorage();
-    consolidateDuplicateSubmissions();
-    
-    // Si se consolidó con un registro existente (mismo RUT), usamos ese ID para que la UI/PDF coincida
-    const currentRut = submissionData.funcionario && submissionData.funcionario.rut ? formatRut(submissionData.funcionario.rut) : null;
-    if (currentRut) {
-        const consolidatedSub = submissions.find(s => s.funcionario && formatRut(s.funcionario.rut) === currentRut);
-        if (consolidatedSub) {
-            activeSubmissionId = consolidatedSub.id;
-        } else {
-            activeSubmissionId = submissionData.id;
-        }
-    } else {
-        activeSubmissionId = submissionData.id;
-    }
+    try {
+        let storageFirmas = null;
+        let syncedCloud = false;
 
-    // Sincronizar en caliente con Supabase
-    if (supabase) {
-        (async () => {
+        // 1. Intentar guardar en la nube si Supabase está disponible y estamos online
+        if (supabase && navigator.onLine) {
             try {
-                const storageFirmas = await uploadSignaturesToStorage(submissionData.id, submissionData.firmas);
+                // Subir firmas al Storage
+                storageFirmas = await uploadSignaturesToStorage(submissionData.id, submissionData.firmas);
                 
                 const dbRow = _mapSubmissionToDbRow(submissionData, storageFirmas);
 
+                // Guardar registro
                 const { error } = await supabase
                     .from('solicitudes_tic')
                     .upsert(dbRow);
                 
-                if (error) {
-                    console.error("Error al guardar en Supabase:", error.message);
-                    showToast("Guardado localmente. Error al sincronizar con la nube.", "error");
-                } else {
-                    showToast("Registro guardado y sincronizado con la nube.", "success");
+                if (error) throw error;
+                syncedCloud = true;
+            } catch (cloudErr) {
+                console.error("Error al guardar en Supabase:", cloudErr.message || cloudErr);
+                showToast(`Error de base de datos web: ${cloudErr.message || 'Error de red'}. El registro NO se ha guardado.`, "error");
+                
+                // Restaurar botón para reintentar
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalBtnText;
                 }
-            } catch (err) {
-                console.error("Error de conexión al guardar en Supabase:", err);
-                showToast("Guardado localmente. Error de conexión con la nube.", "error");
+                return; // Interrumpir flujo
             }
-        })();
+        } else if (supabase && !navigator.onLine) {
+            console.warn("Sin conexión a internet. Guardando en caché local temporal.");
+        }
+
+        // 2. Si se sincronizó o estamos realmente offline, actualizar caché local
+        if (activeSubmissionId) {
+            // Editar Registro Existente
+            const idx = submissions.findIndex(s => s.id === activeSubmissionId);
+            if (idx !== -1) {
+                submissions[idx] = submissionData;
+            }
+        } else {
+            // Crear Nuevo Registro
+            submissions.unshift(submissionData);
+        }
+
+        saveSubmissionsToStorage();
+        consolidateDuplicateSubmissions();
+        
+        // Si se consolidó con un registro existente (mismo RUT), usamos ese ID para que la UI/PDF coincida
+        const currentRut = submissionData.funcionario && submissionData.funcionario.rut ? formatRut(submissionData.funcionario.rut) : null;
+        if (currentRut) {
+            const consolidatedSub = submissions.find(s => s.funcionario && formatRut(s.funcionario.rut) === currentRut);
+            if (consolidatedSub) {
+                activeSubmissionId = consolidatedSub.id;
+            } else {
+                activeSubmissionId = submissionData.id;
+            }
+        } else {
+            activeSubmissionId = submissionData.id;
+        }
+
+        if (syncedCloud) {
+            showToast("Registro guardado y sincronizado con la nube.", "success");
+        } else {
+            showToast("Guardado localmente (Modo Offline). Se sincronizará al recuperar conexión.", "warning");
+        }
+
+        // Habilitar impresión, PDF y previsualización tras guardar exitosamente
+        document.getElementById('print-btn-form').classList.remove('hidden');
+        document.getElementById('pdf-btn-form').classList.remove('hidden');
+        document.getElementById('preview-btn-form').classList.remove('hidden');
+        
+        // Regresar al dashboard después de un corto retardo para visualización
+        setTimeout(() => {
+            switchTab('dashboard');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalBtnText;
+            }
+        }, 1000);
+        
+    } catch (err) {
+        console.error("Error general en el guardado de datos:", err);
+        showToast("Error crítico al procesar el guardado: " + err.message, "error");
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalBtnText;
+        }
     }
-    
-    // Habilitar impresión, PDF y previsualización tras guardar exitosamente
-    document.getElementById('print-btn-form').classList.remove('hidden');
-    document.getElementById('pdf-btn-form').classList.remove('hidden');
-    document.getElementById('preview-btn-form').classList.remove('hidden');
-    
-    // Regresar al dashboard después de un corto retardo para visualización
-    setTimeout(() => {
-        switchTab('dashboard');
-    }, 1000);
 }
 
 // Sincronizar los datos del formulario web interactivo al documento oficial de impresión
@@ -2271,16 +2312,17 @@ function drawSavedSignature(id, dataUrl) {
 }
 
 // Eliminar Registro
+// Eliminar Registro
 async function deleteSubmission(id) {
-    if (confirm("¿Está seguro de que desea eliminar permanentemente este registro del historial local y la nube?")) {
-        submissions = submissions.filter(s => s.id !== id);
-        if (activeSubmissionId === id) {
-            activeSubmissionId = null;
-        }
-        saveSubmissionsToStorage();
-        renderTable();
-        
-        if (supabase) {
+    if (!confirm("¿Está seguro de que desea eliminar permanentemente este registro de la nube y del historial local?")) {
+        return;
+    }
+
+    try {
+        let deletedCloud = false;
+
+        // 1. Intentar eliminar de la nube si Supabase está disponible y estamos online
+        if (supabase && navigator.onLine) {
             try {
                 const { error } = await supabase
                     .from('solicitudes_tic')
@@ -2288,14 +2330,32 @@ async function deleteSubmission(id) {
                     .eq('id', id);
                 
                 if (error) throw error;
-                showToast("Registro eliminado de local y de la nube.", "success");
-            } catch (e) {
-                console.error("Error al eliminar de Supabase:", e.message);
-                showToast("Eliminado localmente. Error al eliminar en la nube.", "error");
+                deletedCloud = true;
+            } catch (cloudErr) {
+                console.error("Error al eliminar de Supabase:", cloudErr.message || cloudErr);
+                showToast(`Error de base de datos web: ${cloudErr.message || 'Error de red'}. El registro NO se ha eliminado.`, "error");
+                return; // Interrumpir flujo
             }
-        } else {
-            showToast("Registro eliminado localmente.", "success");
+        } else if (supabase && !navigator.onLine) {
+            console.warn("Sin conexión a internet. No se puede eliminar en la nube.");
         }
+
+        // 2. Si se eliminó en la nube o estamos offline, eliminar localmente
+        submissions = submissions.filter(s => s.id !== id);
+        if (activeSubmissionId === id) {
+            activeSubmissionId = null;
+        }
+        saveSubmissionsToStorage();
+        renderTable();
+
+        if (deletedCloud) {
+            showToast("Registro eliminado de la nube y localmente.", "success");
+        } else {
+            showToast("Registro eliminado localmente (Modo Offline).", "warning");
+        }
+    } catch (err) {
+        console.error("Error al procesar la eliminación del registro:", err);
+        showToast("Error crítico al eliminar: " + err.message, "error");
     }
 }
 

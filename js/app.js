@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import Chart from 'chart.js/auto';
 
+console.log("=== SOPORTE TIC APP v4.1 LOADED ===");
+
 // Inicializar Supabase Client (Producción con variables de entorno)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -54,7 +56,7 @@ function showLoginOverlay() {
     if (divider) divider.classList.add('hidden');
     
     // Deshabilitar botones de navegación
-    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
     });
@@ -69,36 +71,66 @@ function hideLoginOverlay() {
     if (divider) divider.classList.remove('hidden');
     
     // Habilitar botones de navegación
-    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-metrics', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = false;
     });
 }
 
 async function checkAuthSession() {
-    if (!supabase) return;
-    try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        if (session) {
-            onUserAuthenticated(session.user);
-        } else {
-            showLoginOverlay();
+    // 1. Intentar restaurar sesión local desde sessionStorage
+    const localUser = sessionStorage.getItem('tic_auth_user');
+    if (localUser) {
+        try {
+            const user = JSON.parse(localUser);
+            currentUserRole = user.role;
+            hideLoginOverlay();
+            applyRolePermissions();
+            showToast(`Sesión restaurada: ${user.email}`, "success");
+            await loadSubmissions();
+            return;
+        } catch (e) {
+            console.error("Error al parsear usuario local:", e);
+            sessionStorage.removeItem('tic_auth_user');
         }
-    } catch (err) {
-        console.error("Error al obtener sesión de Supabase:", err.message);
-        showLoginOverlay();
     }
     
-    // Escuchar cambios de estado en auth
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            onUserAuthenticated(session.user);
-        } else if (event === 'SIGNED_OUT') {
-            showLoginOverlay();
+    // 2. Si no hay sesión local y hay Supabase configurado, intentar autenticación remota
+    if (supabase) {
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            
+            if (session) {
+                hideLoginOverlay();
+                await fetchUserRole(session.user);
+                applyRolePermissions();
+                showToast(`Sesión iniciada (Nube): ${session.user.email}`, "success");
+                await loadSubmissions();
+                
+                // Escuchar cambios de estado en auth
+                supabase.auth.onAuthStateChange(async (event, newSession) => {
+                    if (event === 'SIGNED_IN' && newSession) {
+                        hideLoginOverlay();
+                        await fetchUserRole(newSession.user);
+                        applyRolePermissions();
+                        await loadSubmissions();
+                        lucide.createIcons();
+                    } else if (event === 'SIGNED_OUT') {
+                        showLoginOverlay();
+                    }
+                });
+                return;
+            }
+        } catch (err) {
+            console.error("Error al obtener sesión de Supabase:", err.message);
         }
-    });
+    }
+    
+    // 3. Si no hay sesión local ni remota, mostrar el overlay de login y deshabilitar navegación
+    showLoginOverlay();
+    submissions = [];
+    renderTable();
 }
 
 async function onUserAuthenticated(user) {
@@ -139,12 +171,23 @@ async function fetchUserRole(user) {
 function applyRolePermissions() {
     const uploadLabel = document.getElementById('excel-upload-label');
     const exportBtn = document.getElementById('excel-export-btn');
+    const navUsers = document.getElementById('nav-users');
     
     if (currentUserRole === 'tecnico') {
         if (uploadLabel) uploadLabel.classList.add('hidden');
         if (exportBtn) exportBtn.classList.add('hidden');
-    } else {
+        if (navUsers) navUsers.classList.add('hidden');
+        if (activeTab === 'users') {
+            switchTab('dashboard');
+        }
+    } else if (currentUserRole === 'admin') {
         if (uploadLabel) uploadLabel.classList.remove('hidden');
+        if (window.uploadedWorkbook || (window.loadedAllEquipments && window.loadedAllEquipments.length > 0)) {
+            if (exportBtn) exportBtn.classList.remove('hidden');
+        } else {
+            if (exportBtn) exportBtn.classList.add('hidden');
+        }
+        if (navUsers) navUsers.classList.remove('hidden');
     }
 }
 
@@ -160,7 +203,7 @@ function setFormReadOnly(readOnly) {
         }
         
         // Botones de firma y selección de modo
-        if (el.classList.contains('clear-sig-btn') || el.classList.contains('mode-sig-btn')) {
+        if (el.classList.contains('clear-sig-btn') || el.classList.contains('mode-sig-btn') || el.classList.contains('sig-clear-btn')) {
             el.disabled = readOnly;
             el.style.opacity = readOnly ? '0.5' : '1';
             el.style.pointerEvents = readOnly ? 'none' : 'auto';
@@ -188,35 +231,226 @@ function setFormReadOnly(readOnly) {
 
 async function handleLogin(event) {
     event.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
+    const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value;
     const errorMsg = document.getElementById('login-error-msg');
     
     if (errorMsg) errorMsg.classList.add('hidden');
     
-    if (!supabase) return;
+    // 1. Verificación local / offline en localStorage
+    initLocalUsersStorage();
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    const matchedUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
     
-    try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-    } catch (err) {
-        console.error("Error de autenticación:", err.message);
+    if (matchedUser) {
+        currentUserRole = matchedUser.role;
+        sessionStorage.setItem('tic_auth_user', JSON.stringify({ email: matchedUser.email, role: matchedUser.role }));
+        hideLoginOverlay();
+        applyRolePermissions();
+        showToast(`Sesión iniciada como ${matchedUser.role === 'admin' ? 'Administrador' : 'Técnico'} (Local).`, "success");
+        await loadSubmissions();
+        lucide.createIcons();
+        return;
+    }
+    
+    // 2. Si no coincide localmente, intentar con Supabase si está configurado
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error de autenticación remota:", err.message);
+            if (errorMsg) {
+                errorMsg.innerText = "Credenciales inválidas. Intente de nuevo.";
+                errorMsg.classList.remove('hidden');
+            }
+        }
+    } else {
         if (errorMsg) {
-            errorMsg.innerText = "Credenciales inválidas. Intente de nuevo.";
+            errorMsg.innerText = "Credenciales inválidas para el modo local.";
             errorMsg.classList.remove('hidden');
         }
     }
 }
 
 async function handleLogout() {
+    sessionStorage.removeItem('tic_auth_user');
+    currentUserRole = null;
+    
     if (supabase) {
         try {
             await supabase.auth.signOut();
-            currentUserRole = null;
-            showToast("Sesión cerrada.", "success");
         } catch (err) {
-            console.error("Error al cerrar sesión:", err.message);
+            console.error("Error al cerrar sesión remota:", err.message);
         }
+    }
+    
+    showToast("Sesión cerrada.", "success");
+    showLoginOverlay();
+    submissions = [];
+    renderTable();
+}
+
+// --- GESTIÓN DE ACCESOS Y USUARIOS LOCALES (ADMIN ONLY) ---
+
+// Inicializar listado local de usuarios en localStorage si no existe
+function initLocalUsersStorage() {
+    let localUsers = localStorage.getItem('tic_local_users');
+    if (!localUsers) {
+        const defaultUsers = [
+            { email: 'admin@ispch.cl', password: 'Admin.1234', role: 'admin' },
+            { email: 'tecnico@ispch.cl', password: 'Tacnico.1234', role: 'tecnico' }
+        ];
+        localStorage.setItem('tic_local_users', JSON.stringify(defaultUsers));
+    }
+}
+
+// Renderizar la tabla de usuarios locales
+function renderUsersTab() {
+    initLocalUsersStorage();
+    const tbody = document.getElementById('local-users-list');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    
+    // Obtener correo del usuario actualmente autenticado para evitar auto-eliminación
+    let currentAuthEmail = '';
+    const localSession = sessionStorage.getItem('tic_auth_user');
+    if (localSession) {
+        currentAuthEmail = JSON.parse(localSession).email.toLowerCase();
+    }
+    
+    localUsers.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850/60";
+        
+        const roleBadge = u.role === 'admin'
+            ? '<span class="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold font-mono text-[9px] uppercase tracking-wider">Administrador</span>'
+            : '<span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold font-mono text-[9px] uppercase tracking-wider">Técnico</span>';
+            
+        // No permitir que un administrador se auto-elimine
+        const isSelf = u.email.toLowerCase() === currentAuthEmail;
+        const deleteButton = isSelf 
+            ? '<span class="text-[9px] text-slate-400 font-medium italic">Tu Cuenta</span>' 
+            : `<button type="button" onclick="deleteUser('${escapeHTML(u.email)}')" class="p-1.5 text-rose-500 hover:text-rose-750 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Eliminar Cuenta"><i data-lucide="user-minus" class="w-4 h-4"></i></button>`;
+            
+        tr.innerHTML = `
+            <td class="py-3 px-4 font-medium text-slate-800 dark:text-slate-200">${escapeHTML(u.email)}</td>
+            <td class="py-3 px-4">${roleBadge}</td>
+            <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" onclick="openChangePassModal('${escapeHTML(u.email)}')" class="p-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors" title="Cambiar Contraseña">
+                        <i data-lucide="key" class="w-4 h-4"></i>
+                    </button>
+                    ${deleteButton}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    lucide.createIcons();
+}
+
+// Crear un nuevo usuario en localStorage
+function createUser(event) {
+    event.preventDefault();
+    const email = document.getElementById('new-user-email').value.trim().toLowerCase();
+    const password = document.getElementById('new-user-password').value;
+    const role = document.getElementById('new-user-role').value;
+    
+    if (!email || !password || !role) {
+        showToast("Por favor complete todos los campos.", "error");
+        return;
+    }
+    
+    initLocalUsersStorage();
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    
+    // Validar duplicado
+    const exists = localUsers.some(u => u.email.toLowerCase() === email);
+    if (exists) {
+        showToast("Esta dirección de correo ya tiene un registro de acceso.", "error");
+        return;
+    }
+    
+    localUsers.push({ email, password, role });
+    localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
+    
+    // Resetear formulario
+    document.getElementById('create-user-form').reset();
+    showToast("Cuenta de acceso creada con éxito.", "success");
+    renderUsersTab();
+}
+
+// Eliminar un usuario de localStorage
+function deleteUser(email) {
+    if (!confirm(`¿Está seguro de que desea eliminar la cuenta de acceso para ${email}?`)) {
+        return;
+    }
+    
+    initLocalUsersStorage();
+    let localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    
+    // Evitar eliminar el último administrador
+    const adminsCount = localUsers.filter(u => u.role === 'admin').length;
+    const targetUser = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (targetUser && targetUser.role === 'admin' && adminsCount <= 1) {
+        showToast("No se puede eliminar el único administrador disponible en el sistema.", "error");
+        return;
+    }
+    
+    localUsers = localUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase());
+    localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
+    
+    showToast("Cuenta eliminada con éxito.", "success");
+    renderUsersTab();
+}
+
+// Abrir el modal de cambio de contraseña
+function openChangePassModal(email) {
+    const modal = document.getElementById('change-pass-modal');
+    const displayEmail = document.getElementById('change-pass-email-display');
+    const hiddenEmail = document.getElementById('change-pass-email-hidden');
+    
+    if (modal && displayEmail && hiddenEmail) {
+        displayEmail.innerText = email;
+        hiddenEmail.value = email;
+        document.getElementById('change-pass-new-password').value = '';
+        modal.classList.remove('hidden');
+    }
+}
+
+// Cerrar el modal de cambio de contraseña
+function closeChangePassModal() {
+    const modal = document.getElementById('change-pass-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Guardar la nueva contraseña de usuario en localStorage
+function saveUserPassword(event) {
+    event.preventDefault();
+    const email = document.getElementById('change-pass-email-hidden').value;
+    const newPassword = document.getElementById('change-pass-new-password').value;
+    
+    if (!email || !newPassword) {
+        showToast("La contraseña no puede estar vacía.", "error");
+        return;
+    }
+    
+    initLocalUsersStorage();
+    const localUsers = JSON.parse(localStorage.getItem('tic_local_users') || '[]');
+    const userIdx = localUsers.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (userIdx !== -1) {
+        localUsers[userIdx].password = newPassword;
+        localStorage.setItem('tic_local_users', JSON.stringify(localUsers));
+        showToast(`Contraseña actualizada para ${email}.`, "success");
+        closeChangePassModal();
+    } else {
+        showToast("No se encontró la cuenta especificada.", "error");
     }
 }
 
@@ -313,7 +547,7 @@ async function mapDbRowsToSubmissions(data) {
             ticket: dbRow.ticket,
             funcionario: {
                 nombre: dbRow.funcionario_nombre,
-                rut: formatRut(dbRow.funcionario_rut),
+                rut: formatRut(dbRow.funcionario_rut || '1-9'),
                 cargo: dbRow.funcionario_cargo,
                 depto: dbRow.funcionario_depto
             },
@@ -363,16 +597,42 @@ window.addEventListener('load', () => {
     // Intentar precargar el catastro Excel desde el servidor local automáticamente
     preloadExcelData();
 
-    // Cargar caché local e iniciar sincronización de datos
-    currentUserRole = 'admin';
-    applyRolePermissions();
-    loadSubmissions();
+    // Verificar sesión e iniciar carga de datos
+    checkAuthSession();
 
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+            .then(reg => {
+                console.log('[PWA] Service Worker registrado con éxito:', reg.scope);
+                
+                // Si hay un service worker esperando, forzar que se active
+                if (reg.waiting) {
+                    reg.waiting.postMessage({ action: 'skipWaiting' });
+                }
+                
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('[PWA] Nuevo service worker disponible, activando...');
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                            }
+                        });
+                    }
+                });
+            })
             .catch(err => console.error('[PWA] Error en Service Worker:', err));
+
+        // Escuchar cuando el nuevo service worker tome el control y recargar la página automáticamente
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+            }
+        });
     }
 });
 
@@ -471,6 +731,7 @@ function consolidateDuplicateSubmissions() {
     // Procesamos de más antiguo a más reciente para preservar el orden y datos actualizados
     for (let i = submissions.length - 1; i >= 0; i--) {
         const sub = submissions[i];
+        if (!sub) continue;
         const rawRut = sub.funcionario && sub.funcionario.rut;
         if (!rawRut) {
             consolidated.push(sub);
@@ -485,9 +746,11 @@ function consolidateDuplicateSubmissions() {
             
             // Fusionar equipamiento evitando duplicados
             if (sub.equipamiento) {
+                if (!existing.equipamiento) existing.equipamiento = [];
                 sub.equipamiento.forEach(eq => {
+                    if (!eq) return;
                     const isDup = existing.equipamiento.some(e => 
-                        (e.serie || '').trim().toUpperCase() === (eq.serie || '').trim().toUpperCase()
+                        e && (e.serie || '').trim().toUpperCase() === (eq.serie || '').trim().toUpperCase()
                     );
                     if (!isDup) {
                         existing.equipamiento.push(eq);
@@ -500,6 +763,7 @@ function consolidateDuplicateSubmissions() {
             
             // Fusionar categorías
             if (sub.equipamiento_categorias) {
+                if (!existing.equipamiento_categorias) existing.equipamiento_categorias = [];
                 sub.equipamiento_categorias.forEach(cat => {
                     if (!existing.equipamiento_categorias.includes(cat)) {
                         existing.equipamiento_categorias.push(cat);
@@ -511,38 +775,51 @@ function consolidateDuplicateSubmissions() {
             }
             
             // Fusionar observaciones
-            if (sub.observaciones_generales && !existing.observaciones_generales.includes(sub.observaciones_generales)) {
-                existing.observaciones_generales += (existing.observaciones_generales ? ' | ' : '') + sub.observaciones_generales;
-                if (!pendingUpserts.has(existing.id)) {
-                    updatedSubmissions.add(existing);
+            if (sub.observaciones_generales) {
+                if (existing.observaciones_generales === null || existing.observaciones_generales === undefined) {
+                    existing.observaciones_generales = '';
+                }
+                if (!existing.observaciones_generales.includes(sub.observaciones_generales)) {
+                    existing.observaciones_generales += (existing.observaciones_generales ? ' | ' : '') + sub.observaciones_generales;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
                 }
             }
-            if (sub.accesorios && !existing.accesorios.includes(sub.accesorios)) {
-                existing.accesorios += (existing.accesorios ? ' | ' : '') + sub.accesorios;
-                if (!pendingUpserts.has(existing.id)) {
-                    updatedSubmissions.add(existing);
+            if (sub.accesorios) {
+                if (existing.accesorios === null || existing.accesorios === undefined) {
+                    existing.accesorios = '';
+                }
+                if (!existing.accesorios.includes(sub.accesorios)) {
+                    existing.accesorios += (existing.accesorios ? ' | ' : '') + sub.accesorios;
+                    if (!pendingUpserts.has(existing.id)) {
+                        updatedSubmissions.add(existing);
+                    }
                 }
             }
             
             // Fusionar firmas
             if (sub.firmas) {
+                if (!existing.firmas) {
+                    existing.firmas = { tic_mode: 'digital', emisor_mode: 'digital', receptor_mode: 'digital', tic: null, emisor: null, receptor: null };
+                }
                 if (!existing.firmas.tic && sub.firmas.tic) {
                     existing.firmas.tic = sub.firmas.tic;
-                    existing.firmas.tic_mode = sub.firmas.tic_mode;
+                    existing.firmas.tic_mode = sub.firmas.tic_mode || 'digital';
                     if (!pendingUpserts.has(existing.id)) {
                         updatedSubmissions.add(existing);
                     }
                 }
                 if (!existing.firmas.emisor && sub.firmas.emisor) {
                     existing.firmas.emisor = sub.firmas.emisor;
-                    existing.firmas.emisor_mode = sub.firmas.emisor_mode;
+                    existing.firmas.emisor_mode = sub.firmas.emisor_mode || 'digital';
                     if (!pendingUpserts.has(existing.id)) {
                         updatedSubmissions.add(existing);
                     }
                 }
                 if (!existing.firmas.receptor && sub.firmas.receptor) {
                     existing.firmas.receptor = sub.firmas.receptor;
-                    existing.firmas.receptor_mode = sub.firmas.receptor_mode;
+                    existing.firmas.receptor_mode = sub.firmas.receptor_mode || 'digital';
                     if (!pendingUpserts.has(existing.id)) {
                         updatedSubmissions.add(existing);
                     }
@@ -550,7 +827,10 @@ function consolidateDuplicateSubmissions() {
             }
             
             // Unificar nombre conservando el más largo/completo (evitar typos como Mors vs Mora)
-            if (sub.funcionario.nombre && existing.funcionario.nombre && sub.funcionario.nombre.length > existing.funcionario.nombre.length) {
+            if (!existing.funcionario) {
+                existing.funcionario = { nombre: '', rut: '', cargo: '', depto: '' };
+            }
+            if (sub.funcionario && sub.funcionario.nombre && existing.funcionario.nombre && sub.funcionario.nombre.length > existing.funcionario.nombre.length) {
                 existing.funcionario.nombre = sub.funcionario.nombre;
                 if (!pendingUpserts.has(existing.id)) {
                     updatedSubmissions.add(existing);
@@ -563,6 +843,9 @@ function consolidateDuplicateSubmissions() {
                 hasChanges = true;
             }
         } else {
+            if (!sub.funcionario) {
+                sub.funcionario = { nombre: '', rut: '', cargo: '', depto: '' };
+            }
             sub.funcionario.rut = rutKey;
             rutMap.set(rutKey, sub);
         }
@@ -719,45 +1002,65 @@ function updateStats() {
 
 // Alternar visualización de pestañas
 function switchTab(tabId) {
+    if (tabId === 'users' && currentUserRole !== 'admin') {
+        tabId = 'dashboard';
+    }
     activeTab = tabId;
-    document.getElementById('tab-dashboard').classList.add('hidden');
-    document.getElementById('tab-form-view').classList.add('hidden');
-    document.getElementById('tab-metrics').classList.add('hidden');
-    const tabHistory = document.getElementById('tab-history');
-    if (tabHistory) tabHistory.classList.add('hidden');
+    
+    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-metrics', 'tab-history', 'tab-users'];
+    tabs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.add('hidden');
+            el.classList.remove('fade-in-slide');
+        }
+    });
     
     // Estilos de botones de navegación
     const btnDash = document.getElementById('nav-dashboard');
     const btnForm = document.getElementById('nav-form');
     const btnMetrics = document.getElementById('nav-metrics');
     const btnHistory = document.getElementById('nav-history');
+    const btnUsers = document.getElementById('nav-users');
     
-    if (btnDash) btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnForm) btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnMetrics) btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnHistory) btnHistory.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800";
+    const inactiveClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-850/50";
+    const activeClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-650 text-white shadow-sm shadow-indigo-600/30";
+    
+    if (btnDash) btnDash.className = inactiveClass;
+    if (btnForm) btnForm.className = inactiveClass;
+    if (btnMetrics) btnMetrics.className = inactiveClass;
+    if (btnHistory) btnHistory.className = inactiveClass;
+    if (btnUsers) btnUsers.className = inactiveClass;
 
+    let targetEl = null;
     if (tabId === 'dashboard') {
-        document.getElementById('tab-dashboard').classList.remove('hidden');
-        if (btnDash) btnDash.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+        targetEl = document.getElementById('tab-dashboard');
+        if (btnDash) btnDash.className = activeClass;
         renderTable();
     } else if (tabId === 'form-view') {
-        document.getElementById('tab-form-view').classList.remove('hidden');
-        if (btnForm) btnForm.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+        targetEl = document.getElementById('tab-form-view');
+        if (btnForm) btnForm.className = activeClass;
         // Redimensionar canvases de firma al visualizar
         setTimeout(resizeAllCanvases, 50);
     } else if (tabId === 'metrics') {
-        document.getElementById('tab-metrics').classList.remove('hidden');
-        if (btnMetrics) {
-            btnMetrics.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        }
+        targetEl = document.getElementById('tab-metrics');
+        if (btnMetrics) btnMetrics.className = activeClass;
         renderMetrics();
     } else if (tabId === 'history') {
-        if (tabHistory) tabHistory.classList.remove('hidden');
-        if (btnHistory) {
-            btnHistory.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        }
+        targetEl = document.getElementById('tab-history');
+        if (btnHistory) btnHistory.className = activeClass;
         resetHistoryTab();
+    } else if (tabId === 'users') {
+        targetEl = document.getElementById('tab-users');
+        if (btnUsers) btnUsers.className = activeClass;
+        renderUsersTab();
+    }
+    
+    if (targetEl) {
+        targetEl.classList.remove('hidden');
+        // Forzar reflow para reiniciar la animación
+        void targetEl.offsetWidth;
+        targetEl.classList.add('fade-in-slide');
     }
 }
 
@@ -810,7 +1113,9 @@ function openNewForm() {
 
 // Formatear RUT Chileno
 function formatRut(rut) {
-    let valor = rut.replace(/[^0-9kK]/g, '');
+    if (rut === null || rut === undefined) return '';
+    const strRut = String(rut).trim();
+    let valor = strRut.replace(/[^0-9kK]/g, '');
     if (valor.length <= 1) return valor;
     let cuerpo = valor.slice(0, -1);
     let dv = valor.slice(-1).toUpperCase();
@@ -827,7 +1132,8 @@ function formatRut(rut) {
 // Algoritmo de validación del RUT (Módulo 11)
 function validateRut(rut) {
     if (!rut) return false;
-    const clean = rut.replace(/\./g, '').replace(/-/g, '').trim().toUpperCase();
+    const strRut = String(rut);
+    const clean = strRut.replace(/\./g, '').replace(/-/g, '').trim().toUpperCase();
     if (clean.length < 2) return false;
     
     const body = clean.slice(0, -1);
@@ -885,7 +1191,8 @@ function handleRutInput(element) {
 
 // Alternar modo de firma (Digital / Manual)
 function toggleSigMode(id) {
-    const mode = document.querySelector(`input[name="sig_mode_${id}"]:checked`).value;
+    const modeRadio = document.querySelector(`input[name="sig_mode_${id}"]:checked`);
+    const mode = modeRadio ? modeRadio.value : 'digital';
     const container = document.getElementById(`sig-container-${id}`);
     const placeholder = document.getElementById(`sig-manual-placeholder-${id}`);
     
@@ -902,7 +1209,8 @@ function toggleSigMode(id) {
 
 // Toggle Seccion Traspaso
 function toggleTraspasoSection() {
-    const isTraspaso = document.querySelector('input[name="solicitud_tipo"]:checked').value === 'Traspaso';
+    const tipoRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const isTraspaso = tipoRadio ? tipoRadio.value === 'Traspaso' : false;
     const section = document.getElementById('section-traspaso');
     if (isTraspaso) {
         section.classList.remove('hidden');
@@ -911,27 +1219,85 @@ function toggleTraspasoSection() {
     }
 }
 
+// Auto-detectar tipo de equipamiento en base a modelo o serie
+function autoDetectTypeFromFields(inputEl) {
+    const row = inputEl.closest('tr');
+    if (!row) return;
+    
+    const tipoInput = row.querySelector('[name="eq_tipo"]');
+    const marcaInput = row.querySelector('[name="eq_marca"]');
+    const modeloInput = row.querySelector('[name="eq_modelo"]');
+    const serieInput = row.querySelector('[name="eq_serie"]');
+    
+    if (!tipoInput || !modeloInput || !serieInput) return;
+    
+    const tipoVal = tipoInput.value.trim().toLowerCase();
+    const marcaVal = marcaInput ? marcaInput.value.trim().toLowerCase() : '';
+    const modeloVal = modeloInput.value.trim().toLowerCase();
+    const serieVal = serieInput.value.trim().toLowerCase();
+    
+    let detectedType = '';
+    
+    if (modeloVal.includes('veriton') || tipoVal.includes('veriton') || (marcaVal.includes('acer') && modeloVal.includes('veriton'))) {
+        detectedType = 'All In One';
+    } else if (modeloVal.includes('probook') || tipoVal.includes('probook')) {
+        detectedType = 'Notebook';
+    } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
+        detectedType = 'Notebook';
+    } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
+        detectedType = 'Monitor';
+    } else if (modeloVal.includes('p24v') || modeloVal.includes('p22v') || modeloVal.includes('p27v') || modeloVal.includes('monitor') || modeloVal.includes('pantalla')) {
+        detectedType = 'Monitor';
+    }
+    
+    if (detectedType) {
+        tipoInput.value = detectedType;
+    }
+    
+    syncEquipmentCategoriesFromRows();
+}
+
 // Tabla de Equipos Dinámica: Añadir Fila
 function addEquipmentRow(data = {}) {
     const container = document.getElementById('equipment-rows');
     const rowId = 'row_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
     
+    // Auto-detectar/normalizar tipo antes de rellenar la fila si viene genérico o vacío
+    let tipoVal = String(data.tipo || '').trim();
+    const marcaVal = String(data.marca || '').trim().toLowerCase();
+    const modeloVal = String(data.modelo || '').trim().toLowerCase();
+    const serieVal = String(data.serie || '').trim().toLowerCase();
+    
+    if (!tipoVal || tipoVal.toLowerCase() === 'equipo') {
+        if (modeloVal.includes('veriton') || (marcaVal.includes('acer') && modeloVal.includes('veriton'))) {
+            tipoVal = 'All In One';
+        } else if (modeloVal.includes('probook') || tipoVal.toLowerCase().includes('probook')) {
+            tipoVal = 'Notebook';
+        } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
+            tipoVal = 'Notebook';
+        } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
+            tipoVal = 'Monitor';
+        } else if (modeloVal.includes('p24v') || modeloVal.includes('p22v') || modeloVal.includes('p27v') || modeloVal.includes('monitor') || modeloVal.includes('pantalla')) {
+            tipoVal = 'Monitor';
+        }
+    }
+
     const tr = document.createElement('tr');
     tr.id = rowId;
     tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850";
     
     tr.innerHTML = `
         <td class="p-2">
-            <input type="text" name="eq_tipo" value="${escapeHTML(data.tipo || '')}" placeholder="Ej: Notebook" required oninput="syncEquipmentCategoriesFromRows()" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_tipo" value="${escapeHTML(tipoVal)}" placeholder="Ej: Notebook" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_marca" value="${escapeHTML(data.marca || '')}" placeholder="Ej: Lenovo" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_modelo" value="${escapeHTML(data.modelo || '')}" placeholder="Ej: ThinkPad L14" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
+            <input type="text" name="eq_modelo" value="${escapeHTML(data.modelo || '')}" placeholder="Ej: ThinkPad L14" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
         </td>
         <td class="p-2">
-            <input type="text" name="eq_serie" value="${escapeHTML(data.serie || '')}" placeholder="Ej: SPF0349A" required class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
+            <input type="text" name="eq_serie" value="${escapeHTML(data.serie || '')}" placeholder="Ej: SPF0349A" required oninput="autoDetectTypeFromFields(this)" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
         </td>
         <td class="p-2">
             <input type="text" name="eq_inventario" value="${escapeHTML(data.inventario || '')}" placeholder="Ej: ISP-2024-49" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono transition-all">
@@ -1101,7 +1467,7 @@ function updateSignatureFeedback(id) {
     let badge = container.querySelector('.sig-badge');
     if (hasSigned) {
         container.classList.remove('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
-        container.classList.add('border-emerald-500', 'dark:border-emerald-500');
+        container.classList.add('border-emerald-500', 'dark:border-emerald-500', 'has-signature');
         
         if (!badge) {
             badge = document.createElement('div');
@@ -1110,7 +1476,7 @@ function updateSignatureFeedback(id) {
             container.appendChild(badge);
         }
     } else {
-        container.classList.remove('border-emerald-500', 'dark:border-emerald-500');
+        container.classList.remove('border-emerald-500', 'dark:border-emerald-500', 'has-signature');
         container.classList.add('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
         if (badge) badge.remove();
     }
@@ -1118,6 +1484,9 @@ function updateSignatureFeedback(id) {
 
 function startDrawing(e, id, isTouch = false) {
     const canvas = document.getElementById(`canvas-${id}`);
+    const container = canvas.parentElement;
+    container.classList.add('drawing');
+    
     const state = drawingStates[id];
     state.isDrawing = true;
     
@@ -1156,6 +1525,10 @@ function draw(e, id, isTouch = false) {
 
 function stopDrawing(id) {
     drawingStates[id].isDrawing = false;
+    const canvas = document.getElementById(`canvas-${id}`);
+    if (canvas) {
+        canvas.parentElement.classList.remove('drawing');
+    }
 }
 
 function getCoords(e, canvas, isTouch) {
@@ -1178,8 +1551,10 @@ function getCoords(e, canvas, isTouch) {
 function saveForm(event) {
     event.preventDefault();
     
-    const tipo_solicitud = document.querySelector('input[name="solicitud_tipo"]:checked').value;
-    const propiedad_tipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
+    const tipoSolicitudRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const tipo_solicitud = tipoSolicitudRadio ? tipoSolicitudRadio.value : 'Asignacion';
+    const propiedadTipoRadio = document.querySelector('input[name="propiedad_tipo"]:checked');
+    const propiedad_tipo = propiedadTipoRadio ? propiedadTipoRadio.value : 'Fiscal';
     
     // Normalizar campos de la Sección 1 y Traspaso antes de validar
     const nombreField = document.getElementById('func-nombre');
@@ -1275,9 +1650,14 @@ function saveForm(event) {
     }
 
     // Obtener modos de firma
-    const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked').value;
-    const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked').value;
-    const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked').value;
+    const sigModeTicEl = document.querySelector('input[name="sig_mode_tic"]:checked');
+    const sigModeTic = sigModeTicEl ? sigModeTicEl.value : 'digital';
+    
+    const sigModeEmisorEl = document.querySelector('input[name="sig_mode_emisor"]:checked');
+    const sigModeEmisor = sigModeEmisorEl ? sigModeEmisorEl.value : 'digital';
+    
+    const sigModeReceptorEl = document.querySelector('input[name="sig_mode_receptor"]:checked');
+    const sigModeReceptor = sigModeReceptorEl ? sigModeReceptorEl.value : 'digital';
 
     // Validar firmas digitales requeridas
     if (sigModeTic === 'digital' && !drawingStates.tic.hasSigned) {
@@ -1440,8 +1820,10 @@ function syncPrintTemplate() {
     document.getElementById('print-func-depto').innerText = document.getElementById('func-depto').value.trim() || '-';
     
     // Seccion 2 checkboxes
-    const solicitudTipo = document.querySelector('input[name="solicitud_tipo"]:checked').value;
-    const propiedadTipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
+    const solTipoRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const solicitudTipo = solTipoRadio ? solTipoRadio.value : 'Asignacion';
+    const propTipoRadio = document.querySelector('input[name="propiedad_tipo"]:checked');
+    const propiedadTipo = propTipoRadio ? propTipoRadio.value : 'Fiscal';
     
     document.getElementById('print-solicitud-asignacion').querySelector('span').innerText = solicitudTipo === 'Asignacion' ? 'X' : '';
     document.getElementById('print-solicitud-traspaso').querySelector('span').innerText = solicitudTipo === 'Traspaso' ? 'X' : '';
@@ -1522,9 +1904,12 @@ function syncPrintTemplate() {
     document.getElementById('print-observaciones').innerText = document.getElementById('form-observaciones').value.trim() || 'Sin observaciones.';
     
     // Renderizar firmas de acuerdo a la modalidad
-    const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked').value;
-    const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked').value;
-    const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked').value;
+    const sigModeTicEl = document.querySelector('input[name="sig_mode_tic"]:checked');
+    const sigModeTic = sigModeTicEl ? sigModeTicEl.value : 'digital';
+    const sigModeEmisorEl = document.querySelector('input[name="sig_mode_emisor"]:checked');
+    const sigModeEmisor = sigModeEmisorEl ? sigModeEmisorEl.value : 'digital';
+    const sigModeReceptorEl = document.querySelector('input[name="sig_mode_receptor"]:checked');
+    const sigModeReceptor = sigModeReceptorEl ? sigModeReceptorEl.value : 'digital';
     
     // TIC (Pagina 1)
     const imgTic = document.getElementById('print-sig-tic-img');
@@ -1583,17 +1968,18 @@ function renderTable() {
     tbody.innerHTML = '';
     
     const filtered = submissions.filter(s => {
+        if (!s) return false;
         // Filtro por Tipo de Solicitud (Categoría de Botón)
         if (activeFilterType !== 'All' && s.tipo_solicitud !== activeFilterType) {
             return false;
         }
 
         // Filtro por Texto de Búsqueda
-        const matchNombre = s.funcionario.nombre.toLowerCase().includes(search);
-        const matchRut = s.funcionario.rut.toLowerCase().includes(search);
-        const matchTicket = s.ticket.toLowerCase().includes(search);
-        const matchTipo = s.tipo_solicitud.toLowerCase().includes(search);
-        const matchSerie = s.equipamiento.some(e => e.serie.toLowerCase().includes(search));
+        const matchNombre = (s.funcionario && s.funcionario.nombre) ? s.funcionario.nombre.toLowerCase().includes(search) : false;
+        const matchRut = (s.funcionario && s.funcionario.rut) ? s.funcionario.rut.toLowerCase().includes(search) : false;
+        const matchTicket = s.ticket ? s.ticket.toLowerCase().includes(search) : false;
+        const matchTipo = s.tipo_solicitud ? s.tipo_solicitud.toLowerCase().includes(search) : false;
+        const matchSerie = s.equipamiento ? s.equipamiento.some(e => e && e.serie && e.serie.toLowerCase().includes(search)) : false;
         return matchNombre || matchRut || matchTicket || matchTipo || matchSerie;
     });
 
@@ -1616,7 +2002,7 @@ function renderTable() {
             }
 
             // Formatear resumen de equipos para la columna
-            const eqSummary = s.equipamiento.map(e => `${escapeHTML(e.tipo)} (${escapeHTML(e.marca)} ${escapeHTML(e.modelo)})`).join(', ');
+            const eqSummary = s.equipamiento ? s.equipamiento.map(e => e ? `${escapeHTML(e.tipo || '')} (${escapeHTML(e.marca || '')} ${escapeHTML(e.modelo || '')})` : '').join(', ') : '';
 
             const deleteBtnHtml = currentUserRole === 'admin' ? `
                 <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-755 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
@@ -1624,15 +2010,18 @@ function renderTable() {
                 </button>
             ` : '';
 
+            const funcNombre = s.funcionario ? s.funcionario.nombre : '';
+            const funcRut = s.funcionario ? s.funcionario.rut : '';
+
             tr.innerHTML = `
                 <td class="py-4 px-6 font-medium text-slate-900 dark:text-slate-100">${escapeHTML(s.fecha)}</td>
                 <td class="py-4 px-6 font-mono text-xs text-indigo-650 dark:text-indigo-400 font-semibold">${escapeHTML(s.ticket)}</td>
                 <td class="py-4 px-6">
-                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(s.funcionario.nombre)}</div>
-                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(s.funcionario.rut)}</div>
+                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(funcNombre)}</div>
+                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(funcRut)}</div>
                 </td>
                 <td class="py-4 px-6">${badgesSolicitud}</td>
-                <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-450" title="${eqSummary}">${eqSummary}</td>
+                <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-455" title="${eqSummary}">${eqSummary}</td>
                 <td class="py-4 px-6 text-center">
                     <div class="flex items-center justify-center gap-2">
                         <button onclick="viewAndEditForm('${s.id}')" class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors" title="Ver / Editar">
@@ -1675,8 +2064,10 @@ function viewAndEditForm(id) {
     document.getElementById('func-depto').value = s.funcionario.depto;
 
     // Rellenar sección 2: Solicitud y propiedad
-    document.querySelector(`input[name="solicitud_tipo"][value="${s.tipo_solicitud}"]`).checked = true;
-    document.querySelector(`input[name="propiedad_tipo"][value="${s.propiedad_equipamiento}"]`).checked = true;
+    const solTipoRadio = document.querySelector(`input[name="solicitud_tipo"][value="${s.tipo_solicitud}"]`);
+    if (solTipoRadio) solTipoRadio.checked = true;
+    const propTipoRadio = document.querySelector(`input[name="propiedad_tipo"][value="${s.propiedad_equipamiento}"]`);
+    if (propTipoRadio) propTipoRadio.checked = true;
     
     // Desmarcar todos y re-marcar
     document.querySelectorAll('input[name="eq_cat"]').forEach(cb => cb.checked = false);
@@ -1709,9 +2100,12 @@ function viewAndEditForm(id) {
 
     // Rellenar modos de firma (Digital vs Manual)
     const sigModes = s.firmas || { tic_mode: 'digital', emisor_mode: 'digital', receptor_mode: 'digital' };
-    document.querySelector(`input[name="sig_mode_tic"][value="${sigModes.tic_mode || 'digital'}"]`).checked = true;
-    document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`).checked = true;
-    document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`).checked = true;
+    const ticRadio = document.querySelector(`input[name="sig_mode_tic"][value="${sigModes.tic_mode || 'digital'}"]`);
+    if (ticRadio) ticRadio.checked = true;
+    const emisorRadio = document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`);
+    if (emisorRadio) emisorRadio.checked = true;
+    const receptorRadio = document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`);
+    if (receptorRadio) receptorRadio.checked = true;
     
     toggleSigMode('tic');
     toggleSigMode('emisor');
@@ -2268,7 +2662,7 @@ function processWorkbookData(isManualUpload = false) {
             if (!grouped[key]) {
                 grouped[key] = {
                     nombre: String(nombre).trim(),
-                    rut: (rutKey && rutKey !== '-') ? rutKey : '',
+                    rut: (rutKey && rutKey !== '-') ? rutKey : '1-9',
                     cargo: String(item['Cargo'] || '').trim(),
                     depto: String(item['Departamento'] || '').trim(),
                     propiedad: item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo',
@@ -2775,67 +3169,91 @@ function splitEquipmentIfCombined(rawEq) {
     const isCombined = hasSlashTipo || hasSlashSerie || 
                        (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')));
 
-    if (!isCombined) {
-        return [rawEq];
-    }
-
-    const splitTipo = hasSlashTipo ? tipo.split('/') : [tipo];
-    const splitSerie = hasSlashSerie ? serie.split('/') : [serie];
-    const splitMarca = marca.includes('/') ? marca.split('/') : [marca];
-    const splitModelo = modelo.includes('/') ? modelo.split('/') : [modelo];
-    const splitInventario = inventario.includes('/') ? inventario.split('/') : [inventario];
-    const splitObservacion = observacion.includes('/') ? observacion.split('/') : [observacion];
-
-    let numItems = Math.max(splitTipo.length, splitSerie.length);
-    if (numItems === 1 && (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')))) {
-        numItems = 2;
-    }
-
     const results = [];
-    for (let i = 0; i < numItems; i++) {
-        let itemTipo = (splitTipo[i] || splitTipo[0] || 'Equipo').trim();
-        let itemSerie = (splitSerie[i] || '').trim();
-        let itemMarca = (splitMarca[i] || splitMarca[0] || '').trim();
-        let itemModelo = (splitModelo[i] || splitModelo[0] || '').trim();
-        let itemInventario = (splitInventario[i] || splitInventario[0] || '').trim();
-        let itemObservacion = (splitObservacion[i] || splitObservacion[0] || '').trim();
 
-        // Limpiar el número de serie para el segundo ítem si el original no tenía división (ej. sólo serial del AIO)
-        // Excepto si es una etiqueta especial como "ARRIENDO", "N/A" o "S/N"
-        if (i > 0 && splitSerie.length === 1) {
-            const sLower = itemSerie.toLowerCase();
-            if (sLower !== 'arriendo' && sLower !== 'n/a' && sLower !== 's/n') {
-                itemSerie = '';
-            }
-        }
-
-        // Normalizar tipos
-        const itemTipoLower = itemTipo.toLowerCase();
-        if (itemTipoLower === 'aio' || itemTipoLower === 'all in one' || itemTipoLower === 'all-in-one') {
-            itemTipo = 'All In One';
-        } else if (itemTipoLower === 'monitor' || itemTipoLower === 'pantalla' || itemTipoLower === 'display') {
-            itemTipo = 'Monitor';
-        } else if (itemTipoLower === 'pc' || itemTipoLower === 'torre' || itemTipoLower === 'desktop') {
-            itemTipo = 'PC';
-        } else if (itemTipoLower === 'notebook' || itemTipoLower === 'laptop') {
-            itemTipo = 'Notebook';
-        }
-
+    if (!isCombined) {
         results.push({
-            tipo: itemTipo,
-            marca: itemMarca,
-            modelo: itemModelo,
-            serie: itemSerie,
-            inventario: itemInventario,
-            observacion: itemObservacion
+            tipo,
+            serie,
+            marca,
+            modelo,
+            inventario,
+            observacion
         });
+    } else {
+        const splitTipo = hasSlashTipo ? tipo.split('/') : [tipo];
+        const splitSerie = hasSlashSerie ? serie.split('/') : [serie];
+        const splitMarca = marca.includes('/') ? marca.split('/') : [marca];
+        const splitModelo = modelo.includes('/') ? modelo.split('/') : [modelo];
+        const splitInventario = inventario.includes('/') ? inventario.split('/') : [inventario];
+        const splitObservacion = observacion.includes('/') ? observacion.split('/') : [observacion];
+
+        let numItems = Math.max(splitTipo.length, splitSerie.length);
+        if (numItems === 1 && (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')))) {
+            numItems = 2;
+        }
+
+        for (let i = 0; i < numItems; i++) {
+            let itemTipo = (splitTipo[i] || splitTipo[0] || 'Equipo').trim();
+            let itemSerie = (splitSerie[i] || '').trim();
+            let itemMarca = (splitMarca[i] || splitMarca[0] || '').trim();
+            let itemModelo = (splitModelo[i] || splitModelo[0] || '').trim();
+            let itemInventario = (splitInventario[i] || splitInventario[0] || '').trim();
+            let itemObservacion = (splitObservacion[i] || splitObservacion[0] || '').trim();
+
+            // Limpiar el número de serie para el segundo ítem si el original no tenía división (ej. sólo serial del AIO)
+            // Excepto si es una etiqueta especial como "ARRIENDO", "N/A" o "S/N"
+            if (i > 0 && splitSerie.length === 1) {
+                const sLower = itemSerie.toLowerCase();
+                if (sLower !== 'arriendo' && sLower !== 'n/a' && sLower !== 's/n') {
+                    itemSerie = '';
+                }
+            }
+
+            results.push({
+                tipo: itemTipo,
+                marca: itemMarca,
+                modelo: itemModelo,
+                serie: itemSerie,
+                inventario: itemInventario,
+                observacion: itemObservacion
+            });
+        }
+
+        // Caso especial: si el tipo contiene AIO y Monitor pero no se dividió por slashes, forzar la asignación
+        if (splitTipo.length === 1 && tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla'))) {
+            if (results[0]) results[0].tipo = 'All In One';
+            if (results[1]) results[1].tipo = 'Monitor';
+        }
     }
 
-    // Caso especial: si el tipo contiene AIO y Monitor pero no se dividió por slashes, forzar la asignación
-    if (splitTipo.length === 1 && tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla'))) {
-        if (results[0]) results[0].tipo = 'All In One';
-        if (results[1]) results[1].tipo = 'Monitor';
-    }
+    // Normalizar tipos para todos los elementos resultantes (tanto combinados como individuales)
+    results.forEach(item => {
+        const itemTipoLower = item.tipo.toLowerCase();
+        const itemModelLower = item.modelo.toLowerCase();
+        const itemSerieLower = item.serie.toLowerCase();
+        const itemMarcaLower = item.marca ? item.marca.toLowerCase() : '';
+
+        if (itemModelLower.includes('veriton') || itemTipoLower.includes('veriton') || (itemMarcaLower.includes('acer') && itemModelLower.includes('veriton'))) {
+            item.tipo = 'All In One';
+        } else if (itemModelLower.includes('probook') || itemTipoLower.includes('probook')) {
+            item.tipo = 'Notebook';
+        } else if (itemSerieLower.startsWith('5cd') || itemSerieLower.includes('5cd')) {
+            item.tipo = 'Notebook';
+        } else if (itemSerieLower.startsWith('cnc') || itemSerieLower.includes('cnc')) {
+            item.tipo = 'Monitor';
+        } else if (itemModelLower.includes('p24v') || itemModelLower.includes('p22v') || itemModelLower.includes('p27v') || itemModelLower.includes('monitor') || itemModelLower.includes('pantalla')) {
+            item.tipo = 'Monitor';
+        } else if (itemTipoLower === 'aio' || itemTipoLower === 'all in one' || itemTipoLower === 'all-in-one') {
+            item.tipo = 'All In One';
+        } else if (itemTipoLower === 'monitor' || itemTipoLower === 'pantalla' || itemTipoLower === 'display') {
+            item.tipo = 'Monitor';
+        } else if (itemTipoLower === 'pc' || itemTipoLower === 'torre' || itemTipoLower === 'desktop') {
+            item.tipo = 'PC';
+        } else if (itemTipoLower === 'notebook' || itemTipoLower === 'laptop') {
+            item.tipo = 'Notebook';
+        }
+    });
 
     return results;
 }
@@ -4186,6 +4604,7 @@ window.triggerPrintMode = triggerPrintMode;
 window.clearCanvas = clearCanvas;
 window.addEquipmentRow = addEquipmentRow;
 window.syncEquipmentCategoriesFromRows = syncEquipmentCategoriesFromRows;
+window.autoDetectTypeFromFields = autoDetectTypeFromFields;
 window.toggleSigMode = toggleSigMode;
 
 window.exportSubmissionToPDF = exportSubmissionToPDF;
@@ -4202,3 +4621,9 @@ window.handleLogout = handleLogout;
 window.normalizeName = normalizeName;
 window.consolidateFuncionarioNames = consolidateFuncionarioNames;
 window.resolveEquipmentDuplicate = resolveEquipmentDuplicate;
+
+window.createUser = createUser;
+window.deleteUser = deleteUser;
+window.openChangePassModal = openChangePassModal;
+window.closeChangePassModal = closeChangePassModal;
+window.saveUserPassword = saveUserPassword;

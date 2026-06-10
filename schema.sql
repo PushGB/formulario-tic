@@ -21,7 +21,9 @@ DROP FUNCTION IF EXISTS public.trg_auditar_solicitudes() CASCADE;
 -- Re-crear extensión de encriptación pgcrypto
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- =======================================================================
 -- 1. CREAR LA TABLA DE SOLICITUDES (solicitudes_tic)
+-- =======================================================================
 CREATE TABLE public.solicitudes_tic (
     id TEXT PRIMARY KEY,
     fecha DATE NOT NULL,
@@ -67,7 +69,9 @@ CREATE TABLE public.solicitudes_tic (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- =======================================================================
 -- 2. CREAR LA TABLA DE CATASTRO DE EQUIPOS (catastro_equipos)
+-- =======================================================================
 CREATE TABLE public.catastro_equipos (
     id SERIAL PRIMARY KEY,
     n TEXT,
@@ -86,7 +90,9 @@ CREATE TABLE public.catastro_equipos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- =======================================================================
 -- 3. CREAR LA TABLA DE ROLES (user_roles)
+-- =======================================================================
 CREATE TABLE public.user_roles (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT UNIQUE NOT NULL,
@@ -94,7 +100,9 @@ CREATE TABLE public.user_roles (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- =======================================================================
 -- 4. CREAR LA TABLA DE AUDITORÍA (auditoria_solicitudes)
+-- =======================================================================
 CREATE TABLE public.auditoria_solicitudes (
     id SERIAL PRIMARY KEY,
     solicitud_id TEXT NOT NULL,
@@ -113,7 +121,7 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auditoria_solicitudes ENABLE ROW LEVEL SECURITY;
 
 -- =======================================================================
--- 6. POLÍTICAS RLS ROBUSTAS UTILIZANDO ROLES EXPLÍCITOS DE SUPABASE
+-- 6. POLÍTICAS RLS ROBUSTAS
 -- =======================================================================
 
 -- solicitudes_tic: Acceso total para la API del cliente (anon y authenticated) y service_role
@@ -175,7 +183,7 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- =======================================================================
--- 8. FUNCIONES DE ENCRIPTACIÓN (SECURITY INVOKER - PREVIENE ADVERTENCIAS)
+-- 8. FUNCIONES DE ENCRIPTACIÓN (SECURITY DEFINER CON BÚSQUEDA DE EXTENSIONS)
 -- =======================================================================
 CREATE OR REPLACE FUNCTION public.encrypt_rut(rut TEXT) RETURNS TEXT AS $$
 BEGIN
@@ -313,3 +321,42 @@ GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_tecnico() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.encrypt_rut(TEXT) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.decrypt_rut(TEXT) TO anon, authenticated, service_role;
+
+-- =======================================================================
+-- 12. CONFIGURACIÓN DE REALTIME
+-- =======================================================================
+BEGIN;
+  DO $$
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+      CREATE PUBLICATION supabase_realtime;
+    END IF;
+  END
+  $$;
+
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_rel pr 
+      JOIN pg_class c ON pr.prrelid = c.oid 
+      JOIN pg_publication p ON pr.prpubid = p.oid 
+      WHERE p.pubname = 'supabase_realtime' AND c.relname = 'solicitudes_tic'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE solicitudes_tic;
+    END IF;
+  END
+  $$;
+
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_rel pr 
+      JOIN pg_class c ON pr.prrelid = c.oid 
+      JOIN pg_publication p ON pr.prpubid = p.oid 
+      WHERE p.pubname = 'supabase_realtime' AND c.relname = 'catastro_equipos'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE catastro_equipos;
+    END IF;
+  END
+  $$;
+COMMIT;

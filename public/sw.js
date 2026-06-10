@@ -3,7 +3,8 @@ const ASSETS = [
   '/',
   '/index.html',
   '/css/styles.css',
-  '/js/app.js',
+  '/js/index.js',
+  '/js/vendor.js',
   '/js/xlsx.full.min.js',
   '/js/tailwind.min.js',
   '/js/lucide.min.js',
@@ -62,4 +63,11 @@ self.addEventListener('fetch', e => {
       return fetch(e.request);
     })
   );
+});
+
+// Escuchar mensajes del cliente para forzar la actualización (skipWaiting)
+self.addEventListener('message', e => {
+  if (e.data && e.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });

@@ -47,6 +47,38 @@ const drawingStates = {
     receptor: { isDrawing: false, lastX: 0, lastY: 0, hasSigned: false }
 };
 
+
+// Helper para formatear una solicitud (submission) al formato dbRow requerido por Supabase
+function _mapSubmissionToDbRow(s, storageFirmas) {
+    return {
+        id: s.id,
+        fecha: s.fecha,
+        ticket: s.ticket,
+        funcionario_nombre: s.funcionario ? s.funcionario.nombre : null,
+        funcionario_rut: s.funcionario ? s.funcionario.rut : null,
+        funcionario_cargo: s.funcionario ? s.funcionario.cargo : null,
+        funcionario_depto: s.funcionario ? s.funcionario.depto : null,
+        tipo_solicitud: s.tipo_solicitud,
+        propiedad_equipamiento: s.propiedad_equipamiento,
+        equipamiento_categorias: s.equipamiento_categorias,
+        otros_detalles: s.otros_detalles,
+        traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
+        traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
+        traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
+        traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
+        traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
+        equipamiento: s.equipamiento,
+        accesorios: s.accesorios,
+        observaciones_generales: s.observaciones_generales,
+        firmas_tic_mode: s.firmas ? s.firmas.tic_mode : 'draw',
+        firmas_emisor_mode: s.firmas ? s.firmas.emisor_mode : 'draw',
+        firmas_receptor_mode: s.firmas ? s.firmas.receptor_mode : 'draw',
+        firma_tic: storageFirmas ? storageFirmas.tic : null,
+        firma_emisor: storageFirmas ? storageFirmas.emisor : null,
+        firma_receptor: storageFirmas ? storageFirmas.receptor : null
+    };
+}
+
 // --- SISTEMA DE AUTENTICACIÓN (SUPABASE AUTH) ---
 function showLoginOverlay() {
     const overlay = document.getElementById('auth-login-overlay');
@@ -962,33 +994,7 @@ function consolidateDuplicateSubmissions() {
                     try {
                         const storageFirmas = await uploadSignaturesToStorage(s.id, s.firmas);
                         
-                        const dbRow = {
-                            id: s.id,
-                            fecha: s.fecha,
-                            ticket: s.ticket,
-                            funcionario_nombre: s.funcionario.nombre,
-                            funcionario_rut: s.funcionario.rut,
-                            funcionario_cargo: s.funcionario.cargo,
-                            funcionario_depto: s.funcionario.depto,
-                            tipo_solicitud: s.tipo_solicitud,
-                            propiedad_equipamiento: s.propiedad_equipamiento,
-                            equipamiento_categorias: s.equipamiento_categorias,
-                            otros_detalles: s.otros_detalles,
-                            traspaso_emisor_nombre: s.traspaso ? s.traspaso.emisor_nombre : null,
-                            traspaso_emisor_depto: s.traspaso ? s.traspaso.emisor_depto : null,
-                            traspaso_receptor_nombre: s.traspaso ? s.traspaso.receptor_nombre : null,
-                            traspaso_receptor_depto: s.traspaso ? s.traspaso.receptor_depto : null,
-                            traspaso_observacion: s.traspaso ? s.traspaso.observacion : null,
-                            equipamiento: s.equipamiento,
-                            accesorios: s.accesorios,
-                            observaciones_generales: s.observaciones_generales,
-                            firmas_tic_mode: s.firmas.tic_mode,
-                            firmas_emisor_mode: s.firmas.emisor_mode,
-                            firmas_receptor_mode: s.firmas.receptor_mode,
-                            firma_tic: storageFirmas.tic,
-                            firma_emisor: storageFirmas.emisor,
-                            firma_receptor: storageFirmas.receptor
-                        };
+                        const dbRow = _mapSubmissionToDbRow(s, storageFirmas);
                         const { error } = await supabase.from('solicitudes_tic').upsert(dbRow);
                         if (error) console.error(`Error al actualizar consolidado ${s.id} en Supabase:`, error.message);
                     } catch (e) {
@@ -1294,6 +1300,39 @@ function toggleTraspasoSection() {
     }
 }
 
+// Helper para detectar y normalizar el tipo de equipamiento en base a marca, modelo y serie
+function detectEquipmentType(tipo, marca, modelo, serie) {
+    const tipoLower = String(tipo || '').trim().toLowerCase();
+    const marcaLower = String(marca || '').trim().toLowerCase();
+    const modeloLower = String(modelo || '').trim().toLowerCase();
+    const serieLower = String(serie || '').trim().toLowerCase();
+    
+    if (modeloLower.includes('veriton') || tipoLower.includes('veriton') || (marcaLower.includes('acer') && modeloLower.includes('veriton'))) {
+        return 'All In One';
+    } else if (modeloLower.includes('probook') || tipoLower.includes('probook')) {
+        return 'Notebook';
+    } else if (serieLower.startsWith('5cd') || serieLower.includes('5cd')) {
+        return 'Notebook';
+    } else if (serieLower.startsWith('cnc') || serieLower.includes('cnc')) {
+        return 'Monitor';
+    } else if (modeloLower.includes('p24v') || modeloLower.includes('p22v') || modeloLower.includes('p27v') || modeloLower.includes('monitor') || modeloLower.includes('pantalla')) {
+        return 'Monitor';
+    }
+    
+    // Normalizaciones basadas en tipo
+    if (tipoLower === 'aio' || tipoLower === 'all in one' || tipoLower === 'all-in-one') {
+        return 'All In One';
+    } else if (tipoLower === 'monitor' || tipoLower === 'pantalla' || tipoLower === 'display') {
+        return 'Monitor';
+    } else if (tipoLower === 'pc' || tipoLower === 'torre' || tipoLower === 'desktop') {
+        return 'PC';
+    } else if (tipoLower === 'notebook' || tipoLower === 'laptop') {
+        return 'Notebook';
+    }
+    
+    return tipo || '';
+}
+
 // Auto-detectar tipo de equipamiento en base a modelo o serie
 function autoDetectTypeFromFields(inputEl) {
     const row = inputEl.closest('tr');
@@ -1306,26 +1345,13 @@ function autoDetectTypeFromFields(inputEl) {
     
     if (!tipoInput || !modeloInput || !serieInput) return;
     
-    const tipoVal = tipoInput.value.trim().toLowerCase();
-    const marcaVal = marcaInput ? marcaInput.value.trim().toLowerCase() : '';
-    const modeloVal = modeloInput.value.trim().toLowerCase();
-    const serieVal = serieInput.value.trim().toLowerCase();
+    const tipoVal = tipoInput.value;
+    const marcaVal = marcaInput ? marcaInput.value : '';
+    const modeloVal = modeloInput.value;
+    const serieVal = serieInput.value;
     
-    let detectedType = '';
-    
-    if (modeloVal.includes('veriton') || tipoVal.includes('veriton') || (marcaVal.includes('acer') && modeloVal.includes('veriton'))) {
-        detectedType = 'All In One';
-    } else if (modeloVal.includes('probook') || tipoVal.includes('probook')) {
-        detectedType = 'Notebook';
-    } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
-        detectedType = 'Notebook';
-    } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
-        detectedType = 'Monitor';
-    } else if (modeloVal.includes('p24v') || modeloVal.includes('p22v') || modeloVal.includes('p27v') || modeloVal.includes('monitor') || modeloVal.includes('pantalla')) {
-        detectedType = 'Monitor';
-    }
-    
-    if (detectedType) {
+    const detectedType = detectEquipmentType(tipoVal, marcaVal, modeloVal, serieVal);
+    if (detectedType && detectedType.toLowerCase() !== tipoVal.trim().toLowerCase()) {
         tipoInput.value = detectedType;
     }
     
@@ -1339,22 +1365,12 @@ function addEquipmentRow(data = {}) {
     
     // Auto-detectar/normalizar tipo antes de rellenar la fila si viene genérico o vacío
     let tipoVal = String(data.tipo || '').trim();
-    const marcaVal = String(data.marca || '').trim().toLowerCase();
-    const modeloVal = String(data.modelo || '').trim().toLowerCase();
-    const serieVal = String(data.serie || '').trim().toLowerCase();
+    const marcaVal = String(data.marca || '').trim();
+    const modeloVal = String(data.modelo || '').trim();
+    const serieVal = String(data.serie || '').trim();
     
     if (!tipoVal || tipoVal.toLowerCase() === 'equipo') {
-        if (modeloVal.includes('veriton') || (marcaVal.includes('acer') && modeloVal.includes('veriton'))) {
-            tipoVal = 'All In One';
-        } else if (modeloVal.includes('probook') || tipoVal.toLowerCase().includes('probook')) {
-            tipoVal = 'Notebook';
-        } else if (serieVal.startsWith('5cd') || serieVal.includes('5cd')) {
-            tipoVal = 'Notebook';
-        } else if (serieVal.startsWith('cnc') || serieVal.includes('cnc')) {
-            tipoVal = 'Monitor';
-        } else if (modeloVal.includes('p24v') || modeloVal.includes('p22v') || modeloVal.includes('p27v') || modeloVal.includes('monitor') || modeloVal.includes('pantalla')) {
-            tipoVal = 'Monitor';
-        }
+        tipoVal = detectEquipmentType(tipoVal, marcaVal, modeloVal, serieVal) || 'Equipo';
     }
 
     const tr = document.createElement('tr');
@@ -1826,33 +1842,7 @@ function saveForm(event) {
             try {
                 const storageFirmas = await uploadSignaturesToStorage(submissionData.id, submissionData.firmas);
                 
-                const dbRow = {
-                    id: submissionData.id,
-                    fecha: submissionData.fecha,
-                    ticket: submissionData.ticket,
-                    funcionario_nombre: submissionData.funcionario.nombre,
-                    funcionario_rut: submissionData.funcionario.rut,
-                    funcionario_cargo: submissionData.funcionario.cargo,
-                    funcionario_depto: submissionData.funcionario.depto,
-                    tipo_solicitud: submissionData.tipo_solicitud,
-                    propiedad_equipamiento: submissionData.propiedad_equipamiento,
-                    equipamiento_categorias: submissionData.equipamiento_categorias,
-                    otros_detalles: submissionData.otros_detalles,
-                    traspaso_emisor_nombre: submissionData.traspaso ? submissionData.traspaso.emisor_nombre : null,
-                    traspaso_emisor_depto: submissionData.traspaso ? submissionData.traspaso.emisor_depto : null,
-                    traspaso_receptor_nombre: submissionData.traspaso ? submissionData.traspaso.receptor_nombre : null,
-                    traspaso_receptor_depto: submissionData.traspaso ? submissionData.traspaso.receptor_depto : null,
-                    traspaso_observacion: submissionData.traspaso ? submissionData.traspaso.observacion : null,
-                    equipamiento: submissionData.equipamiento,
-                    accesorios: submissionData.accesorios,
-                    observaciones_generales: submissionData.observaciones_generales,
-                    firmas_tic_mode: submissionData.firmas.tic_mode,
-                    firmas_emisor_mode: submissionData.firmas.emisor_mode,
-                    firmas_receptor_mode: submissionData.firmas.receptor_mode,
-                    firma_tic: storageFirmas.tic,
-                    firma_emisor: storageFirmas.emisor,
-                    firma_receptor: storageFirmas.receptor
-                };
+                const dbRow = _mapSubmissionToDbRow(submissionData, storageFirmas);
 
                 const { error } = await supabase
                     .from('solicitudes_tic')
@@ -3322,30 +3312,7 @@ function splitEquipmentIfCombined(rawEq) {
 
     // Normalizar tipos para todos los elementos resultantes (tanto combinados como individuales)
     results.forEach(item => {
-        const itemTipoLower = item.tipo.toLowerCase();
-        const itemModelLower = item.modelo.toLowerCase();
-        const itemSerieLower = item.serie.toLowerCase();
-        const itemMarcaLower = item.marca ? item.marca.toLowerCase() : '';
-
-        if (itemModelLower.includes('veriton') || itemTipoLower.includes('veriton') || (itemMarcaLower.includes('acer') && itemModelLower.includes('veriton'))) {
-            item.tipo = 'All In One';
-        } else if (itemModelLower.includes('probook') || itemTipoLower.includes('probook')) {
-            item.tipo = 'Notebook';
-        } else if (itemSerieLower.startsWith('5cd') || itemSerieLower.includes('5cd')) {
-            item.tipo = 'Notebook';
-        } else if (itemSerieLower.startsWith('cnc') || itemSerieLower.includes('cnc')) {
-            item.tipo = 'Monitor';
-        } else if (itemModelLower.includes('p24v') || itemModelLower.includes('p22v') || itemModelLower.includes('p27v') || itemModelLower.includes('monitor') || itemModelLower.includes('pantalla')) {
-            item.tipo = 'Monitor';
-        } else if (itemTipoLower === 'aio' || itemTipoLower === 'all in one' || itemTipoLower === 'all-in-one') {
-            item.tipo = 'All In One';
-        } else if (itemTipoLower === 'monitor' || itemTipoLower === 'pantalla' || itemTipoLower === 'display') {
-            item.tipo = 'Monitor';
-        } else if (itemTipoLower === 'pc' || itemTipoLower === 'torre' || itemTipoLower === 'desktop') {
-            item.tipo = 'PC';
-        } else if (itemTipoLower === 'notebook' || itemTipoLower === 'laptop') {
-            item.tipo = 'Notebook';
-        }
+        item.tipo = detectEquipmentType(item.tipo, item.marca, item.modelo, item.serie);
     });
 
     return results;
@@ -3419,33 +3386,7 @@ async function consolidateFuncionarioNames(rut, targetName) {
             // A. Actualizar solicitudes_tic
             if (subToUpdate) {
                 const storageFirmas = await uploadSignaturesToStorage(subToUpdate.id, subToUpdate.firmas);
-                const dbRow = {
-                    id: subToUpdate.id,
-                    fecha: subToUpdate.fecha,
-                    ticket: subToUpdate.ticket,
-                    funcionario_nombre: subToUpdate.funcionario.nombre,
-                    funcionario_rut: subToUpdate.funcionario.rut,
-                    funcionario_cargo: subToUpdate.funcionario.cargo,
-                    funcionario_depto: subToUpdate.funcionario.depto,
-                    tipo_solicitud: subToUpdate.tipo_solicitud,
-                    propiedad_equipamiento: subToUpdate.propiedad_equipamiento,
-                    equipamiento_categorias: subToUpdate.equipamiento_categorias,
-                    otros_detalles: subToUpdate.otros_detalles,
-                    traspaso_emisor_nombre: subToUpdate.traspaso ? subToUpdate.traspaso.emisor_nombre : null,
-                    traspaso_emisor_depto: subToUpdate.traspaso ? subToUpdate.traspaso.emisor_depto : null,
-                    traspaso_receptor_nombre: subToUpdate.traspaso ? subToUpdate.traspaso.receptor_nombre : null,
-                    traspaso_receptor_depto: subToUpdate.traspaso ? subToUpdate.traspaso.receptor_depto : null,
-                    traspaso_observacion: subToUpdate.traspaso ? subToUpdate.traspaso.observacion : null,
-                    equipamiento: subToUpdate.equipamiento,
-                    accesorios: subToUpdate.accesorios,
-                    observaciones_generales: subToUpdate.observaciones_generales,
-                    firmas_tic_mode: subToUpdate.firmas.tic_mode,
-                    firmas_emisor_mode: subToUpdate.firmas.emisor_mode,
-                    firmas_receptor_mode: subToUpdate.firmas.receptor_mode,
-                    firma_tic: storageFirmas.tic,
-                    firma_emisor: storageFirmas.emisor,
-                    firma_receptor: storageFirmas.receptor
-                };
+                const dbRow = _mapSubmissionToDbRow(subToUpdate, storageFirmas);
                 const { error: subError } = await supabase.from('solicitudes_tic').upsert(dbRow);
                 if (subError) throw subError;
             }
@@ -3521,33 +3462,7 @@ async function resolveEquipmentDuplicate(serial, correctSubId) {
         if (supabase) {
             for (const sub of subsToUpdate) {
                 const storageFirmas = await uploadSignaturesToStorage(sub.id, sub.firmas);
-                const dbRow = {
-                    id: sub.id,
-                    fecha: sub.fecha,
-                    ticket: sub.ticket,
-                    funcionario_nombre: sub.funcionario.nombre,
-                    funcionario_rut: sub.funcionario.rut,
-                    funcionario_cargo: sub.funcionario.cargo,
-                    funcionario_depto: sub.funcionario.depto,
-                    tipo_solicitud: sub.tipo_solicitud,
-                    propiedad_equipamiento: sub.propiedad_equipamiento,
-                    equipamiento_categorias: sub.equipamiento_categorias,
-                    otros_detalles: sub.otros_detalles,
-                    traspaso_emisor_nombre: sub.traspaso ? sub.traspaso.emisor_nombre : null,
-                    traspaso_emisor_depto: sub.traspaso ? sub.traspaso.emisor_depto : null,
-                    traspaso_receptor_nombre: sub.traspaso ? sub.traspaso.receptor_nombre : null,
-                    traspaso_receptor_depto: sub.traspaso ? sub.traspaso.receptor_depto : null,
-                    traspaso_observacion: sub.traspaso ? sub.traspaso.observacion : null,
-                    equipamiento: sub.equipamiento,
-                    accesorios: sub.accesorios,
-                    observaciones_generales: sub.observaciones_generales,
-                    firmas_tic_mode: sub.firmas.tic_mode,
-                    firmas_emisor_mode: sub.firmas.emisor_mode,
-                    firmas_receptor_mode: sub.firmas.receptor_mode,
-                    firma_tic: storageFirmas.tic,
-                    firma_emisor: storageFirmas.emisor,
-                    firma_receptor: storageFirmas.receptor
-                };
+                const dbRow = _mapSubmissionToDbRow(sub, storageFirmas);
                 const { error: subError } = await supabase.from('solicitudes_tic').upsert(dbRow);
                 if (subError) throw subError;
             }

@@ -4760,3 +4760,40 @@ window.addEventListener('offline', updateStatusIndicator);
 // Exportar funciones globales
 window.clearDatabase = clearDatabase;
 window.updateStatusIndicator = updateStatusIndicator;
+
+async function forceAppUpdate() {
+    showToast("Actualizando aplicación...", "info");
+    if ('serviceWorker' in navigator) {
+        try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (let registration of registrations) {
+                await registration.unregister();
+            }
+            console.log("Service workers desregistrados.");
+        } catch (e) {
+            console.error("Error al desregistrar service worker:", e);
+        }
+    }
+    
+    // Clear caches
+    if ('caches' in window) {
+        try {
+            const keys = await caches.keys();
+            for (let key of keys) {
+                await caches.delete(key);
+            }
+            console.log("Caché borrada.");
+        } catch (e) {
+            console.error("Error al borrar caché:", e);
+        }
+    }
+
+    // Limpiar caché de solicitudes local
+    localStorage.removeItem('tic_equip_submissions');
+
+    showToast("Aplicación restablecida. Recargando...", "success");
+    setTimeout(() => {
+        window.location.reload(true);
+    }, 1000);
+}
+window.forceAppUpdate = forceAppUpdate;

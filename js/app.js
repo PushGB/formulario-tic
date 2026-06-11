@@ -40,6 +40,14 @@ const pendingDeletes = new Set();
 const pendingUpserts = new Set();
 let currentUserRole = 'admin'; // 'admin' o 'tecnico' (por defecto 'admin' en modo local)
 
+// Estado de Tabla — Orden, Paginación y Filtro por Fechas
+let activeSortCol = 'fecha';   // columna activa: 'fecha'|'ticket'|'nombre'|'tipo'
+let activeSortDir = 'desc';    // dirección: 'asc' | 'desc'
+let currentPage   = 1;         // página actual (1-indexed)
+const pageSize    = 20;        // registros por página
+let filterDateFrom = '';       // YYYY-MM-DD o ''
+let filterDateTo   = '';       // YYYY-MM-DD o ''
+
 // Estructuras de Firmas
 const drawingStates = {
     tic: { isDrawing: false, lastX: 0, lastY: 0, hasSigned: false },
@@ -601,15 +609,20 @@ async function createUser(event) {
 
 // Eliminar usuario — llama al API route seguro
 async function deleteUser(email) {
-    if (!confirm(`¿Eliminar la cuenta ${email}?`)) return;
-
-    try {
-        await _callManageUsers({ action: 'delete', email });
-        showToast(`Cuenta eliminada: ${email}`, 'success');
-        await renderUsersTab();
-    } catch (err) {
-        showToast(`Error: ${err.message}`, 'error');
-    }
+    showConfirmModal(
+        'Eliminar Cuenta de Usuario',
+        `¿Está seguro de que desea eliminar permanentemente la cuenta "${email}"? El usuario perderá todo acceso al sistema.`,
+        async () => {
+            try {
+                await _callManageUsers({ action: 'delete', email });
+                showToast(`Cuenta eliminada: ${email}`, 'success');
+                await renderUsersTab();
+            } catch (err) {
+                showToast(`Error al eliminar: ${err.message}`, 'error');
+            }
+        },
+        true
+    );
 }
 
 // Abrir modal cambio de contraseña
@@ -1095,8 +1108,7 @@ async function loadSubmissions() {
                     sub.funcionario.rut = formatRut(sub.funcionario.rut);
                 }
             });
-            // Consolidar duplicados en caché
-            consolidateDuplicateSubmissions();
+            // Sin consolidación automática: cada formulario firmado es un documento independiente
         } catch (e) {
             console.error("Error al cargar registros locales", e);
             submissions = [];
@@ -1121,8 +1133,7 @@ async function loadSubmissions() {
                 const mappedSubmissions = await mapDbRowsToSubmissions(data);
  
                 submissions = mappedSubmissions;
-                // Consolidar duplicados en base a datos frescos de la nube
-                consolidateDuplicateSubmissions();
+                // Sin consolidación automática desde la nube
                 
                 localStorage.setItem('tic_equip_submissions', JSON.stringify(submissions));
                 updateStats();
@@ -1942,20 +1953,8 @@ async function saveForm(event) {
         }
 
         saveSubmissionsToStorage();
-        consolidateDuplicateSubmissions();
-        
-        // Si se consolidó con un registro existente (mismo RUT), usamos ese ID para que la UI/PDF coincida
-        const currentRut = submissionData.funcionario && submissionData.funcionario.rut ? formatRut(submissionData.funcionario.rut) : null;
-        if (currentRut) {
-            const consolidatedSub = submissions.find(s => s.funcionario && formatRut(s.funcionario.rut) === currentRut);
-            if (consolidatedSub) {
-                activeSubmissionId = consolidatedSub.id;
-            } else {
-                activeSubmissionId = submissionData.id;
-            }
-        } else {
-            activeSubmissionId = submissionData.id;
-        }
+        // Cada formulario firmado es un documento legal independiente — sin consolidación automática
+        activeSubmissionId = submissionData.id;
 
         if (syncedCloud) {
             showToast("Registro guardado y sincronizado con la nube.", "success");
@@ -2125,6 +2124,7 @@ function syncPrintTemplate() {
 // Filtro por tipo desde los botones del dashboard
 function setFilterType(type) {
     activeFilterType = type;
+    currentPage = 1; // resetear página al cambiar filtro
     
     const types = ['All', 'Asignacion', 'Traspaso', 'Devolucion'];
     types.forEach(t => {
@@ -2135,43 +2135,163 @@ function setFilterType(type) {
             btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700";
         }
     });
-    
     renderTable();
+}
+
+// ======================================================================
+// HELPERS: Filtrado, Orden, Paginación y Fechas
+// ======================================================================
+
+/** Devuelve las solicitudes aplicando todos los filtros activos (tipo, texto, fechas) */
+function getFilteredSubmissions() {
+    const search = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+    return submissions.filter(s => {
+        if (!s) return false;
+        if (activeFilterType !== 'All' && s.tipo_solicitud !== activeFilterType) return false;
+        if (filterDateFrom && s.fecha < filterDateFrom) return false;
+        if (filterDateTo   && s.fecha > filterDateTo)   return false;
+        if (!search) return true;
+        return (
+            s.funcionario?.nombre?.toLowerCase().includes(search) ||
+            s.funcionario?.rut?.toLowerCase().includes(search)    ||
+            s.funcionario?.depto?.toLowerCase().includes(search)  ||
+            s.ticket?.toLowerCase().includes(search)              ||
+            s.tipo_solicitud?.toLowerCase().includes(search)      ||
+            s.equipamiento?.some(e => e?.serie?.toLowerCase().includes(search))
+        );
+    });
+}
+
+/** Actualiza las flechitas de orden en los encabezados de columna */
+function updateSortIndicators() {
+    ['fecha', 'ticket', 'nombre', 'tipo'].forEach(col => {
+        const el = document.getElementById(`sort-${col}`);
+        if (!el) return;
+        el.textContent = activeSortCol === col ? (activeSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+        el.className   = activeSortCol === col ? 'text-indigo-500 font-bold' : 'text-slate-300 dark:text-slate-600';
+    });
+}
+
+/** Cambia la columna/dirección de ordenamiento y re-renderiza */
+function setSort(col) {
+    activeSortDir = (activeSortCol === col && activeSortDir === 'asc') ? 'desc' : 'asc';
+    if (activeSortCol !== col) { activeSortCol = col; activeSortDir = col === 'fecha' ? 'desc' : 'asc'; }
+    currentPage = 1;
+    renderTable();
+}
+
+/** Activa el filtro de fechas (llamado desde los inputs del HTML) */
+function setDateFilter() {
+    filterDateFrom = document.getElementById('filter-date-from')?.value || '';
+    filterDateTo   = document.getElementById('filter-date-to')?.value   || '';
+    currentPage    = 1;
+    const clearBtn = document.getElementById('clear-date-filter');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !filterDateFrom && !filterDateTo);
+    renderTable();
+}
+
+/** Limpia los filtros de fecha */
+function clearDateFilter() {
+    filterDateFrom = ''; filterDateTo = '';
+    const f = document.getElementById('filter-date-from');
+    const t = document.getElementById('filter-date-to');
+    if (f) f.value = ''; if (t) t.value = '';
+    document.getElementById('clear-date-filter')?.classList.add('hidden');
+    currentPage = 1;
+    renderTable();
+}
+
+/** Ir a una página específica */
+function setPage(page) {
+    currentPage = page;
+    renderTable();
+    document.getElementById('submissions-list')?.closest('.overflow-x-auto')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/** Renderizar los controles de paginación */
+function renderPagination(page, totalPages, totalCount) {
+    const container = document.getElementById('pagination-container');
+    if (!container) return;
+    if (totalPages <= 1 || totalCount === 0) { container.innerHTML = ''; return; }
+
+    const start = (page - 1) * pageSize + 1;
+    const end   = Math.min(page * pageSize, totalCount);
+
+    const btn = (p, label, disabled, active) => {
+        const cls = active
+            ? 'w-8 h-8 rounded-lg bg-indigo-600 text-white text-xs font-bold flex items-center justify-center'
+            : disabled
+            ? 'w-8 h-8 rounded-lg text-slate-300 dark:text-slate-600 text-xs flex items-center justify-center cursor-not-allowed'
+            : 'w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-600 dark:text-slate-400 hover:text-indigo-600 text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer';
+        const action = (!disabled && !active) ? `onclick="setPage(${p})"` : '';
+        return `<button ${action} class="${cls}">${label}</button>`;
+    };
+
+    const pages = [];
+    if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+    else {
+        pages.push(1);
+        if (page > 3) pages.push('...');
+        for (let i = Math.max(2, page-1); i <= Math.min(totalPages-1, page+1); i++) pages.push(i);
+        if (page < totalPages - 2) pages.push('...');
+        pages.push(totalPages);
+    }
+
+    const pagesHtml = pages.map(p =>
+        p === '...' ? `<span class="w-8 h-8 flex items-center justify-center text-slate-400 text-xs">…</span>`
+                    : btn(p, p, false, p === page)
+    ).join('');
+
+    container.innerHTML = `
+        <div class="text-xs text-slate-400 dark:text-slate-500">
+            Mostrando <span class="font-semibold text-slate-600 dark:text-slate-300">${start}–${end}</span>
+            de <span class="font-semibold">${totalCount}</span> registros
+        </div>
+        <div class="flex items-center gap-1">
+            ${btn(page-1, '←', page === 1, false)}
+            ${pagesHtml}
+            ${btn(page+1, '→', page === totalPages, false)}
+        </div>`;
 }
 
 // Renderizar la tabla del Dashboard con Filtros de Búsqueda y de Tipo
 function renderTable() {
-    const search = document.getElementById('search-input').value.toLowerCase().trim();
-    const tbody = document.getElementById('submissions-list');
+    const tbody     = document.getElementById('submissions-list');
     const emptyState = document.getElementById('empty-state');
-    
-    tbody.innerHTML = '';
-    
-    const filtered = submissions.filter(s => {
-        if (!s) return false;
-        // Filtro por Tipo de Solicitud (Categoría de Botón)
-        if (activeFilterType !== 'All' && s.tipo_solicitud !== activeFilterType) {
-            return false;
-        }
+    tbody.innerHTML  = '';
 
-        // Filtro por Texto de Búsqueda
-        const matchNombre = (s.funcionario && s.funcionario.nombre) ? s.funcionario.nombre.toLowerCase().includes(search) : false;
-        const matchRut = (s.funcionario && s.funcionario.rut) ? s.funcionario.rut.toLowerCase().includes(search) : false;
-        const matchTicket = s.ticket ? s.ticket.toLowerCase().includes(search) : false;
-        const matchTipo = s.tipo_solicitud ? s.tipo_solicitud.toLowerCase().includes(search) : false;
-        const matchSerie = s.equipamiento ? s.equipamiento.some(e => e && e.serie && e.serie.toLowerCase().includes(search)) : false;
-        return matchNombre || matchRut || matchTicket || matchTipo || matchSerie;
+    // 1. Filtrar
+    const filtered = getFilteredSubmissions();
+
+    // 2. Ordenar
+    filtered.sort((a, b) => {
+        let va = '', vb = '';
+        switch (activeSortCol) {
+            case 'ticket': va = a.ticket || '';              vb = b.ticket || '';              break;
+            case 'nombre': va = a.funcionario?.nombre || ''; vb = b.funcionario?.nombre || ''; break;
+            case 'tipo':   va = a.tipo_solicitud || '';      vb = b.tipo_solicitud || '';      break;
+            default:       va = a.fecha || '';               vb = b.fecha || '';
+        }
+        const cmp = va.localeCompare(vb, 'es', { sensitivity: 'base' });
+        return activeSortDir === 'asc' ? cmp : -cmp;
     });
 
-    if (filtered.length === 0) {
+    // 3. Paginar
+    const totalFiltered = filtered.length;
+    const totalPages    = Math.max(1, Math.ceil(totalFiltered / pageSize));
+    if (currentPage > totalPages) currentPage = 1;
+    const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+    if (totalFiltered === 0) {
         emptyState.classList.remove('hidden');
+        renderPagination(1, 1, 0);
     } else {
         emptyState.classList.add('hidden');
-        
-        filtered.forEach(s => {
+
+        paginated.forEach(s => {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors border-b border-slate-100 dark:border-slate-800/60";
-            
+
             let badgesSolicitud = '';
             if (s.tipo_solicitud === 'Asignacion') {
                 badgesSolicitud = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-450"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Asignación</span>';
@@ -2181,43 +2301,41 @@ function renderTable() {
                 badgesSolicitud = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-455"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Devolución</span>';
             }
 
-            // Formatear resumen de equipos para la columna
-            const eqSummary = s.equipamiento ? s.equipamiento.map(e => e ? `${escapeHTML(e.tipo || '')} (${escapeHTML(e.marca || '')} ${escapeHTML(e.modelo || '')})` : '').join(', ') : '';
+            const eqSummary = s.equipamiento
+                ? s.equipamiento.map(e => e ? `${escapeHTML(e.tipo||'')} (${escapeHTML(e.marca||'')} ${escapeHTML(e.modelo||'')})` : '').join(', ')
+                : '';
 
             const deleteBtnHtml = currentUserRole === 'admin' ? `
-                <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-755 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
-                    <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
-                </button>
-            ` : '';
-
-            const funcNombre = s.funcionario ? s.funcionario.nombre : '';
-            const funcRut = s.funcionario ? s.funcionario.rut : '';
+                <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>` : '';
 
             tr.innerHTML = `
                 <td class="py-4 px-6 font-medium text-slate-900 dark:text-slate-100">${escapeHTML(s.fecha)}</td>
                 <td class="py-4 px-6 font-mono text-xs text-indigo-650 dark:text-indigo-400 font-semibold">${escapeHTML(s.ticket)}</td>
                 <td class="py-4 px-6">
-                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(funcNombre)}</div>
-                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(funcRut)}</div>
+                    <div class="font-medium text-slate-850 dark:text-slate-200">${escapeHTML(s.funcionario?.nombre||'')}</div>
+                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${escapeHTML(s.funcionario?.rut||'')}</div>
                 </td>
                 <td class="py-4 px-6">${badgesSolicitud}</td>
-                <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-455" title="${eqSummary}">${eqSummary}</td>
+                <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-455" title="${escapeHTML(eqSummary)}">${escapeHTML(eqSummary)}</td>
                 <td class="py-4 px-6 text-center">
                     <div class="flex items-center justify-center gap-2">
-                        <button onclick="viewAndEditForm('${s.id}')" class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors" title="Ver / Editar">
-                            <i data-lucide="edit" class="w-4.5 h-4.5"></i>
+                        <button onclick="viewAndEditForm('${s.id}')" class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors" title="Ver / Editar">
+                            <i data-lucide="edit" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="exportSubmissionToPDF('${s.id}')" class="p-2 text-emerald-600 dark:text-emerald-450 hover:text-emerald-850 dark:hover:text-emerald-300 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors" title="Descargar PDF">
-                            <i data-lucide="file-text" class="w-4.5 h-4.5"></i>
+                        <button onclick="exportSubmissionToPDF('${s.id}')" class="p-2 text-emerald-600 dark:text-emerald-450 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors" title="Descargar PDF">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
                         </button>
                         ${deleteBtnHtml}
                     </div>
-                </td>
-            `;
+                </td>`;
             tbody.appendChild(tr);
         });
+        renderPagination(currentPage, totalPages, totalFiltered);
     }
     lucide.createIcons();
+    updateSortIndicators();
 }
 
 // Cargar un registro para editarlo o imprimirlo
@@ -2334,64 +2452,64 @@ function drawSavedSignature(id, dataUrl) {
 
 // Eliminar Registro
 async function deleteSubmission(id) {
-    if (!confirm("¿Está seguro de que desea eliminar permanentemente este registro de la nube y del historial local?")) {
-        return;
-    }
+    showConfirmModal(
+        'Eliminar Registro',
+        '¿Está seguro de que desea eliminar permanentemente este registro de la nube y del historial local? Esta acción es irreversible.',
+        () => _doDeleteSubmission(id),
+        true
+    );
+}
 
+async function _doDeleteSubmission(id) {
     try {
         let deletedCloud = false;
 
-        // 1. Intentar eliminar de la nube si Supabase está disponible y estamos online
         if (supabase && navigator.onLine) {
             try {
                 const { error } = await supabase
                     .from('solicitudes_tic')
                     .delete()
                     .eq('id', id);
-                
                 if (error) throw error;
                 deletedCloud = true;
             } catch (cloudErr) {
-                console.error("Error al eliminar de Supabase:", cloudErr.message || cloudErr);
-                showToast(`Error de base de datos web: ${cloudErr.message || 'Error de red'}. El registro NO se ha eliminado.`, "error");
-                return; // Interrumpir flujo
+                showToast(`Error de base de datos: ${cloudErr.message || 'Error de red'}. El registro NO se eliminó.`, "error");
+                return;
             }
-        } else if (supabase && !navigator.onLine) {
-            console.warn("Sin conexión a internet. No se puede eliminar en la nube.");
         }
 
-        // 2. Si se eliminó en la nube o estamos offline, eliminar localmente
         submissions = submissions.filter(s => s.id !== id);
-        if (activeSubmissionId === id) {
-            activeSubmissionId = null;
-        }
+        if (activeSubmissionId === id) activeSubmissionId = null;
         saveSubmissionsToStorage();
         renderTable();
 
-        if (deletedCloud) {
-            showToast("Registro eliminado de la nube y localmente.", "success");
-        } else {
-            showToast("Registro eliminado localmente (Modo Offline).", "warning");
-        }
+        showToast(deletedCloud
+            ? "Registro eliminado de la nube y localmente."
+            : "Registro eliminado localmente (Modo Offline).",
+            deletedCloud ? "success" : "warning");
     } catch (err) {
         console.error("Error al procesar la eliminación del registro:", err);
         showToast("Error crítico al eliminar: " + err.message, "error");
     }
 }
 
-// Exportar toda la base de datos local a un CSV amigable con Excel
+
+
+// Exportar al CSV los registros con los filtros activos (respeta tipo, fecha y texto de búsqueda)
 function exportToCSV() {
-    if (submissions.length === 0) {
-        showToast("No hay registros en el historial para exportar.", "error");
+    const toExport = getFilteredSubmissions();
+    if (toExport.length === 0) {
+        showToast("No hay registros con los filtros actuales para exportar.", "error");
         return;
     }
 
-    let csvContent = "\uFEFF"; // Byte Order Mark (BOM) para acentos en Excel
-    
-    // Encabezados
+    const hasFilters = activeFilterType !== 'All' || filterDateFrom || filterDateTo || document.getElementById('search-input')?.value.trim();
+    const label = hasFilters ? `filtrado_${toExport.length}_de_${submissions.length}` : `todos_${toExport.length}`;
+
+    let csvContent = "\uFEFF"; // BOM para acentos en Excel
     csvContent += "ID,Fecha Solicitud,N° Ticket,Funcionario Receptor,RUT Receptor,Cargo,Depto Receptor,Tipo Solicitud,Propiedad Equipamiento,Categorías,Otros Detalles,Traspaso Emisor,Traspaso Emisor Depto,Traspaso Observación,Equipos Detalle,Accesorios Incluidos,Observaciones Generales\r\n";
 
-    submissions.forEach(s => {
+    toExport.forEach(s => {
         const equiposDetalleStr = s.equipamiento.map(e => `${e.tipo} [Marca: ${e.marca} Mod: ${e.modelo} Serie: ${e.serie} Inv: ${e.inventario || 'S/N'} Obs: ${e.observacion || 'Ninguna'}]`).join(' | ');
         
         const fila = [
@@ -2470,6 +2588,36 @@ function showToast(message, type = "success") {
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast._hideTimeout = null;
     }, duration);
+}
+
+// ======================================================================
+// MODAL DE CONFIRMACIÓN UNIVERSAL (reemplaza confirm() del navegador)
+// ======================================================================
+function showConfirmModal(title, message, onConfirm, danger = true) {
+    const modal = document.getElementById('confirm-modal');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const msgEl   = document.getElementById('confirm-modal-message');
+    const okBtn   = document.getElementById('confirm-modal-ok');
+    // Fallback si el HTML no tiene el modal todavía
+    if (!modal) { if (confirm(message)) onConfirm(); return; }
+
+    titleEl.textContent = title;
+    msgEl.textContent   = message;
+    okBtn.textContent   = danger ? 'Eliminar' : 'Confirmar';
+    okBtn.className = danger
+        ? 'bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all'
+        : 'bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all';
+
+    // Clonar para limpiar listeners anteriores
+    const newBtn = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newBtn, okBtn);
+    newBtn.addEventListener('click', () => { closeConfirmModal(); onConfirm(); });
+
+    modal.classList.remove('hidden');
+    lucide.createIcons();
+}
+function closeConfirmModal() {
+    document.getElementById('confirm-modal')?.classList.add('hidden');
 }
 
 // ================= INTEGRACIÓN Y AUTOMATIZACIÓN CON EXCEL =================
@@ -4625,4 +4773,10 @@ async function forceAppUpdate() {
         window.location.reload(true);
     }, 1000);
 }
+window.setSort = setSort;
+window.setPage = setPage;
+window.setDateFilter = setDateFilter;
+window.clearDateFilter = clearDateFilter;
+window.showConfirmModal = showConfirmModal;
+window.closeConfirmModal = closeConfirmModal;
 window.forceAppUpdate = forceAppUpdate;

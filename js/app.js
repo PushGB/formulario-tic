@@ -47,6 +47,7 @@ let currentPage   = 1;         // página actual (1-indexed)
 const pageSize    = 20;        // registros por página
 let filterDateFrom = '';       // YYYY-MM-DD o ''
 let filterDateTo   = '';       // YYYY-MM-DD o ''
+let activeInventorySubTab = 'equipments'; // sub-pestaña activa de inventario: 'equipments' | 'users'
 
 // Estructuras de Firmas
 const drawingStates = {
@@ -811,6 +812,12 @@ window.addEventListener('load', () => {
     // Inicializar sincronización en tiempo real (Supabase Realtime)
     initRealtime();
 
+    // Configurar autoguardado del borrador (v4)
+    setupDraftAutoSave();
+    
+    // Cargar borrador existente si existe (v4)
+    loadFormDraft();
+
     // Registrar Service Worker para PWA (offline local)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
@@ -872,7 +879,7 @@ async function loadSubmissionsBackground() {
                 const mappedSubmissions = await mapDbRowsToSubmissions(data);
 
                 submissions = mappedSubmissions;
-                consolidateDuplicateSubmissions();
+                // Sin consolidación automática desde la nube
                 localStorage.setItem('tic_equip_submissions', JSON.stringify(submissions));
                 updateStats();
                 renderTable();
@@ -1170,6 +1177,9 @@ function updateStats() {
     document.getElementById('stat-asignaciones').innerText = asignaciones;
     document.getElementById('stat-traspasos').innerText = traspasos;
     document.getElementById('stat-devoluciones').innerText = devoluciones;
+
+    // Renderizar gráficos estadísticos
+    renderDashboardCharts();
 }
 
 // Alternar visualización de pestañas
@@ -1179,7 +1189,7 @@ function switchTab(tabId) {
     }
     activeTab = tabId;
     
-    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-history', 'tab-users'];
+    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-history', 'tab-users', 'tab-inventory'];
     tabs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -1193,6 +1203,7 @@ function switchTab(tabId) {
     const btnForm = document.getElementById('nav-form');
     const btnHistory = document.getElementById('nav-history');
     const btnUsers = document.getElementById('nav-users');
+    const btnInventory = document.getElementById('nav-inventory');
     
     const inactiveClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-850/50";
     const activeClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-650 text-white shadow-sm shadow-indigo-600/30";
@@ -1201,6 +1212,7 @@ function switchTab(tabId) {
     if (btnForm) btnForm.className = inactiveClass;
     if (btnHistory) btnHistory.className = inactiveClass;
     if (btnUsers) btnUsers.className = inactiveClass;
+    if (btnInventory) btnInventory.className = inactiveClass;
 
     let targetEl = null;
     if (tabId === 'dashboard') {
@@ -1220,6 +1232,10 @@ function switchTab(tabId) {
         targetEl = document.getElementById('tab-users');
         if (btnUsers) btnUsers.className = activeClass;
         renderUsersTab();
+    } else if (tabId === 'inventory') {
+        targetEl = document.getElementById('tab-inventory');
+        if (btnInventory) btnInventory.className = activeClass;
+        renderInventory();
     }
     
     if (targetEl) {
@@ -1229,6 +1245,7 @@ function switchTab(tabId) {
         targetEl.classList.add('fade-in-slide');
     }
 }
+
 
 // Abrir un nuevo formulario vacío
 function openNewForm() {
@@ -1371,6 +1388,7 @@ function toggleSigMode(id) {
         placeholder.classList.remove('hidden');
         clearCanvas(id); // Limpiar firmas digitales previas al cambiar a manual
     }
+    saveFormDraft();
 }
 
 // Toggle Seccion Traspaso
@@ -1383,6 +1401,7 @@ function toggleTraspasoSection() {
     } else {
         section.classList.add('hidden');
     }
+    saveFormDraft();
 }
 
 // Helper para detectar y normalizar el tipo de equipamiento en base a marca, modelo y serie
@@ -1490,6 +1509,7 @@ function addEquipmentRow(data = {}) {
     container.appendChild(tr);
     lucide.createIcons();
     syncEquipmentCategoriesFromRows();
+    saveFormDraft();
 }
 
 // Eliminar fila de equipos
@@ -1501,6 +1521,7 @@ function removeEquipmentRow(rowId) {
         if (container.children.length > 1) {
             row.remove();
             syncEquipmentCategoriesFromRows();
+            saveFormDraft();
         } else {
             showToast("Debe haber al menos un ítem de equipamiento en la solicitud.", "error");
         }
@@ -1705,6 +1726,7 @@ function stopDrawing(id) {
     if (canvas) {
         canvas.parentElement.classList.remove('drawing');
     }
+    saveFormDraft();
 }
 
 function getCoords(e, canvas, isTouch) {
@@ -1954,6 +1976,7 @@ async function saveForm(event) {
 
         saveSubmissionsToStorage();
         // Cada formulario firmado es un documento legal independiente — sin consolidación automática
+        clearFormDraft();
         activeSubmissionId = submissionData.id;
 
         if (syncedCloud) {
@@ -2155,6 +2178,7 @@ function getFilteredSubmissions() {
             s.funcionario?.nombre?.toLowerCase().includes(search) ||
             s.funcionario?.rut?.toLowerCase().includes(search)    ||
             s.funcionario?.depto?.toLowerCase().includes(search)  ||
+            s.funcionario?.cargo?.toLowerCase().includes(search)  ||
             s.ticket?.toLowerCase().includes(search)              ||
             s.tipo_solicitud?.toLowerCase().includes(search)      ||
             s.equipamiento?.some(e => e?.serie?.toLowerCase().includes(search))
@@ -4780,3 +4804,656 @@ window.clearDateFilter = clearDateFilter;
 window.showConfirmModal = showConfirmModal;
 window.closeConfirmModal = closeConfirmModal;
 window.forceAppUpdate = forceAppUpdate;
+
+// ======================================================================
+// SISTEMA DE AUTOGUARDADO DE BORRADOR (v4)
+// ======================================================================
+let draftSaveDebounceTimeout = null;
+
+function saveFormDraftDebounced() {
+    if (draftSaveDebounceTimeout) clearTimeout(draftSaveDebounceTimeout);
+    draftSaveDebounceTimeout = setTimeout(saveFormDraft, 500);
+}
+
+function saveFormDraft() {
+    // Si la visualización actual es de solo lectura (por ejemplo, editando un registro existente en Supabase), no guardar borrador
+    if (activeSubmissionId) return;
+
+    const form = document.getElementById('equip-form');
+    if (!form) return;
+
+    // Obtener campos de radio
+    const tipoSolicitudRadio = document.querySelector('input[name="solicitud_tipo"]:checked');
+    const tipo_solicitud = tipoSolicitudRadio ? tipoSolicitudRadio.value : 'Asignacion';
+    const propiedadTipoRadio = document.querySelector('input[name="propiedad_tipo"]:checked');
+    const propiedad_tipo = propiedadTipoRadio ? propiedadTipoRadio.value : 'Fiscal';
+
+    // Obtener categorías marcadas
+    const eqCategorias = Array.from(document.querySelectorAll('input[name="eq_cat"]:checked')).map(cb => cb.value);
+
+    // Obtener filas de equipos
+    const eqRows = document.getElementById('equipment-rows').children;
+    const equipamiento = [];
+    for (let tr of eqRows) {
+        const tipo = tr.querySelector('[name="eq_tipo"]')?.value || '';
+        const marca = tr.querySelector('[name="eq_marca"]')?.value || '';
+        const modelo = tr.querySelector('[name="eq_modelo"]')?.value || '';
+        const serie = tr.querySelector('[name="eq_serie"]')?.value || '';
+        const inventario = tr.querySelector('[name="eq_inventario"]')?.value || '';
+        const observacion = tr.querySelector('[name="eq_obs"]')?.value || '';
+        
+        if (tipo || marca || modelo || serie || inventario || observacion) {
+            equipamiento.push({ tipo, marca, modelo, serie, inventario, observacion });
+        }
+    }
+
+    // Obtener firmas (Base64 si se ha firmado)
+    const firmasBase64 = {};
+    ['tic', 'emisor', 'receptor'].forEach(id => {
+        const hasSigned = drawingStates[id]?.hasSigned;
+        const canvas = document.getElementById(`canvas-${id}`);
+        if (hasSigned && canvas) {
+            firmasBase64[id] = canvas.toDataURL();
+        }
+    });
+
+    const draft = {
+        tipo_solicitud,
+        propiedad_tipo,
+        funcionario: {
+            nombre: document.getElementById('func-nombre')?.value || '',
+            rut: document.getElementById('func-rut')?.value || '',
+            cargo: document.getElementById('func-cargo')?.value || '',
+            depto: document.getElementById('func-depto')?.value || ''
+        },
+        equipamiento_categorias: eqCategorias,
+        otros_detalles: document.getElementById('eq_otros_detalles')?.value || '',
+        equipamiento,
+        accesorios: document.getElementById('eq-accesorios')?.value || '',
+        observaciones_generales: document.getElementById('eq-observaciones')?.value || '',
+        traspaso: {
+            emisor_nombre: document.getElementById('traspaso-emisor-nombre')?.value || '',
+            emisor_depto: document.getElementById('traspaso-emisor-depto')?.value || '',
+            receptor_nombre: document.getElementById('traspaso-receptor-nombre')?.value || '',
+            receptor_depto: document.getElementById('traspaso-receptor-depto')?.value || '',
+            observacion: document.getElementById('traspaso-observacion')?.value || ''
+        },
+        firmasBase64,
+        saved_at: Date.now()
+    };
+
+    localStorage.setItem('tic_form_draft', JSON.stringify(draft));
+}
+
+function loadFormDraft() {
+    const draftStr = localStorage.getItem('tic_form_draft');
+    if (!draftStr) return;
+
+    try {
+        const draft = JSON.parse(draftStr);
+        if (!draft) return;
+
+        // Si se está editando un registro activo, no cargar borrador
+        if (activeSubmissionId) return;
+
+        // Restaurar radios de tipo solicitud
+        const tipoRadio = document.querySelector(`input[name="solicitud_tipo"][value="${draft.tipo_solicitud}"]`);
+        if (tipoRadio) {
+            tipoRadio.checked = true;
+            // Disparar evento change para actualizar vistas (sección traspaso, etc.)
+            tipoRadio.dispatchEvent(new Event('change'));
+        }
+
+        // Restaurar radios de propiedad
+        const propRadio = document.querySelector(`input[name="propiedad_tipo"][value="${draft.propiedad_tipo}"]`);
+        if (propRadio) propRadio.checked = true;
+
+        // Restaurar funcionario
+        if (draft.funcionario) {
+            if (document.getElementById('func-nombre')) document.getElementById('func-nombre').value = draft.funcionario.nombre || '';
+            if (document.getElementById('func-rut')) document.getElementById('func-rut').value = draft.funcionario.rut || '';
+            if (document.getElementById('func-cargo')) document.getElementById('func-cargo').value = draft.funcionario.cargo || '';
+            if (document.getElementById('func-depto')) document.getElementById('func-depto').value = draft.funcionario.depto || '';
+        }
+
+        // Restaurar otros detalles y observaciones
+        if (document.getElementById('eq_otros_detalles')) document.getElementById('eq_otros_detalles').value = draft.otros_detalles || '';
+        if (document.getElementById('eq-accesorios')) document.getElementById('eq-accesorios').value = draft.accesorios || '';
+        if (document.getElementById('eq-observaciones')) document.getElementById('eq-observaciones').value = draft.observaciones_generales || '';
+
+        // Restaurar traspaso
+        if (draft.traspaso) {
+            if (document.getElementById('traspaso-emisor-nombre')) document.getElementById('traspaso-emisor-nombre').value = draft.traspaso.emisor_nombre || '';
+            if (document.getElementById('traspaso-emisor-depto')) document.getElementById('traspaso-emisor-depto').value = draft.traspaso.emisor_depto || '';
+            if (document.getElementById('traspaso-receptor-nombre')) document.getElementById('traspaso-receptor-nombre').value = draft.traspaso.receptor_nombre || '';
+            if (document.getElementById('traspaso-receptor-depto')) document.getElementById('traspaso-receptor-depto').value = draft.traspaso.receptor_depto || '';
+            if (document.getElementById('traspaso-observacion')) document.getElementById('traspaso-observacion').value = draft.traspaso.observacion || '';
+        }
+
+        // Restaurar filas de equipamiento
+        const rowsContainer = document.getElementById('equipment-rows');
+        if (rowsContainer && draft.equipamiento && draft.equipamiento.length > 0) {
+            rowsContainer.innerHTML = '';
+            draft.equipamiento.forEach(eq => {
+                addEquipmentRow(eq);
+            });
+        }
+
+        // Restaurar categorías en checkboxes
+        if (draft.equipamiento_categorias) {
+            document.querySelectorAll('input[name="eq_cat"]').forEach(cb => {
+                cb.checked = draft.equipamiento_categorias.includes(cb.value);
+            });
+        }
+
+        // Restaurar firmas
+        if (draft.firmasBase64) {
+            Object.keys(draft.firmasBase64).forEach(id => {
+                const base64 = draft.firmasBase64[id];
+                const canvas = document.getElementById(`canvas-${id}`);
+                if (canvas && base64) {
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+                    img.onload = function() {
+                        // Limpiar y dibujar
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        drawingStates[id].hasSigned = true;
+                        updateSignatureFeedback(id);
+                    };
+                    img.src = base64;
+                }
+            });
+        }
+
+        showToast("Se ha restaurado tu borrador de formulario.", "info");
+
+    } catch (e) {
+        console.error("Error al restaurar borrador de formulario:", e);
+    }
+}
+
+function clearFormDraft() {
+    localStorage.removeItem('tic_form_draft');
+}
+
+function clearFormAndDraftWithConfirm() {
+    showConfirmModal(
+        '¿Limpiar Formulario?',
+        'Se borrarán todos los datos ingresados actualmente y el borrador guardado en caché. Esta acción no se puede deshacer.',
+        () => {
+            clearFormDraft();
+            document.getElementById('equip-form').reset();
+            clearCanvas('tic');
+            clearCanvas('emisor');
+            clearCanvas('receptor');
+            const rowsContainer = document.getElementById('equipment-rows');
+            if (rowsContainer) {
+                rowsContainer.innerHTML = '';
+                addEquipmentRow();
+            }
+            clearValidationStyles();
+            showToast('Formulario y borrador limpiados con éxito.', 'success');
+        },
+        true
+    );
+}
+
+function setupDraftAutoSave() {
+    const form = document.getElementById('equip-form');
+    if (form) {
+        form.addEventListener('input', () => {
+            saveFormDraftDebounced();
+        });
+        
+        form.addEventListener('change', () => {
+            saveFormDraft();
+        });
+    }
+}
+
+// ======================================================================
+// RENDIMIENTO DE GRÁFICOS SVG DINÁMICOS (v4)
+// ======================================================================
+function renderDashboardCharts() {
+    const asignaciones = submissions.filter(s => s.tipo_solicitud === 'Asignacion').length;
+    const traspasos = submissions.filter(s => s.tipo_solicitud === 'Traspaso').length;
+    const devoluciones = submissions.filter(s => s.tipo_solicitud === 'Devolucion').length;
+    
+    renderDonaChart(asignaciones, traspasos, devoluciones);
+
+    // Obtener historial de los últimos 6 meses
+    const last6Months = [];
+    let d = new Date();
+    for (let i = 5; i >= 0; i--) {
+        let temp = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        let y = temp.getFullYear();
+        let m = String(temp.getMonth() + 1).padStart(2, '0');
+        let label = temp.toLocaleDateString('es', { month: 'short' });
+        label = label.charAt(0).toUpperCase() + label.slice(1);
+        last6Months.push({ key: `${y}-${m}`, label });
+    }
+
+    const monthlyCounts = last6Months.map(m => {
+        return submissions.filter(s => {
+            if (!s.fecha) return false;
+            return s.fecha.startsWith(m.key);
+        }).length;
+    });
+
+    renderBarrasChart(last6Months, monthlyCounts);
+}
+
+function renderDonaChart(asignaciones, traspasos, devoluciones) {
+    const total = asignaciones + traspasos + devoluciones;
+    const container = document.getElementById('chart-pie-container');
+    if (!container) return;
+
+    if (total === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 py-8">
+                <i data-lucide="info" class="w-8 h-8 mb-2"></i>
+                <span class="text-xs">No hay datos registrados aún</span>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    const pctAsig = (asignaciones / total) * 100;
+    const pctTras = (traspasos / total) * 100;
+    const pctDev = (devoluciones / total) * 100;
+
+    const r = 45;
+    const circ = 2 * Math.PI * r; // ~282.74
+
+    const dashAsig = circ * (pctAsig / 100);
+    const dashTras = circ * (pctTras / 100);
+    const dashDev = circ * (pctDev / 100);
+
+    const offsetAsig = 0;
+    const offsetTras = -dashAsig;
+    const offsetDev = -(dashAsig + dashTras);
+
+    container.innerHTML = `
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-6 w-full py-4">
+            <div class="relative w-36 h-36">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="${r}" fill="transparent" stroke="#f1f5f9" class="dark:stroke-slate-800" stroke-width="12"/>
+                    ${pctAsig > 0 ? `<circle cx="60" cy="60" r="${r}" fill="transparent" stroke="#4f46e5" stroke-width="12" stroke-dasharray="${dashAsig} ${circ - dashAsig}" stroke-dashoffset="${offsetAsig}" stroke-linecap="round"/>` : ''}
+                    ${pctTras > 0 ? `<circle cx="60" cy="60" r="${r}" fill="transparent" stroke="#d97706" stroke-width="12" stroke-dasharray="${dashTras} ${circ - dashTras}" stroke-dashoffset="${offsetTras}" stroke-linecap="round"/>` : ''}
+                    ${pctDev > 0 ? `<circle cx="60" cy="60" r="${r}" fill="transparent" stroke="#e11d48" stroke-width="12" stroke-dasharray="${dashDev} ${circ - dashDev}" stroke-dashoffset="${offsetDev}" stroke-linecap="round"/>` : ''}
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span class="text-[9px] font-bold text-slate-450 uppercase block">Total</span>
+                    <span class="text-xl font-black text-slate-800 dark:text-slate-100">${total}</span>
+                </div>
+            </div>
+            <div class="flex flex-col gap-2 w-full max-w-[180px]">
+                <div class="flex items-center justify-between gap-4 text-xs font-semibold">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#4f46e5] block"></span>
+                        <span class="text-slate-650 dark:text-slate-400">Asignaciones</span>
+                    </div>
+                    <span class="text-slate-850 dark:text-slate-200 font-mono">${asignaciones} (${Math.round(pctAsig)}%)</span>
+                </div>
+                <div class="flex items-center justify-between gap-4 text-xs font-semibold">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#d97706] block"></span>
+                        <span class="text-slate-650 dark:text-slate-400">Traspasos</span>
+                    </div>
+                    <span class="text-slate-850 dark:text-slate-200 font-mono">${traspasos} (${Math.round(pctTras)}%)</span>
+                </div>
+                <div class="flex items-center justify-between gap-4 text-xs font-semibold">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#e11d48] block"></span>
+                        <span class="text-slate-650 dark:text-slate-400">Devoluciones</span>
+                    </div>
+                    <span class="text-slate-850 dark:text-slate-200 font-mono">${devoluciones} (${Math.round(pctDev)}%)</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderBarrasChart(last6Months, monthlyCounts) {
+    const container = document.getElementById('chart-bar-container');
+    if (!container) return;
+
+    const maxCount = Math.max(...monthlyCounts, 0);
+    const scaleMax = maxCount === 0 ? 1 : maxCount;
+
+    if (maxCount === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 py-8">
+                <i data-lucide="info" class="w-8 h-8 mb-2"></i>
+                <span class="text-xs">No hay actividad en los últimos 6 meses</span>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    const svgWidth = 300;
+    const svgHeight = 160;
+    const paddingLeft = 25;
+    const paddingRight = 10;
+    const paddingTop = 20;
+    const paddingBottom = 20;
+
+    const chartWidth = svgWidth - paddingLeft - paddingRight;
+    const chartHeight = svgHeight - paddingTop - paddingBottom;
+    const barWidth = (chartWidth / 6) - 10;
+
+    let barsHtml = '';
+    let axesHtml = '';
+
+    const gridLines = 3;
+    for (let i = 0; i <= gridLines; i++) {
+        const y = paddingTop + (chartHeight / gridLines) * i;
+        const val = Math.round(scaleMax - (scaleMax / gridLines) * i);
+        axesHtml += `
+            <line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - paddingRight}" y2="${y}" stroke="#f1f5f9" class="dark:stroke-slate-800/60" stroke-width="1" stroke-dasharray="3 3"/>
+            <text x="${paddingLeft - 5}" y="${y + 4}" fill="#94a3b8" class="text-[9px] font-semibold" text-anchor="end">${val}</text>
+        `;
+    }
+
+    last6Months.forEach((m, idx) => {
+        const count = monthlyCounts[idx];
+        const pctHeight = count / scaleMax;
+        const barHeight = chartHeight * pctHeight;
+        const x = paddingLeft + (idx * (chartWidth / 6)) + 5;
+        const y = svgHeight - paddingBottom - barHeight;
+
+        barsHtml += `
+            <g class="group cursor-pointer">
+                <rect x="${x}" y="${y}" width="${barWidth}" height="${Math.max(barHeight, 2)}" rx="4" ry="4" fill="url(#indigoGrad)" class="transition-all duration-300 hover:fill-indigo-500"/>
+                <text x="${x + barWidth/2}" y="${y - 4}" fill="#6366f1" class="text-[9px] font-bold" text-anchor="middle">${count}</text>
+                <text x="${x + barWidth/2}" y="${svgHeight - 6}" fill="#64748b" class="text-[9px] font-semibold" text-anchor="middle">${m.label}</text>
+            </g>
+        `;
+    });
+
+    container.innerHTML = `
+        <svg class="w-full max-w-[320px] h-40" viewBox="0 0 ${svgWidth} ${svgHeight}">
+            <defs>
+                <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#818cf8"/>
+                    <stop offset="100%" stop-color="#4f46e5"/>
+                </linearGradient>
+            </defs>
+            ${axesHtml}
+            ${barsHtml}
+        </svg>
+    `;
+}
+
+// ======================================================================
+// LÓGICA DE INVENTARIO Y ACTIVOS (v4)
+// ======================================================================
+function switchInventorySubTab(subTabId) {
+    activeInventorySubTab = subTabId;
+    
+    const subtabEquipments = document.getElementById('subtab-inventory-equipments');
+    const subtabUsers = document.getElementById('subtab-inventory-users');
+    const btnEquipments = document.getElementById('subnav-inventory-equipments');
+    const btnUsers = document.getElementById('subnav-inventory-users');
+    
+    const activeClass = "px-4 py-1.5 rounded-lg text-xs font-semibold bg-indigo-650 text-white shadow-sm transition-all duration-200";
+    const inactiveClass = "px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all duration-200";
+    
+    if (subTabId === 'equipments') {
+        if (subtabEquipments) subtabEquipments.classList.remove('hidden');
+        if (subtabUsers) subtabUsers.classList.add('hidden');
+        if (btnEquipments) btnEquipments.className = activeClass;
+        if (btnUsers) btnUsers.className = inactiveClass;
+    } else {
+        if (subtabEquipments) subtabEquipments.classList.add('hidden');
+        if (subtabUsers) subtabUsers.classList.remove('hidden');
+        if (btnEquipments) btnEquipments.className = inactiveClass;
+        if (btnUsers) btnUsers.className = activeClass;
+    }
+    renderInventory();
+}
+
+function calculateInventory() {
+    const cronSubmissions = [...submissions].sort((a, b) => {
+        return (a.fecha || '').localeCompare(b.fecha || '');
+    });
+
+    const inventory = new Map();
+
+    cronSubmissions.forEach(sub => {
+        if (!sub.equipamiento) return;
+
+        const tipoSol = sub.tipo_solicitud;
+        const funcionario = sub.funcionario ? {
+            nombre: sub.funcionario.nombre,
+            rut: formatRut(sub.funcionario.rut),
+            cargo: sub.funcionario.cargo,
+            depto: sub.funcionario.depto
+        } : null;
+
+        sub.equipamiento.forEach(eq => {
+            if (!eq || !eq.serie) return;
+            const serieKey = eq.serie.trim().toUpperCase();
+            if (!serieKey || serieKey === 'S/N' || serieKey === '-') return;
+
+            if (tipoSol === 'Asignacion' || tipoSol === 'Traspaso') {
+                inventory.set(serieKey, {
+                    equipo: {
+                        tipo: eq.tipo,
+                        marca: eq.marca,
+                        modelo: eq.modelo,
+                        serie: serieKey,
+                        inventario: eq.inventario || '',
+                        observacion: eq.observacion || ''
+                    },
+                    poseedor: funcionario,
+                    ticket: sub.ticket,
+                    fecha: sub.fecha,
+                    id: sub.id,
+                    estado: 'Asignado'
+                });
+            } else if (tipoSol === 'Devolucion') {
+                inventory.set(serieKey, {
+                    equipo: {
+                        tipo: eq.tipo,
+                        marca: eq.marca,
+                        modelo: eq.modelo,
+                        serie: serieKey,
+                        inventario: eq.inventario || '',
+                        observacion: eq.observacion || ''
+                    },
+                    poseedor: null,
+                    ticket: sub.ticket,
+                    fecha: sub.fecha,
+                    id: sub.id,
+                    estado: 'Devuelto'
+                });
+            }
+        });
+    });
+
+    return inventory;
+}
+
+function renderInventory() {
+    const inventory = calculateInventory();
+    
+    if (activeInventorySubTab === 'equipments') {
+        renderInventoryEquipments(inventory);
+    } else {
+        renderInventoryUsers(inventory);
+    }
+}
+
+function renderInventoryEquipments(inventory) {
+    const tbody = document.getElementById('inventory-equipments-list');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const search = (document.getElementById('inventory-search-equipments')?.value || '').toLowerCase().trim();
+    const items = Array.from(inventory.values());
+
+    const filtered = items.filter(item => {
+        if (!search) return true;
+        return (
+            item.equipo.serie.toLowerCase().includes(search) ||
+            item.equipo.tipo.toLowerCase().includes(search) ||
+            item.equipo.marca.toLowerCase().includes(search) ||
+            item.equipo.modelo.toLowerCase().includes(search) ||
+            item.equipo.inventario.toLowerCase().includes(search) ||
+            (item.poseedor && item.poseedor.nombre.toLowerCase().includes(search)) ||
+            (item.poseedor && item.poseedor.rut.toLowerCase().includes(search)) ||
+            (item.poseedor && item.poseedor.depto.toLowerCase().includes(search))
+        );
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400 text-xs">No se encontraron activos tecnológicos asignados o registrados.</td></tr>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850";
+        
+        let stateBadge = '';
+        if (item.poseedor) {
+            stateBadge = `
+                <div>
+                    <div class="font-semibold text-slate-850 dark:text-slate-200">${escapeHTML(item.poseedor.nombre)}</div>
+                    <div class="text-[10px] text-slate-450 mt-0.5">${escapeHTML(item.poseedor.depto)} <span class="text-slate-350 dark:text-slate-700">|</span> ${escapeHTML(item.poseedor.cargo)}</div>
+                </div>
+            `;
+        } else {
+            stateBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-450"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Devuelto / En Bodega</span>`;
+        }
+
+        tr.innerHTML = `
+            <td class="py-3 px-4 font-semibold text-slate-800 dark:text-slate-100">${escapeHTML(item.equipo.tipo)}</td>
+            <td class="py-3 px-4 text-slate-500 dark:text-slate-400">${escapeHTML(item.equipo.marca)} <span class="text-slate-400 font-normal">/</span> ${escapeHTML(item.equipo.modelo)}</td>
+            <td class="py-3 px-4 font-mono text-xs">
+                <div class="font-bold text-slate-700 dark:text-slate-300">${escapeHTML(item.equipo.serie)}</div>
+                ${item.equipo.inventario ? `<div class="text-[9px] text-indigo-500 dark:text-indigo-400 font-semibold mt-0.5">${escapeHTML(item.equipo.inventario)}</div>` : ''}
+            </td>
+            <td class="py-3 px-4">${stateBadge}</td>
+            <td class="py-3 px-4 text-slate-450">${escapeHTML(item.fecha)}</td>
+            <td class="py-3 px-4 text-center font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer" onclick="viewAndEditForm('${item.id}')">${escapeHTML(item.ticket)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderInventoryUsers(inventory) {
+    const tbody = document.getElementById('inventory-users-list');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const search = (document.getElementById('inventory-search-users')?.value || '').toLowerCase().trim();
+    const userGroups = new Map();
+    
+    Array.from(inventory.values()).forEach(item => {
+        if (!item.poseedor) return;
+        const rutKey = item.poseedor.rut;
+        
+        if (!userGroups.has(rutKey)) {
+            userGroups.set(rutKey, {
+                funcionario: item.poseedor,
+                equipos: []
+            });
+        }
+        userGroups.get(rutKey).equipos.push(item);
+    });
+
+    const groups = Array.from(userGroups.values());
+
+    const filtered = groups.filter(g => {
+        if (!search) return true;
+        return (
+            g.funcionario.nombre.toLowerCase().includes(search) ||
+            g.funcionario.rut.toLowerCase().includes(search) ||
+            g.funcionario.depto.toLowerCase().includes(search) ||
+            g.funcionario.cargo.toLowerCase().includes(search)
+        );
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400 text-xs">No se encontraron funcionarios con equipamiento a cargo.</td></tr>`;
+        return;
+    }
+
+    filtered.forEach(g => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850";
+        
+        tr.innerHTML = `
+            <td class="py-3 px-4 font-semibold text-slate-800 dark:text-slate-100">${escapeHTML(g.funcionario.nombre)}</td>
+            <td class="py-3 px-4 font-mono text-xs text-slate-500 dark:text-slate-400">${escapeHTML(g.funcionario.rut)}</td>
+            <td class="py-3 px-4">
+                <div class="font-medium text-slate-700 dark:text-slate-300">${escapeHTML(g.funcionario.depto)}</div>
+                <div class="text-[10px] text-slate-450">${escapeHTML(g.funcionario.cargo)}</div>
+            </td>
+            <td class="py-3 px-4 text-center font-bold text-slate-800 dark:text-slate-200">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 text-xs font-extrabold border border-indigo-200/50 dark:border-indigo-900/30">
+                    ${g.equipos.length}
+                </span>
+            </td>
+            <td class="py-3 px-4 text-center">
+                <button onclick="showInventoryDetails('${escapeHTML(g.funcionario.rut)}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/30 text-indigo-650 dark:text-indigo-400 rounded-lg font-bold text-[10px] transition-all inline-flex items-center gap-1 mx-auto">
+                    <i data-lucide="eye" class="w-3 h-3"></i> Detalle Activos
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    lucide.createIcons();
+}
+
+function showInventoryDetails(rut) {
+    const inventory = calculateInventory();
+    const userEquips = Array.from(inventory.values()).filter(item => {
+        return item.poseedor && item.poseedor.rut === rut;
+    });
+
+    if (userEquips.length === 0) return;
+
+    const first = userEquips[0].poseedor;
+
+    document.getElementById('inv-detail-name').innerText = first.nombre;
+    document.getElementById('inv-detail-rut').innerText = first.rut;
+    document.getElementById('inv-detail-depto').innerText = first.depto;
+    document.getElementById('inv-detail-cargo').innerText = first.cargo;
+
+    const tbody = document.getElementById('inventory-detail-list');
+    tbody.innerHTML = '';
+
+    userEquips.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors border-b border-slate-100 dark:border-slate-800/80";
+        tr.innerHTML = `
+            <td class="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">${escapeHTML(item.equipo.tipo)}</td>
+            <td class="py-2.5 px-3 text-slate-500">${escapeHTML(item.equipo.marca)} / ${escapeHTML(item.equipo.modelo)}</td>
+            <td class="py-2.5 px-3 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">${escapeHTML(item.equipo.serie)}</td>
+            <td class="py-2.5 px-3 font-mono text-[10px] text-slate-450">${escapeHTML(item.equipo.inventario || '-')}</td>
+            <td class="py-2.5 px-3 text-slate-450">${escapeHTML(item.fecha)}</td>
+            <td class="py-2.5 px-3 text-center font-mono text-[11px] font-bold text-indigo-650 dark:text-indigo-400 hover:underline cursor-pointer" onclick="closeInventoryDetailModal(); viewAndEditForm('${item.id}');">${escapeHTML(item.ticket)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('inventory-detail-modal').classList.remove('hidden');
+}
+
+function closeInventoryDetailModal() {
+    document.getElementById('inventory-detail-modal').classList.add('hidden');
+}
+
+window.switchInventorySubTab = switchInventorySubTab;
+window.showInventoryDetails = showInventoryDetails;
+window.closeInventoryDetailModal = closeInventoryDetailModal;
+window.clearFormAndDraftWithConfirm = clearFormAndDraftWithConfirm;
+window.loadFormDraft = loadFormDraft;
+window.saveFormDraft = saveFormDraft;
+window.clearFormDraft = clearFormDraft;

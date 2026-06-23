@@ -102,7 +102,7 @@ function showLoginOverlay() {
     if (navUserInfo) navUserInfo.classList.add('hidden');
 
     // Deshabilitar botones de navegación
-    ['nav-dashboard', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-users', 'nav-inventory', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
     });
@@ -117,7 +117,7 @@ function hideLoginOverlay() {
     if (divider) divider.classList.remove('hidden');
     
     // Habilitar botones de navegación
-    ['nav-dashboard', 'nav-history', 'nav-users', 'nav-form'].forEach(id => {
+    ['nav-dashboard', 'nav-users', 'nav-inventory', 'nav-form'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = false;
     });
@@ -1186,7 +1186,7 @@ function switchTab(tabId) {
     }
     activeTab = tabId;
     
-    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-history', 'tab-users', 'tab-inventory'];
+    const tabs = ['tab-dashboard', 'tab-form-view', 'tab-users', 'tab-inventory'];
     tabs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -1198,16 +1198,14 @@ function switchTab(tabId) {
     // Estilos de botones de navegación
     const btnDash = document.getElementById('nav-dashboard');
     const btnForm = document.getElementById('nav-form');
-    const btnHistory = document.getElementById('nav-history');
     const btnUsers = document.getElementById('nav-users');
     const btnInventory = document.getElementById('nav-inventory');
     
-    const inactiveClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-850/50";
+    const inactiveClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-855/50";
     const activeClass = "px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-indigo-650 text-white shadow-sm shadow-indigo-600/30";
     
     if (btnDash) btnDash.className = inactiveClass;
     if (btnForm) btnForm.className = inactiveClass;
-    if (btnHistory) btnHistory.className = inactiveClass;
     if (btnUsers) btnUsers.className = inactiveClass;
     if (btnInventory) btnInventory.className = inactiveClass;
 
@@ -1221,10 +1219,6 @@ function switchTab(tabId) {
         if (btnForm) btnForm.className = activeClass;
         // Redimensionar canvases de firma al visualizar
         setTimeout(resizeAllCanvases, 50);
-    } else if (tabId === 'history') {
-        targetEl = document.getElementById('tab-history');
-        if (btnHistory) btnHistory.className = activeClass;
-        resetHistoryTab();
     } else if (tabId === 'users') {
         targetEl = document.getElementById('tab-users');
         if (btnUsers) btnUsers.className = activeClass;
@@ -4258,280 +4252,7 @@ function triggerPrintFromPreview() {
     triggerPrintMode();
 }
 
-// Historial y Sugerencias de Trazabilidad
-function showHistorySuggestions(query) {
-    const dropdown = document.getElementById('history-suggestions-dropdown');
-    if (!dropdown) return;
-    dropdown.innerHTML = '';
-    
-    if (!query || query.trim().length < 1) {
-        dropdown.classList.add('hidden');
-        return;
-    }
-    
-    const term = query.toLowerCase().trim();
-    
-    // Recopilar números de serie únicos
-    const matches = new Map(); // serie -> info
-    
-    // 1. Buscar en registros locales (submissions)
-    submissions.forEach(sub => {
-        if (sub.equipamiento) {
-            sub.equipamiento.forEach(eq => {
-                if (eq.serie && eq.serie.toLowerCase().includes(term)) {
-                    matches.set(eq.serie.toUpperCase(), {
-                        serie: eq.serie.toUpperCase(),
-                        tipo: eq.tipo,
-                        marca: eq.marca,
-                        modelo: eq.modelo,
-                        funcionario: sub.funcionario.nombre,
-                        origen: 'Historial'
-                    });
-                }
-            });
-        }
-    });
-    
-    // 2. Buscar en planilla Excel catastrada
-    loadedAllEquipments.forEach(item => {
-        if (item.serie && item.serie.toLowerCase().includes(term)) {
-            if (!matches.has(item.serie.toUpperCase())) {
-                matches.set(item.serie.toUpperCase(), {
-                    serie: item.serie.toUpperCase(),
-                    tipo: item.tipo,
-                    marca: item.marca,
-                    modelo: item.modelo,
-                    funcionario: item.funcionario,
-                    origen: 'Catastro Excel'
-                });
-            }
-        }
-    });
-    
-    const matchesArr = Array.from(matches.values()).slice(0, 8);
-    
-    if (matchesArr.length === 0) {
-        dropdown.innerHTML = '<div class="p-3 text-center text-slate-450">No se encontraron números de serie.</div>';
-        dropdown.classList.remove('hidden');
-        return;
-    }
-    
-    matchesArr.forEach(item => {
-        const div = document.createElement('div');
-        div.className = "p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors flex justify-between items-center";
-        div.onclick = () => selectHistoryEquipment(item.serie);
-        
-        div.innerHTML = `
-            <div>
-                <div class="font-bold text-slate-850 dark:text-slate-200 font-mono">S/N: ${escapeHTML(item.serie)}</div>
-                <div class="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">${escapeHTML(item.marca || '')} ${escapeHTML(item.modelo || '')}</div>
-            </div>
-            <div class="text-right text-[10px]">
-                <span class="px-2 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">${item.tipo ? escapeHTML(item.tipo) : 'Equipo'}</span>
-                <div class="text-slate-450 dark:text-slate-500 mt-1">Ref: ${escapeHTML(item.origen)}</div>
-            </div>
-        `;
-        dropdown.appendChild(div);
-    });
-    dropdown.classList.remove('hidden');
-}
 
-function selectHistoryEquipment(serie) {
-    const input = document.getElementById('history-search-input');
-    if (input) input.value = serie;
-    
-    const dropdown = document.getElementById('history-suggestions-dropdown');
-    if (dropdown) dropdown.classList.add('hidden');
-    
-    renderHistoryTimeline(serie);
-}
-
-function resetHistoryTab() {
-    const input = document.getElementById('history-search-input');
-    if (input) input.value = '';
-    
-    const dropdown = document.getElementById('history-suggestions-dropdown');
-    if (dropdown) dropdown.classList.add('hidden');
-    
-    document.getElementById('history-results').classList.add('hidden');
-    document.getElementById('history-empty-state').classList.remove('hidden');
-}
-
-function renderHistoryTimeline(serie) {
-    const term = serie.trim().toUpperCase();
-    const timeline = document.getElementById('history-timeline');
-    const eqInfo = document.getElementById('history-eq-info');
-    const results = document.getElementById('history-results');
-    const emptyState = document.getElementById('history-empty-state');
-    
-    if (!timeline || !eqInfo || !results || !emptyState) return;
-    
-    // Encontrar todas las transacciones locales para este N° de Serie
-    const moves = [];
-    submissions.forEach(sub => {
-        if (sub.equipamiento) {
-            sub.equipamiento.forEach(eq => {
-                if (eq.serie && eq.serie.trim().toUpperCase() === term) {
-                    moves.push({
-                        subId: sub.id,
-                        fecha: sub.fecha,
-                        ticket: sub.ticket,
-                        tipo_solicitud: sub.tipo_solicitud,
-                        propiedad: sub.propiedad_equipamiento,
-                        funcionario: sub.funcionario.nombre,
-                        depto: sub.funcionario.depto,
-                        cargo: sub.funcionario.cargo,
-                        traspaso: sub.traspaso,
-                        observacion: eq.observacion,
-                        eqInfo: eq
-                    });
-                }
-            });
-        }
-    });
-    
-    // Ordenar movimientos por fecha (más reciente arriba)
-    moves.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    
-    // Intentar buscar en la base del Excel catastrado para rellenar la ficha general
-    const excelMatch = loadedAllEquipments.find(e => e.serie && e.serie.trim().toUpperCase() === term);
-    
-    let eqMarca = 'Desconocida';
-    let eqModelo = 'Desconocido';
-    let eqTipo = 'Equipo';
-    let eqInventario = 'S/N';
-    let eqPropiedad = 'En Arriendo';
-    let eqUbicacionExcel = '';
-    let eqFuncionarioExcel = '';
-    
-    if (moves.length > 0) {
-        const lastMove = moves[0];
-        eqMarca = lastMove.eqInfo.marca || eqMarca;
-        eqModelo = lastMove.eqInfo.modelo || eqModelo;
-        eqTipo = lastMove.eqInfo.tipo || eqTipo;
-        eqInventario = lastMove.eqInfo.inventario || eqInventario;
-        eqPropiedad = lastMove.propiedad || eqPropiedad;
-    }
-    
-    if (excelMatch) {
-        eqMarca = excelMatch.marca || eqMarca;
-        eqModelo = excelMatch.modelo || eqModelo;
-        eqTipo = excelMatch.tipo || eqTipo;
-        eqInventario = excelMatch.inventario || eqInventario;
-        eqPropiedad = excelMatch.propiedad || eqPropiedad;
-        eqUbicacionExcel = excelMatch.depto || '';
-        eqFuncionarioExcel = excelMatch.funcionario || '';
-    }
-    
-    if (moves.length === 0 && !excelMatch) {
-        showToast("No se encontraron registros ni catastro para el número de serie ingresado.", "error");
-        resetHistoryTab();
-        return;
-    }
-    
-    emptyState.classList.add('hidden');
-    results.classList.remove('hidden');
-    
-    const badgeClass = eqPropiedad.includes('Arriendo') 
-        ? 'bg-amber-50 dark:bg-amber-955/40 text-amber-700 dark:text-amber-400' 
-        : 'bg-emerald-50 dark:bg-emerald-955/40 text-emerald-700 dark:text-emerald-450';
-        
-    let excelBadgeText = '';
-    if (excelMatch) {
-        const estLower = String(excelMatch.estado || '').toLowerCase();
-        if (estLower.includes('catastrado')) {
-            excelBadgeText = `<span class="px-2 py-0.5 rounded bg-emerald-500 text-white font-bold text-[9px] uppercase tracking-wide shadow-sm flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>Catastrado en Planilla</span>`;
-        } else {
-            excelBadgeText = `<span class="px-2 py-0.5 rounded bg-slate-400 text-white font-bold text-[9px] uppercase tracking-wide">Disponible en Planilla</span>`;
-        }
-    }
-    
-    eqInfo.innerHTML = `
-        <div class="space-y-2">
-            <div class="flex items-center gap-3">
-                <span class="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-650 dark:text-indigo-400 flex items-center gap-1.5"><i data-lucide="laptop" class="w-4 h-4"></i> ${escapeHTML(eqTipo)}</span>
-                <span class="px-2.5 py-1 rounded-xl text-xs font-bold ${badgeClass}">${escapeHTML(eqPropiedad)}</span>
-                ${excelBadgeText}
-            </div>
-            <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mt-1">${escapeHTML(eqMarca)} ${escapeHTML(eqModelo)}</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-500 dark:text-slate-455 font-medium">
-                <div><strong>N° Serie:</strong> <span class="font-mono text-indigo-600 dark:text-indigo-400 font-bold">${escapeHTML(term)}</span></div>
-                <div><strong>N° Inventario:</strong> <span class="font-mono">${escapeHTML(eqInventario || 'Sin Inventario')}</span></div>
-                ${eqFuncionarioExcel ? `<div><strong>Titular Catastral:</strong> ${escapeHTML(eqFuncionarioExcel)}</div>` : ''}
-                ${eqUbicacionExcel ? `<div><strong>Ubicación Catastral:</strong> ${escapeHTML(eqUbicacionExcel)}</div>` : ''}
-            </div>
-        </div>
-        <div class="bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30 text-center max-w-xs w-full">
-            <span class="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider block">Movimientos Registrados</span>
-            <span class="text-3xl font-extrabold text-indigo-650 dark:text-indigo-400 block mt-1">${moves.length}</span>
-        </div>
-    `;
-    
-    timeline.innerHTML = '';
-    
-    if (moves.length === 0) {
-        timeline.innerHTML = `
-            <div class="text-slate-450 dark:text-slate-500 text-xs py-4">
-                El equipo se encuentra registrado en el Catastro Excel, pero no ha tenido transacciones de Asignación, Traspaso o Devolución firmadas en el sistema.
-            </div>
-        `;
-    } else {
-        moves.forEach(m => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = "timeline-item pl-4";
-            
-            let colorMarker = 'asignacion';
-            let title = '';
-            let contentHtml = '';
-            
-            if (m.tipo_solicitud === 'Asignacion') {
-                colorMarker = 'asignacion';
-                title = `Asignación de Equipo (Entrega)`;
-                contentHtml = `
-                    <p class="text-slate-650 dark:text-slate-350 text-xs">Asignado al funcionario <strong>${escapeHTML(m.funcionario)}</strong> (${escapeHTML(m.cargo)}) del departamento <strong>${escapeHTML(m.depto)}</strong>.</p>
-                `;
-            } else if (m.tipo_solicitud === 'Traspaso') {
-                colorMarker = 'traspaso';
-                const emisor = m.traspaso ? escapeHTML(m.traspaso.emisor_nombre) : 'Emisor no registrado';
-                const receptor = m.traspaso ? escapeHTML(m.traspaso.receptor_nombre) : 'Receptor no registrado';
-                const obs = m.traspaso && m.traspaso.observacion ? `<div class="mt-2 p-2 bg-amber-500/5 rounded border border-amber-500/10 text-amber-800 dark:text-amber-350 italic text-[11px]">Obs: "${escapeHTML(m.traspaso.observacion)}"</div>` : '';
-                title = `Traspaso de Equipamiento`;
-                contentHtml = `
-                    <p class="text-slate-650 dark:text-slate-350 text-xs">
-                        Traspaso de <strong>${emisor}</strong> a <strong>${receptor}</strong>.<br>
-                        Firmante del traspaso: <strong>${escapeHTML(m.funcionario)}</strong>.
-                    </p>
-                    ${obs}
-                `;
-            } else {
-                colorMarker = 'devolucion';
-                title = `Devolución de Equipo`;
-                contentHtml = `
-                    <p class="text-slate-650 dark:text-slate-350 text-xs">Devuelto por el funcionario <strong>${escapeHTML(m.funcionario)}</strong> del departamento <strong>${escapeHTML(m.depto)}</strong>.</p>
-                `;
-            }
-            
-            itemDiv.innerHTML = `
-                <div class="timeline-marker ${colorMarker}"></div>
-                <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
-                        <span class="text-xs font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500"></i> ${escapeHTML(m.fecha)}</span>
-                        <div class="flex items-center gap-2">
-                            <span class="font-mono text-[10px] text-indigo-650 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">Ticket: ${escapeHTML(m.ticket)}</span>
-                            <button onclick="viewAndEditForm('${escapeHTML(m.subId)}')" class="text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold underline transition-colors">Ver Documento</button>
-                        </div>
-                    </div>
-                    <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">${title}</h4>
-                    <div class="mt-1">${contentHtml}</div>
-                    ${m.observacion ? `<p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Nota: "${escapeHTML(m.observacion)}"</p>` : ''}
-                </div>
-            `;
-            timeline.appendChild(itemDiv);
-        });
-    }
-    
-    lucide.createIcons();
-}
 
 // Validaciones en Formulario
 function setupInputValidationListeners() {
@@ -4606,14 +4327,7 @@ function highlightUnsignedCanvas(id) {
     }
 }
 
-// Ocultar dropdown de autocompletado si se hace clic fuera
-document.addEventListener('click', (e) => {
-    const dropdown = document.getElementById('history-suggestions-dropdown');
-    const input = document.getElementById('history-search-input');
-    if (dropdown && !dropdown.contains(e.target) && e.target !== input) {
-        dropdown.classList.add('hidden');
-    }
-});
+
 
 // =======================================================================
 // EXPOSICIÓN DE FUNCIONES A ÁMBITO GLOBAL (VITE ES MODULE COMPATIBILITY)
@@ -4647,8 +4361,7 @@ window.openPreviewModal = openPreviewModal;
 window.closePreviewModal = closePreviewModal;
 window.triggerPDFExportFromPreview = triggerPDFExportFromPreview;
 window.triggerPrintFromPreview = triggerPrintFromPreview;
-window.showHistorySuggestions = showHistorySuggestions;
-window.selectHistoryEquipment = selectHistoryEquipment;
+
 window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
 

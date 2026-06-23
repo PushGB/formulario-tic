@@ -121,9 +121,6 @@
                                     <span class="flex items-center gap-1.5"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Panel</span></span>
                                 </button>
 
-                                <button onclick="switchTab('history')" id="nav-history" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
-                                    <span class="flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Historial</span></span>
-                                </button>
                                 <button onclick="switchTab('users')" id="nav-users" class="hidden px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs font-semibold transition-all duration-200 text-slate-650 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
                                     <span class="flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Accesos</span></span>
                                 </button>
@@ -296,51 +293,6 @@
                 </div>
             </section>
 
-
-            <!-- ================= PANEL DE HISTORIAL Y TRAZABILIDAD ================= -->
-            <section id="tab-history" class="hidden space-y-6">
-                <div>
-                    <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                        <i data-lucide="history" class="w-6 h-6 text-indigo-500"></i> Historial y Trazabilidad de Equipamiento
-                    </h1>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Busca un número de serie para rastrear su historial de asignaciones, traspasos y devoluciones.</p>
-                </div>
-                
-                <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-6">
-                    <div class="max-w-md relative">
-                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">Buscar por Número de Serie:</label>
-                        <div class="relative">
-                            <i data-lucide="search" class="absolute left-3 top-3.5 h-4 w-4 text-slate-400 dark:text-slate-500"></i>
-                            <input type="text" id="history-search-input" oninput="showHistorySuggestions(this.value)" placeholder="Escriba el número de serie (ej: SPF0349A)..." class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-955 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all" autocomplete="off">
-                            <div id="history-suggestions-dropdown" class="hidden absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-50 divide-y divide-slate-100 dark:divide-slate-800 text-xs text-slate-700 dark:text-slate-200"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Contenedor de Resultados -->
-                    <div id="history-results" class="hidden space-y-6">
-                        <!-- Tarjeta Informativa del Equipo -->
-                        <div id="history-eq-info" class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <!-- Se rellenará dinámicamente -->
-                        </div>
-                        
-                        <!-- Línea de Tiempo -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
-                                <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i> Línea de Tiempo de Movimientos:
-                            </h3>
-                            <div class="relative border-l-2 border-indigo-100 dark:border-indigo-900/50 pl-6 ml-3 space-y-6" id="history-timeline">
-                                <!-- Se rellenará dinámicamente -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Estado Vacío -->
-                    <div id="history-empty-state" class="py-12 text-center text-slate-400 dark:text-slate-500 text-sm">
-                        <i data-lucide="search" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700"></i>
-                        <span>Ingrese un número de serie para comenzar el rastreo.</span>
-                    </div>
-                </div>
-            </section>
 
             <!-- ================= PANEL DE USUARIOS Y ACCESOS (SOLO ADMIN) ================= -->
             <section id="tab-users" class="hidden space-y-6">

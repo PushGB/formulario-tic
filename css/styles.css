@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Estilo para los paneles de firma */
+.signature-canvas {
+    cursor: crosshair;
+    touch-action: none; /* Previene scroll en pantallas táctiles al firmar */
+}
+
+/* Estilos específicos de impresión para emular la plantilla oficial */
+@page {
+    size: 216mm 330mm; /* Oficio Chile / Folio (8.5 x 13 in) */
+    margin: 0;         /* Sin márgenes por defecto del navegador para evitar descuadres */
+}
+
+@media print {
+    body {
+        background-color: white !important;
+        color: black !important;
+        font-size: 10px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-only {
+        display: block !important;
+    }
+    .page-break {
+        page-break-before: always !important;
+        break-before: page !important;
+    }
+    .print-page {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        box-sizing: border-box;
+        width: 216mm;
+        height: 330mm;
+        padding: 15mm 15mm !important; /* Añadimos márgenes internos fijos */
+        margin: 0 auto !important;
+        background-color: white !important;
+    }
+    /* Forzar fondos e imágenes a imprimirse exactamente */
+    .print-exact {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    /* Reglas de fuentes oficiales 1:1 con Word */
+    .print-tnr-10 {
+        font-family: 'Times New Roman', Times, serif !important;
+        font-size: 10pt !important;
+    }
+    .print-tnr-8 {
+        font-family: 'Times New Roman', Times, serif !important;
+        font-size: 8pt !important;
+    }
+    .print-calibri-12 {
+        font-family: 'Calibri', 'Candara', 'Segoe', 'Segoe UI', Arial, sans-serif !important;
+        font-size: 12pt !important;
+        font-weight: normal !important;
+    }
+}

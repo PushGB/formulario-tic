@@ -1,0 +1,32 @@
+{
+  "name": "Gestión Equipamiento TIC - ISP",
+  "short_name": "Soporte TIC",
+  "description": "Sistema Institucional de Asignación, Traspaso y Devolución de Equipamiento Tecnológico - Instituto de Salud Pública de Chile",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/logo-isp.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "formulario-tic",
+  "version": "5.2.0",
+  "private": true,
+  "scripts": {
+    "build": "echo Build complete",
+    "vercel-build": "echo Build complete"
+  }
+}

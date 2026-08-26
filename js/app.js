@@ -1,6 +1,6 @@
 // ================= CONTROL DE VERSIONES Y ACTUALIZACIÓN AUTOMÁTICA =================
-const APP_VERSION = '5.3.0';
-const APP_BUILD_TIMESTAMP = '20260826_0945';
+const APP_VERSION = '5.4.0';
+const APP_BUILD_TIMESTAMP = '20260826_1030';
 
 // ================= CONTROL DE ROLES Y ACCESOS (ADMIN / TÉCNICO / FUNCIONARIO) =================
 let currentUserRole = localStorage.getItem('tic_user_role') || 'funcionario';
@@ -1334,12 +1334,96 @@ function setFilterType(type) {
     renderTable();
 }
 
-// Renderizar la tabla del Dashboard con Filtros de Búsqueda y de Tipo
+// Variables de paginación del Dashboard
+let dashboardCurrentPage = 1;
+let dashboardPerPage = 25;
+
+function changeDashboardPerPage(val) {
+    dashboardPerPage = val === 'all' ? 'all' : parseInt(val, 10);
+    dashboardCurrentPage = 1;
+    renderTable();
+}
+
+function goToDashboardPage(target) {
+    if (target === 'prev') {
+        if (dashboardCurrentPage > 1) dashboardCurrentPage--;
+    } else if (target === 'next') {
+        dashboardCurrentPage++;
+    } else if (typeof target === 'number') {
+        dashboardCurrentPage = target;
+    }
+    renderTable();
+}
+
+function renderDashboardPagination(totalPages) {
+    const prevBtn = document.getElementById('dashboard-prev-btn');
+    const nextBtn = document.getElementById('dashboard-next-btn');
+    const numbersContainer = document.getElementById('dashboard-page-numbers');
+    
+    if (prevBtn) prevBtn.disabled = dashboardCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = dashboardCurrentPage >= totalPages || totalPages === 0;
+    
+    if (numbersContainer) {
+        numbersContainer.innerHTML = '';
+        if (totalPages <= 1) return;
+        
+        let startPage = Math.max(1, dashboardCurrentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) {
+            startPage = Math.max(1, endPage - 4);
+        }
+        
+        if (startPage > 1) {
+            const btn1 = document.createElement('button');
+            btn1.className = 'w-8 h-8 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400';
+            btn1.textContent = '1';
+            btn1.onclick = () => goToDashboardPage(1);
+            numbersContainer.appendChild(btn1);
+            
+            if (startPage > 2) {
+                const dots = document.createElement('span');
+                dots.className = 'px-1 text-slate-400 text-xs';
+                dots.textContent = '...';
+                numbersContainer.appendChild(dots);
+            }
+        }
+        
+        for (let p = startPage; p <= endPage; p++) {
+            const btn = document.createElement('button');
+            if (p === dashboardCurrentPage) {
+                btn.className = 'w-8 h-8 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow-sm';
+            } else {
+                btn.className = 'w-8 h-8 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400';
+            }
+            btn.textContent = p;
+            btn.onclick = () => goToDashboardPage(p);
+            numbersContainer.appendChild(btn);
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dots = document.createElement('span');
+                dots.className = 'px-1 text-slate-400 text-xs';
+                dots.textContent = '...';
+                numbersContainer.appendChild(dots);
+            }
+            const btnLast = document.createElement('button');
+            btnLast.className = 'w-8 h-8 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400';
+            btnLast.textContent = totalPages;
+            btnLast.onclick = () => goToDashboardPage(totalPages);
+            numbersContainer.appendChild(btnLast);
+        }
+    }
+}
+
+// Renderizar la tabla del Dashboard con Filtros de Búsqueda, de Tipo y Paginación
 function renderTable() {
-    const search = document.getElementById('search-input').value.toLowerCase().trim();
+    const searchInput = document.getElementById('search-input');
+    const search = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const tbody = document.getElementById('submissions-list');
     const cardsContainer = document.getElementById('submissions-mobile-cards');
     const emptyState = document.getElementById('empty-state');
+    const paginationBar = document.getElementById('dashboard-pagination-bar');
     
     if (tbody) tbody.innerHTML = '';
     if (cardsContainer) cardsContainer.innerHTML = '';
@@ -1351,20 +1435,45 @@ function renderTable() {
         }
 
         // Filtro por Texto de Búsqueda
-        const matchNombre = s.funcionario.nombre.toLowerCase().includes(search);
-        const matchRut = s.funcionario.rut.toLowerCase().includes(search);
-        const matchTicket = s.ticket.toLowerCase().includes(search);
-        const matchTipo = s.tipo_solicitud.toLowerCase().includes(search);
-        const matchSerie = s.equipamiento.some(e => e.serie.toLowerCase().includes(search));
-        return matchNombre || matchRut || matchTicket || matchTipo || matchSerie;
+        const matchNombre = (s.funcionario && s.funcionario.nombre || '').toLowerCase().includes(search);
+        const matchRut = (s.funcionario && s.funcionario.rut || '').toLowerCase().includes(search);
+        const matchDepto = (s.funcionario && s.funcionario.depto || '').toLowerCase().includes(search);
+        const matchTicket = (s.ticket || '').toLowerCase().includes(search);
+        const matchTipo = (s.tipo_solicitud || '').toLowerCase().includes(search);
+        const matchSerie = s.equipamiento && s.equipamiento.some(e => (e.serie || '').toLowerCase().includes(search));
+        const matchModelo = s.equipamiento && s.equipamiento.some(e => (e.modelo || '').toLowerCase().includes(search));
+        return matchNombre || matchRut || matchDepto || matchTicket || matchTipo || matchSerie || matchModelo;
     });
 
     if (filtered.length === 0) {
-        emptyState.classList.remove('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (paginationBar) paginationBar.classList.add('hidden');
     } else {
-        emptyState.classList.add('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+        if (paginationBar) paginationBar.classList.remove('hidden');
         
-        filtered.forEach(s => {
+        // Paginación
+        const totalItems = filtered.length;
+        let perPage = dashboardPerPage === 'all' ? totalItems : dashboardPerPage;
+        const totalPages = Math.ceil(totalItems / perPage) || 1;
+        
+        if (dashboardCurrentPage > totalPages) dashboardCurrentPage = totalPages;
+        if (dashboardCurrentPage < 1) dashboardCurrentPage = 1;
+        
+        const startIndex = (dashboardCurrentPage - 1) * perPage;
+        const endIndex = dashboardPerPage === 'all' ? totalItems : Math.min(startIndex + perPage, totalItems);
+        const paginated = filtered.slice(startIndex, endIndex);
+
+        // Actualizar resumen de conteo
+        const summary = document.getElementById('dashboard-count-summary');
+        if (summary) {
+            summary.textContent = `Mostrando ${totalItems === 0 ? 0 : startIndex + 1} a ${endIndex} de ${totalItems} solicitudes`;
+        }
+
+        // Renderizar controles de página
+        renderDashboardPagination(totalPages);
+
+        paginated.forEach(s => {
             let badgesSolicitud = '';
             let badgeBgClass = 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400';
             if (s.tipo_solicitud === 'Asignacion') {
@@ -1379,7 +1488,9 @@ function renderTable() {
             }
 
             // Formatear resumen de equipos
-            const eqSummary = s.equipamiento.map(e => `${e.tipo} (${e.marca} ${e.modelo})`).join(', ') || 'Sin equipos especificados';
+            const eqSummary = s.equipamiento && s.equipamiento.length > 0 
+                ? s.equipamiento.map(e => `${e.tipo} (${e.marca || ''} ${e.modelo || ''})`).join(', ') 
+                : 'Sin equipos especificados';
 
             // 1. RENDER PARA ESCRITORIO (Tabla)
             if (tbody) {
@@ -1390,7 +1501,7 @@ function renderTable() {
                     <td class="py-4 px-6 font-mono text-xs text-indigo-650 dark:text-indigo-400 font-semibold">${s.ticket}</td>
                     <td class="py-4 px-6">
                         <div class="font-medium text-slate-850 dark:text-slate-200">${s.funcionario.nombre}</div>
-                        <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${s.funcionario.rut}</div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">${s.funcionario.rut || ''} ${s.funcionario.depto ? '• ' + s.funcionario.depto : ''}</div>
                     </td>
                     <td class="py-4 px-6">${badgesSolicitud}</td>
                     <td class="py-4 px-6 max-w-xs truncate text-slate-500 dark:text-slate-450" title="${eqSummary}">${eqSummary}</td>
@@ -1419,7 +1530,6 @@ function renderTable() {
                 const card = document.createElement('div');
                 card.className = "p-4 sm:p-5 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all cursor-pointer active:scale-[0.99] border-b border-slate-100 dark:border-slate-800/80";
                 card.onclick = (e) => {
-                    // Si se presionó el botón de 3 puntos o cualquier parte de la tarjeta
                     openMobileActions(s.id);
                 };
                 card.innerHTML = `
@@ -1431,7 +1541,7 @@ function renderTable() {
                                 <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">${s.fecha}</span>
                             </div>
                             <h4 class="font-bold text-slate-900 dark:text-slate-100 text-base leading-tight mt-1 truncate">${s.funcionario.nombre}</h4>
-                            <p class="text-xs text-slate-400 dark:text-slate-500 font-mono">${s.funcionario.rut} • <span class="text-slate-500 dark:text-slate-400">${s.funcionario.depto || 'Sin Depto'}</span></p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 font-mono">${s.funcionario.rut || 'S/R'} • <span class="text-slate-500 dark:text-slate-400">${s.funcionario.depto || 'Sin Depto'}</span></p>
                         </div>
                         
                         <!-- Botón de 3 Puntos para Menú de Acciones -->
@@ -2336,142 +2446,200 @@ function processWorkbookData() {
     
     loadedAllEquipments = [...computers, ...printers];
     
-    // 3. Procesar Hoja de Equipos para importar registros ya catastrados
+    // 3. Procesar todas las hojas (Equipos, Computadores e Impresoras) para generar las solicitudes/formularios de cada funcionario
+    const grouped = {};
+    
+    // A. Primero incorporar datos de la hoja 'Equipos' (si contiene RUT, Cargo y Departamento)
     const equiposSheet = uploadedWorkbook.Sheets['Equipos'];
-    let importedCount = 0;
     if (equiposSheet) {
         const rawEquipos = XLSX.utils.sheet_to_json(equiposSheet);
-        
-        // Agrupar filas de catastro por Funcionario
-        const grouped = {};
         rawEquipos.forEach(item => {
             const nombre = item['Nombre Funcionario'] || item['Nombre'];
             const serie = item['Serie'] || item['N° Serie'];
-            
-            // Omitir filas vacías de la plantilla
-            if (!nombre || String(nombre).trim().length === 0 || !serie || String(serie).trim().length === 0) {
-                return;
-            }
-            
+            if (!nombre || String(nombre).trim().length === 0) return;
             const key = String(nombre).trim().toLowerCase();
             if (!grouped[key]) {
                 grouped[key] = {
                     nombre: String(nombre).trim(),
-                    rut: String(item['Rut'] || '').trim(),
+                    rut: String(item['Rut'] || item['RUT'] || '').trim(),
                     cargo: String(item['Cargo'] || '').trim(),
-                    depto: String(item['Departamento'] || '').trim(),
+                    depto: String(item['Departamento'] || item['Unidad'] || '').trim(),
                     propiedad: item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo',
                     equipos: []
                 };
             }
-            
+            if (serie && String(serie).trim().length > 0) {
+                const rawEq = {
+                    tipo: String(item['Tipo (AIO Notebook o Pantalla)'] || 'Equipo').trim(),
+                    marca: String(item['Marca'] || '').trim(),
+                    modelo: String(item['Modelo'] || '').trim(),
+                    serie: String(serie).trim(),
+                    inventario: String(item['Nº Inventario'] || item['N° Inventario'] || '').trim(),
+                    observacion: String(item['Observacion'] || '').trim()
+                };
+                const splitEqs = splitEquipmentIfCombined(rawEq);
+                splitEqs.forEach(eq => {
+                    if (!grouped[key].equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
+                        grouped[key].equipos.push(eq);
+                    }
+                });
+            }
+        });
+    }
+
+    // B. Procesar e incorporar todos los Computadores
+    computers.forEach(item => {
+        const nombre = item.funcionario;
+        if (!nombre || String(nombre).trim().length === 0) return;
+        const key = String(nombre).trim().toLowerCase();
+        if (!grouped[key]) {
+            grouped[key] = {
+                nombre: String(nombre).trim(),
+                rut: '',
+                cargo: '',
+                depto: String(item.depto || '').trim(),
+                propiedad: (item.propiedad || '').toLowerCase().includes('arriendo') ? 'En Arriendo' : 'Propiedad ISP',
+                equipos: []
+            };
+        } else {
+            if (!grouped[key].depto && item.depto) grouped[key].depto = String(item.depto).trim();
+        }
+        if (item.serie && String(item.serie).trim().length > 0) {
             const rawEq = {
-                tipo: String(item['Tipo (AIO Notebook o Pantalla)'] || 'Equipo').trim(),
-                marca: String(item['Marca'] || '').trim(),
-                modelo: String(item['Modelo'] || '').trim(),
-                serie: String(serie).trim(),
-                inventario: String(item['Nº Inventario'] || item['N° Inventario'] || '').trim(),
-                observacion: String(item['Observacion'] || '').trim()
+                tipo: item.tipo || 'Computador',
+                marca: item.marca || 'Lenovo',
+                modelo: item.modelo || (item._originalRow && item._originalRow['Código Arriendo'] ? item._originalRow['Código Arriendo'] : ''),
+                serie: String(item.serie).trim(),
+                inventario: String(item.inventario || (item._originalRow && item._originalRow['Código Arriendo'] ? item._originalRow['Código Arriendo'] : '')).trim(),
+                observacion: String(item.observaciones || '').trim()
             };
             const splitEqs = splitEquipmentIfCombined(rawEq);
             splitEqs.forEach(eq => {
-                grouped[key].equipos.push(eq);
-            });
-        });
-        
-        // Crear las solicitudes agrupadas en LocalStorage
-        Object.keys(grouped).forEach(key => {
-            const group = grouped[key];
-            // ID determinista basado en el nombre para evitar duplicar si se carga múltiples veces
-            const subId = 'sub_excel_' + key.replace(/[^a-z0-9]/g, '_');
-            
-            if (submissions.some(s => s.id === subId)) return;
-            
-            const sub = {
-                id: subId,
-                fecha: new Date().toISOString().split('T')[0],
-                ticket: 'S/N',
-                funcionario: {
-                    nombre: group.nombre,
-                    rut: group.rut,
-                    cargo: group.cargo,
-                    depto: group.depto
-                },
-                tipo_solicitud: 'Asignacion',
-                propiedad_equipamiento: group.propiedad,
-                equipamiento_categorias: [],
-                otros_detalles: '',
-                traspaso: null,
-                equipamiento: group.equipos,
-                accesorios: '',
-                observaciones_generales: '',
-                firmas: {
-                    tic_mode: 'manual',
-                    emisor_mode: 'manual',
-                    receptor_mode: 'manual',
-                    tic: null,
-                    emisor: null,
-                    receptor: null
-                }
-            };
-            
-            // Deducir categorías en base a todos los equipos cargados
-            group.equipos.forEach(eq => {
-                const tipoLower = eq.tipo.toLowerCase();
-                
-                // Usar condicionales independientes (no else-if) para marcar múltiples categorías
-                if (tipoLower === 'pc' || tipoLower.includes('desktop') || tipoLower.includes('computador') || tipoLower.includes('torre')) {
-                    if (!sub.equipamiento_categorias.includes('PC')) {
-                        sub.equipamiento_categorias.push('PC');
-                    }
-                }
-                if (tipoLower.includes('notebook') || tipoLower.includes('laptop')) {
-                    if (!sub.equipamiento_categorias.includes('Notebook')) {
-                        sub.equipamiento_categorias.push('Notebook');
-                    }
-                }
-                if (tipoLower.includes('aio') || tipoLower.includes('all in one') || tipoLower.includes('all-in-one')) {
-                    if (!sub.equipamiento_categorias.includes('All In One')) {
-                        sub.equipamiento_categorias.push('All In One');
-                    }
-                }
-                if (tipoLower.includes('pantalla') || tipoLower.includes('monitor') || tipoLower.includes('display')) {
-                    if (!sub.equipamiento_categorias.includes('Monitor')) {
-                        sub.equipamiento_categorias.push('Monitor');
-                    }
-                }
-                
-                // Telefonía / Conectividad
-                if (tipoLower.includes('celular') || tipoLower.includes('movil') || tipoLower.includes('smartphone')) {
-                    if (!sub.equipamiento_categorias.includes('Celular')) {
-                        sub.equipamiento_categorias.push('Celular');
-                    }
-                }
-                if (tipoLower.includes('telefono ip') || tipoLower.includes('telefono') || tipoLower.includes('phone')) {
-                    if (!sub.equipamiento_categorias.includes('Telefono IP')) {
-                        sub.equipamiento_categorias.push('Telefono IP');
-                    }
-                }
-                if (tipoLower.includes('simcard') || tipoLower.includes('sim card') || tipoLower.includes('chip') || tipoLower.includes('sim')) {
-                    if (!sub.equipamiento_categorias.includes('SIMCARD')) {
-                        sub.equipamiento_categorias.push('SIMCARD');
-                    }
-                }
-                if (tipoLower.includes('bam') || tipoLower.includes('banda ancha') || tipoLower.includes('modem')) {
-                    if (!sub.equipamiento_categorias.includes('BAM')) {
-                        sub.equipamiento_categorias.push('BAM');
-                    }
+                if (!grouped[key].equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
+                    grouped[key].equipos.push(eq);
                 }
             });
-            
-            submissions.push(sub);
-            importedCount++;
-        });
-        
-        if (importedCount > 0) {
-            saveSubmissionsToStorage();
-            renderTable();
         }
+    });
+
+    // C. Procesar e incorporar todas las Impresoras
+    printers.forEach(item => {
+        const nombre = item.funcionario;
+        if (!nombre || String(nombre).trim().length === 0) return;
+        const key = String(nombre).trim().toLowerCase();
+        if (!grouped[key]) {
+            grouped[key] = {
+                nombre: String(nombre).trim(),
+                rut: '',
+                cargo: '',
+                depto: String(item.depto || '').trim(),
+                propiedad: (item.propiedad || '').toLowerCase().includes('arriendo') ? 'En Arriendo' : 'Propiedad ISP',
+                equipos: []
+            };
+        }
+        if (item.serie && String(item.serie).trim().length > 0) {
+            const rawEq = {
+                tipo: item.tipo || 'Impresora',
+                marca: item.marca || 'Brother',
+                modelo: item.modelo || '',
+                serie: String(item.serie).trim(),
+                inventario: String(item.inventario || '').trim(),
+                observacion: String(item.observaciones || '').trim()
+            };
+            const splitEqs = splitEquipmentIfCombined(rawEq);
+            splitEqs.forEach(eq => {
+                if (!grouped[key].equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
+                    grouped[key].equipos.push(eq);
+                }
+            });
+        }
+    });
+
+    let importedCount = 0;
+    Object.keys(grouped).forEach(key => {
+        const group = grouped[key];
+        const subId = 'sub_excel_' + key.replace(/[^a-z0-9]/g, '_');
+        
+        // Si ya existe la solicitud, actualizar equipamiento si faltaba
+        const existingIdx = submissions.findIndex(s => s.id === subId);
+        if (existingIdx !== -1) {
+            if (!submissions[existingIdx].equipamiento || submissions[existingIdx].equipamiento.length === 0) {
+                submissions[existingIdx].equipamiento = group.equipos;
+            }
+            if (!submissions[existingIdx].funcionario.depto && group.depto) {
+                submissions[existingIdx].funcionario.depto = group.depto;
+            }
+            return;
+        }
+        
+        const sub = {
+            id: subId,
+            fecha: new Date().toISOString().split('T')[0],
+            ticket: 'S/N',
+            funcionario: {
+                nombre: group.nombre,
+                rut: group.rut,
+                cargo: group.cargo,
+                depto: group.depto
+            },
+            tipo_solicitud: 'Asignacion',
+            propiedad_equipamiento: group.propiedad,
+            equipamiento_categorias: [],
+            otros_detalles: '',
+            traspaso: null,
+            equipamiento: group.equipos,
+            accesorios: '',
+            observaciones_generales: '',
+            firmas: {
+                tic_mode: 'manual',
+                emisor_mode: 'manual',
+                receptor_mode: 'manual',
+                tic: null,
+                emisor: null,
+                receptor: null
+            }
+        };
+        
+        // Deducir categorías en base a todos los equipos cargados
+        group.equipos.forEach(eq => {
+            const tipoLower = (eq.tipo || '').toLowerCase();
+            
+            if (tipoLower === 'pc' || tipoLower.includes('desktop') || tipoLower.includes('computador') || tipoLower.includes('torre')) {
+                if (!sub.equipamiento_categorias.includes('PC')) sub.equipamiento_categorias.push('PC');
+            }
+            if (tipoLower.includes('notebook') || tipoLower.includes('laptop')) {
+                if (!sub.equipamiento_categorias.includes('Notebook')) sub.equipamiento_categorias.push('Notebook');
+            }
+            if (tipoLower.includes('aio') || tipoLower.includes('all in one') || tipoLower.includes('all-in-one')) {
+                if (!sub.equipamiento_categorias.includes('All In One')) sub.equipamiento_categorias.push('All In One');
+            }
+            if (tipoLower.includes('pantalla') || tipoLower.includes('monitor') || tipoLower.includes('display')) {
+                if (!sub.equipamiento_categorias.includes('Monitor')) sub.equipamiento_categorias.push('Monitor');
+            }
+            if (tipoLower.includes('celular') || tipoLower.includes('movil') || tipoLower.includes('smartphone')) {
+                if (!sub.equipamiento_categorias.includes('Celular')) sub.equipamiento_categorias.push('Celular');
+            }
+            if (tipoLower.includes('telefono')) {
+                if (!sub.equipamiento_categorias.includes('Telefono IP')) sub.equipamiento_categorias.push('Telefono IP');
+            }
+            if (tipoLower.includes('simcard') || tipoLower.includes('chip')) {
+                if (!sub.equipamiento_categorias.includes('SIMCARD')) sub.equipamiento_categorias.push('SIMCARD');
+            }
+            if (tipoLower.includes('bam') || tipoLower.includes('modem')) {
+                if (!sub.equipamiento_categorias.includes('BAM')) sub.equipamiento_categorias.push('BAM');
+            }
+            if (tipoLower.includes('impresora') || tipoLower.includes('scanner') || tipoLower.includes('mfp')) {
+                if (!sub.equipamiento_categorias.includes('Impresora')) sub.equipamiento_categorias.push('Impresora');
+            }
+        });
+        
+        submissions.push(sub);
+        importedCount++;
+    });
+    
+    if (importedCount > 0) {
+        saveSubmissionsToStorage();
+        renderTable();
     }
     
     // 4. Actualizar estado de interfaz

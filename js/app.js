@@ -1,6 +1,6 @@
 // ================= CONTROL DE VERSIONES Y ACTUALIZACIÓN AUTOMÁTICA =================
-const APP_VERSION = '5.2.0';
-const APP_BUILD_TIMESTAMP = '20260818_1008';
+const APP_VERSION = '5.3.0';
+const APP_BUILD_TIMESTAMP = '20260826_0945';
 
 // ================= CONTROL DE ROLES Y ACCESOS (ADMIN / TÉCNICO / FUNCIONARIO) =================
 let currentUserRole = localStorage.getItem('tic_user_role') || 'funcionario';
@@ -498,8 +498,10 @@ function applyRolePermissions() {
     const drawerRoleLabel = document.getElementById('drawer-role-label');
 
     const navDashboard = document.getElementById('nav-dashboard');
+    const navInventory = document.getElementById('nav-inventory');
     const navMetrics = document.getElementById('nav-metrics');
     const drawerDashboard = document.getElementById('drawer-nav-dashboard');
+    const drawerInventory = document.getElementById('drawer-nav-inventory');
     const drawerMetrics = document.getElementById('drawer-nav-metrics');
     const cancelBtn = document.getElementById('form-cancel-btn');
     const mobileTabBar = document.getElementById('mobile-tab-bar');
@@ -512,8 +514,10 @@ function applyRolePermissions() {
             roleBadge.className = "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/40";
         }
         if (navDashboard) navDashboard.classList.remove('hidden');
+        if (navInventory) navInventory.classList.remove('hidden');
         if (navMetrics) navMetrics.classList.remove('hidden');
         if (drawerDashboard) drawerDashboard.classList.remove('hidden');
+        if (drawerInventory) drawerInventory.classList.remove('hidden');
         if (drawerMetrics) drawerMetrics.classList.remove('hidden');
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         if (mobileTabBar) mobileTabBar.classList.remove('hidden');
@@ -525,8 +529,10 @@ function applyRolePermissions() {
             roleBadge.className = "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/30";
         }
         if (navDashboard) navDashboard.classList.remove('hidden');
+        if (navInventory) navInventory.classList.remove('hidden');
         if (navMetrics) navMetrics.classList.remove('hidden');
         if (drawerDashboard) drawerDashboard.classList.remove('hidden');
+        if (drawerInventory) drawerInventory.classList.remove('hidden');
         if (drawerMetrics) drawerMetrics.classList.remove('hidden');
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         if (mobileTabBar) mobileTabBar.classList.remove('hidden');
@@ -539,8 +545,10 @@ function applyRolePermissions() {
             roleBadge.className = "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700";
         }
         if (navDashboard) navDashboard.classList.add('hidden');
+        if (navInventory) navInventory.classList.add('hidden');
         if (navMetrics) navMetrics.classList.add('hidden');
         if (drawerDashboard) drawerDashboard.classList.add('hidden');
+        if (drawerInventory) drawerInventory.classList.add('hidden');
         if (drawerMetrics) drawerMetrics.classList.add('hidden');
         if (cancelBtn) cancelBtn.classList.add('hidden');
         if (mobileTabBar) mobileTabBar.classList.add('hidden');
@@ -554,63 +562,90 @@ function applyRolePermissions() {
 
 // Alternar visualización de pestañas
 function switchTab(tabId) {
-    // Si está en modo funcionario y quiere acceder al panel de registros o métricas, solicitar login
-    if (currentUserRole === 'funcionario' && (tabId === 'dashboard' || tabId === 'metrics')) {
+    // Si está en modo funcionario y quiere acceder al panel de registros, inventario o métricas, solicitar login
+    if (currentUserRole === 'funcionario' && (tabId === 'dashboard' || tabId === 'inventory' || tabId === 'metrics')) {
         openAuthModal();
         showToast("Se requiere clave de Técnico o Administrador para acceder al panel institucional.", "warning");
         return;
     }
 
     activeTab = tabId;
-    document.getElementById('tab-dashboard').classList.add('hidden');
-    document.getElementById('tab-form-view').classList.add('hidden');
-    document.getElementById('tab-metrics').classList.add('hidden');
+    const tabDash = document.getElementById('tab-dashboard');
+    const tabInv = document.getElementById('tab-inventory');
+    const tabForm = document.getElementById('tab-form-view');
+    const tabMet = document.getElementById('tab-metrics');
+
+    if (tabDash) tabDash.classList.add('hidden');
+    if (tabInv) tabInv.classList.add('hidden');
+    if (tabForm) tabForm.classList.add('hidden');
+    if (tabMet) tabMet.classList.add('hidden');
     
     // Estilos de botones de navegación de escritorio
     const btnDash = document.getElementById('nav-dashboard');
+    const btnInv = document.getElementById('nav-inventory');
     const btnForm = document.getElementById('nav-form');
     const btnMetrics = document.getElementById('nav-metrics');
     
-    if (btnDash) btnDash.className = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnForm) btnForm.className = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800";
-    if (btnMetrics) btnMetrics.className = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800";
+    const inactiveClass = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800";
+    const activeClass = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
+
+    if (btnDash) btnDash.className = inactiveClass;
+    if (btnInv) btnInv.className = inactiveClass;
+    if (btnForm) btnForm.className = inactiveClass;
+    if (btnMetrics) btnMetrics.className = inactiveClass;
 
     // Estilos de botones de navegación móvil (Drawer)
     const dBtnDash = document.getElementById('drawer-nav-dashboard');
+    const dBtnInv = document.getElementById('drawer-nav-inventory');
     const dBtnForm = document.getElementById('drawer-nav-form');
     const dBtnMetrics = document.getElementById('drawer-nav-metrics');
 
-    if (dBtnDash) dBtnDash.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800";
-    if (dBtnForm) dBtnForm.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800";
-    if (dBtnMetrics) dBtnMetrics.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800";
+    const dInactiveClass = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800";
+    const dActiveClass = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors bg-indigo-600 text-white";
+
+    if (dBtnDash) dBtnDash.className = dInactiveClass;
+    if (dBtnInv) dBtnInv.className = dInactiveClass;
+    if (dBtnForm) dBtnForm.className = dInactiveClass;
+    if (dBtnMetrics) dBtnMetrics.className = dInactiveClass;
 
     // Estilos de barra de navegación inferior móvil (Bottom Bar)
     const mTabDash = document.getElementById('mobile-tab-dashboard');
+    const mTabInv = document.getElementById('mobile-tab-inventory');
     const mTabMetrics = document.getElementById('mobile-tab-metrics');
     const mTabForm = document.getElementById('mobile-tab-form');
 
-    if (mTabDash) mTabDash.className = "flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all";
-    if (mTabMetrics) mTabMetrics.className = "flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all";
-    if (mTabForm) mTabForm.className = "flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all";
+    const mInactiveClass = "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-semibold text-slate-400 hover:text-white transition-all";
+    const mActiveClass = "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-bold text-indigo-400 bg-indigo-950/80 shadow-inner";
+
+    if (mTabDash) mTabDash.className = mInactiveClass;
+    if (mTabInv) mTabInv.className = mInactiveClass;
+    if (mTabMetrics) mTabMetrics.className = mInactiveClass;
+    if (mTabForm) mTabForm.className = mInactiveClass;
 
     if (tabId === 'dashboard') {
-        document.getElementById('tab-dashboard').classList.remove('hidden');
-        if (btnDash) btnDash.className = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        if (dBtnDash) dBtnDash.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors bg-indigo-600 text-white";
-        if (mTabDash) mTabDash.className = "flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl text-xs font-bold text-indigo-400 bg-indigo-950/80 shadow-inner";
+        if (tabDash) tabDash.classList.remove('hidden');
+        if (btnDash) btnDash.className = activeClass;
+        if (dBtnDash) dBtnDash.className = dActiveClass;
+        if (mTabDash) mTabDash.className = mActiveClass;
         renderTable();
+    } else if (tabId === 'inventory') {
+        if (tabInv) tabInv.classList.remove('hidden');
+        if (btnInv) btnInv.className = activeClass;
+        if (dBtnInv) dBtnInv.className = dActiveClass;
+        if (mTabInv) mTabInv.className = mActiveClass;
+        renderInventoryTable();
     } else if (tabId === 'form-view') {
-        document.getElementById('tab-form-view').classList.remove('hidden');
-        if (btnForm) btnForm.className = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        if (dBtnForm) dBtnForm.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors bg-indigo-600 text-white";
-        if (mTabForm) mTabForm.className = "flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl text-xs font-bold text-indigo-400 bg-indigo-950/80 shadow-inner";
+        if (tabForm) tabForm.classList.remove('hidden');
+        if (btnForm) btnForm.className = activeClass;
+        if (dBtnForm) dBtnForm.className = dActiveClass;
+        if (mTabForm) mTabForm.className = mActiveClass;
         // Redimensionar canvases de firma al visualizar
         setTimeout(resizeAllCanvases, 50);
     } else if (tabId === 'metrics') {
-        document.getElementById('tab-metrics').classList.remove('hidden');
-        if (btnMetrics) btnMetrics.className = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
-        if (dBtnMetrics) dBtnMetrics.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors bg-indigo-600 text-white";
-        if (mTabMetrics) mTabMetrics.className = "flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl text-xs font-bold text-indigo-400 bg-indigo-950/80 shadow-inner";
+        if (tabMet) tabMet.classList.remove('hidden');
+        if (btnMetrics) btnMetrics.className = activeClass;
+        if (dBtnMetrics) dBtnMetrics.className = dActiveClass;
+        if (mTabMetrics) mTabMetrics.className = mActiveClass;
         renderMetrics();
     }
     lucide.createIcons();
@@ -2460,6 +2495,11 @@ function processWorkbookData() {
     
     const exportBtn = document.getElementById('excel-export-btn');
     if (exportBtn) exportBtn.classList.remove('hidden');
+
+    // Poblar departamentos dinámicos y refrescar inventario y métricas
+    populateInventoryDeptFilter();
+    renderInventoryTable();
+    renderMetrics();
 }
 
 // Variable de seguimiento para navegación por teclado
@@ -3021,3 +3061,595 @@ function renderMetrics() {
         }
     }
 }
+
+// ================= MÓDULO DE INVENTARIO DE CATASTRO (+900 EQUIPOS) =================
+let inventoryFilterSearch = '';
+let inventoryFilterType = 'All';
+let inventoryFilterDept = 'All';
+let inventoryFilterStatus = 'All';
+let inventoryFilterSheet = 'All';
+let inventoryCurrentPage = 1;
+let inventoryPerPage = 25;
+
+// Poblar selector dinámico de departamentos en los filtros
+function populateInventoryDeptFilter() {
+    const deptSelect = document.getElementById('inventory-dept-filter');
+    if (!deptSelect) return;
+    
+    const currentVal = deptSelect.value;
+    const deptsSet = new Set();
+    
+    loadedAllEquipments.forEach(item => {
+        if (item.depto && item.depto.trim().length > 0 && item.depto.trim().toUpperCase() !== 'UNDEFINED') {
+            deptsSet.add(item.depto.trim());
+        }
+    });
+    
+    const sortedDepts = Array.from(deptsSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    
+    let html = '<option value="All">Todos los Departamentos</option>';
+    sortedDepts.forEach(d => {
+        html += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
+    });
+    deptSelect.innerHTML = html;
+    
+    if (sortedDepts.includes(currentVal)) {
+        deptSelect.value = currentVal;
+    }
+}
+
+// Manejar búsqueda en tiempo real
+function handleInventorySearch() {
+    const input = document.getElementById('inventory-search-input');
+    const clearBtn = document.getElementById('inventory-search-clear');
+    if (!input) return;
+    
+    inventoryFilterSearch = (input.value || '').trim().toLowerCase();
+    if (clearBtn) {
+        if (inventoryFilterSearch.length > 0) {
+            clearBtn.classList.remove('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+        }
+    }
+    inventoryCurrentPage = 1;
+    renderInventoryTable();
+}
+
+function clearInventorySearch() {
+    const input = document.getElementById('inventory-search-input');
+    if (input) input.value = '';
+    handleInventorySearch();
+}
+
+// Manejar cambios en selectores de tipo, departamento y estado
+function handleInventoryFilterChange() {
+    const typeSelect = document.getElementById('inventory-type-filter');
+    const deptSelect = document.getElementById('inventory-dept-filter');
+    const statusSelect = document.getElementById('inventory-status-filter');
+    
+    if (typeSelect) inventoryFilterType = typeSelect.value;
+    if (deptSelect) inventoryFilterDept = deptSelect.value;
+    if (statusSelect) inventoryFilterStatus = statusSelect.value;
+    
+    inventoryCurrentPage = 1;
+    renderInventoryTable();
+}
+
+// Filtrar por origen (Computadores vs Impresoras)
+function setInventorySheetFilter(sheetName) {
+    inventoryFilterSheet = sheetName;
+    
+    const btnAll = document.getElementById('btn-sheet-all');
+    const btnComps = document.getElementById('btn-sheet-comps');
+    const btnPrinters = document.getElementById('btn-sheet-printers');
+    
+    const activeBtnClass = "px-3 py-1 rounded-xl font-bold bg-indigo-600 text-white shadow-sm transition-all";
+    const inactiveBtnClass = "px-3 py-1 rounded-xl font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all";
+    
+    if (btnAll) btnAll.className = sheetName === 'All' ? activeBtnClass : inactiveBtnClass;
+    if (btnComps) btnComps.className = sheetName === 'Computadores' ? activeBtnClass : inactiveBtnClass;
+    if (btnPrinters) btnPrinters.className = sheetName === 'Impresoras-Scanner' ? activeBtnClass : inactiveBtnClass;
+    
+    inventoryCurrentPage = 1;
+    renderInventoryTable();
+}
+
+// Restablecer todos los filtros
+function resetInventoryFilters() {
+    inventoryFilterSearch = '';
+    inventoryFilterType = 'All';
+    inventoryFilterDept = 'All';
+    inventoryFilterStatus = 'All';
+    inventoryFilterSheet = 'All';
+    inventoryCurrentPage = 1;
+    
+    const searchInput = document.getElementById('inventory-search-input');
+    const typeSelect = document.getElementById('inventory-type-filter');
+    const deptSelect = document.getElementById('inventory-dept-filter');
+    const statusSelect = document.getElementById('inventory-status-filter');
+    const clearBtn = document.getElementById('inventory-search-clear');
+    
+    if (searchInput) searchInput.value = '';
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (typeSelect) typeSelect.value = 'All';
+    if (deptSelect) deptSelect.value = 'All';
+    if (statusSelect) statusSelect.value = 'All';
+    
+    setInventorySheetFilter('All');
+}
+
+// Cambiar tamaño de página
+function changeInventoryPerPage(val) {
+    inventoryPerPage = val === 'all' ? 'all' : (parseInt(val, 10) || 25);
+    inventoryCurrentPage = 1;
+    renderInventoryTable();
+}
+
+// Navegar entre páginas
+function goToInventoryPage(target) {
+    if (target === 'prev') {
+        if (inventoryCurrentPage > 1) inventoryCurrentPage--;
+    } else if (target === 'next') {
+        inventoryCurrentPage++;
+    } else if (typeof target === 'number') {
+        inventoryCurrentPage = target;
+    }
+    renderInventoryTable();
+}
+
+// Asignar equipo directamente al formulario oficial
+function assignEquipmentToForm(equipmentIndex) {
+    const item = loadedAllEquipments[equipmentIndex];
+    if (!item) return;
+    
+    openNewForm();
+    selectExcelSuggestion(equipmentIndex);
+    switchTab('form-view');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`Datos de ${item.funcionario || 'equipo'} (${item.serie || 'S/N'}) cargados en el formulario oficial.`, "success");
+}
+
+// Copiar número de serie al portapapeles
+function copySerialToClipboard(serial) {
+    if (!serial) return;
+    navigator.clipboard.writeText(serial).then(() => {
+        showToast(`N° Serie "${serial}" copiado al portapapeles.`, "success");
+    }).catch(() => {
+        showToast(`Serie: ${serial}`, "info");
+    });
+}
+
+// Helper para escapar HTML en cadenas de texto
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Exportar la vista actual filtrada de inventario a Excel
+function exportFilteredInventory() {
+    if (!loadedAllEquipments || loadedAllEquipments.length === 0) {
+        showToast("No hay datos cargados en el inventario para exportar.", "warning");
+        return;
+    }
+    
+    // Obtener los datos filtrados actuales
+    const localCatastradosSet = new Set();
+    submissions.forEach(sub => {
+        if (sub.equipamiento) {
+            sub.equipamiento.forEach(eq => {
+                if (eq.serie) localCatastradosSet.add(String(eq.serie).trim().toLowerCase());
+            });
+        }
+    });
+    
+    const isEqCatastrado = (e) => {
+        const estadoLower = String(e.estado || '').toLowerCase();
+        const isCatExcel = estadoLower.includes('catastrado');
+        const isCatLocal = e.serie && localCatastradosSet.has(String(e.serie).trim().toLowerCase());
+        return isCatExcel || isCatLocal;
+    };
+    
+    const filtered = loadedAllEquipments.filter(e => {
+        if (inventoryFilterSheet !== 'All' && e.sheet !== inventoryFilterSheet) return false;
+        
+        if (inventoryFilterType !== 'All') {
+            const tLower = (e.tipo || '').toLowerCase();
+            const filterLower = inventoryFilterType.toLowerCase();
+            if (filterLower === 'notebook' && !tLower.includes('notebook') && !tLower.includes('laptop') && !tLower.includes('ntb')) return false;
+            else if (filterLower === 'aio' && !tLower.includes('aio') && !tLower.includes('all in one') && !tLower.includes('all-in-one')) return false;
+            else if (filterLower === 'pc' && !tLower.includes('pc') && !tLower.includes('desktop') && !tLower.includes('torre')) return false;
+            else if (filterLower === 'impresora' && !tLower.includes('impresora') && !tLower.includes('mfp')) return false;
+            else if (filterLower === 'scanner' && !tLower.includes('scanner')) return false;
+            else if (filterLower === 'monitor' && !tLower.includes('monitor') && !tLower.includes('pantalla')) return false;
+        }
+        
+        if (inventoryFilterDept !== 'All') {
+            if ((e.depto || '').toLowerCase() !== inventoryFilterDept.toLowerCase()) return false;
+        }
+        
+        if (inventoryFilterStatus !== 'All') {
+            const isCat = isEqCatastrado(e);
+            if (inventoryFilterStatus === 'Catastrado' && !isCat) return false;
+            if (inventoryFilterStatus === 'Pendiente' && isCat) return false;
+            if (inventoryFilterStatus === 'Operativo' && !(e.estado || '').toLowerCase().includes('operativo')) return false;
+        }
+        
+        if (inventoryFilterSearch) {
+            const search = inventoryFilterSearch;
+            const matchFunc = (e.funcionario || '').toLowerCase().includes(search);
+            const matchSerie = (e.serie || '').toLowerCase().includes(search);
+            const matchInv = (e.inventario || '').toLowerCase().includes(search);
+            const matchMail = (e.mail || '').toLowerCase().includes(search);
+            const matchDepto = (e.depto || '').toLowerCase().includes(search);
+            const matchMarca = (e.marca || '').toLowerCase().includes(search);
+            const matchModelo = (e.modelo || '').toLowerCase().includes(search);
+            const matchTipo = (e.tipo || '').toLowerCase().includes(search);
+            const matchContrato = e._originalRow && (e._originalRow['Contrato Arriendo'] || '').toLowerCase().includes(search);
+            const matchCod = e._originalRow && (e._originalRow['Código Arriendo'] || '').toLowerCase().includes(search);
+            const matchIP = e._originalRow && (e._originalRow['Dirección IP'] || '').toLowerCase().includes(search);
+            const matchSubDepto = e._originalRow && (e._originalRow['Subdepartamento'] || '').toLowerCase().includes(search);
+            if (!matchFunc && !matchSerie && !matchInv && !matchMail && !matchDepto && !matchMarca && !matchModelo && !matchTipo && !matchContrato && !matchCod && !matchIP && !matchSubDepto) {
+                return false;
+            }
+        }
+        return true;
+    });
+    
+    if (filtered.length === 0) {
+        showToast("No hay registros que coincidan con los filtros para exportar.", "warning");
+        return;
+    }
+    
+    const rows = filtered.map((e, idx) => {
+        const isCat = isEqCatastrado(e);
+        return {
+            'N°': idx + 1,
+            'Hoja / Origen': e.sheet,
+            'Funcionario(a)': e.funcionario || 'Sin asignar',
+            'Correo': e.mail || '',
+            'Unidad / Departamento': e.depto || '',
+            'Tipo Equipo': e.tipo || '',
+            'Marca': e.marca || '',
+            'Modelo': e.modelo || '',
+            'N° Serie': e.serie || '',
+            'N° Inventario / Código': e.inventario || (e._originalRow && e._originalRow['Código Arriendo']) || '',
+            'Propiedad': e.propiedad || '',
+            'Contrato': (e._originalRow && e._originalRow['Contrato Arriendo']) || '',
+            'Estado Catastro': isCat ? 'CATASTRADO' : (e.estado || 'SIN REGISTRO'),
+            'Observaciones': e.observaciones || ''
+        };
+    });
+    
+    try {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Inventario_Catastro');
+        XLSX.writeFile(wb, `Catastro_ISP_2025_Filtrado_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showToast(`Exportados ${filtered.length} equipos a archivo Excel.`, "success");
+    } catch (err) {
+        console.error("Error al exportar inventario:", err);
+        showToast("Error al generar archivo Excel.", "error");
+    }
+}
+
+// Renderizar la tabla y tarjetas completas del Módulo de Inventario de Catastro
+function renderInventoryTable() {
+    const tbody = document.getElementById('inventory-table-body');
+    const mobileContainer = document.getElementById('inventory-mobile-cards');
+    const emptyState = document.getElementById('inventory-empty-state');
+    const paginationBar = document.getElementById('inventory-pagination-bar');
+    
+    if (!tbody && !mobileContainer) return;
+    
+    // 1. Obtener conjunto de series catastradas localmente
+    const localCatastradosSet = new Set();
+    submissions.forEach(sub => {
+        if (sub.equipamiento) {
+            sub.equipamiento.forEach(eq => {
+                if (eq.serie) localCatastradosSet.add(String(eq.serie).trim().toLowerCase());
+            });
+        }
+    });
+    
+    const isEqCatastrado = (e) => {
+        const estadoLower = String(e.estado || '').toLowerCase();
+        const isCatExcel = estadoLower.includes('catastrado');
+        const isCatLocal = e.serie && localCatastradosSet.has(String(e.serie).trim().toLowerCase());
+        return isCatExcel || isCatLocal;
+    };
+    
+    // 2. Actualizar contadores superiores de KPI
+    const totalComps = loadedAllEquipments.filter(e => e.sheet === 'Computadores').length;
+    const totalPrinters = loadedAllEquipments.filter(e => e.sheet === 'Impresoras-Scanner').length;
+    const totalCatastrados = loadedAllEquipments.filter(e => isEqCatastrado(e)).length;
+    
+    const elCountTotal = document.getElementById('inv-count-total');
+    const elCountComps = document.getElementById('inv-count-comps');
+    const elCountPrinters = document.getElementById('inv-count-printers');
+    const elCountCat = document.getElementById('inv-count-catastrados');
+    
+    if (elCountTotal) elCountTotal.innerText = loadedAllEquipments.length;
+    if (elCountComps) elCountComps.innerText = totalComps;
+    if (elCountPrinters) elCountPrinters.innerText = totalPrinters;
+    if (elCountCat) elCountCat.innerText = totalCatastrados;
+    
+    const chipAll = document.getElementById('count-chip-all');
+    const chipComps = document.getElementById('count-chip-comps');
+    const chipPrinters = document.getElementById('count-chip-printers');
+    if (chipAll) chipAll.innerText = loadedAllEquipments.length;
+    if (chipComps) chipComps.innerText = totalComps;
+    if (chipPrinters) chipPrinters.innerText = totalPrinters;
+    
+    // 3. Aplicar filtros a loadedAllEquipments
+    const filteredWithIndex = [];
+    for (let i = 0; i < loadedAllEquipments.length; i++) {
+        const e = loadedAllEquipments[i];
+        
+        // Filtro por hoja de origen
+        if (inventoryFilterSheet !== 'All' && e.sheet !== inventoryFilterSheet) {
+            continue;
+        }
+        
+        // Filtro por tipo de equipo
+        if (inventoryFilterType !== 'All') {
+            const tLower = (e.tipo || '').toLowerCase();
+            const filterLower = inventoryFilterType.toLowerCase();
+            if (filterLower === 'notebook' && !tLower.includes('notebook') && !tLower.includes('laptop') && !tLower.includes('ntb')) continue;
+            else if (filterLower === 'aio' && !tLower.includes('aio') && !tLower.includes('all in one') && !tLower.includes('all-in-one')) continue;
+            else if (filterLower === 'pc' && !tLower.includes('pc') && !tLower.includes('desktop') && !tLower.includes('torre')) continue;
+            else if (filterLower === 'impresora' && !tLower.includes('impresora') && !tLower.includes('mfp')) continue;
+            else if (filterLower === 'scanner' && !tLower.includes('scanner')) continue;
+            else if (filterLower === 'monitor' && !tLower.includes('monitor') && !tLower.includes('pantalla')) continue;
+        }
+        
+        // Filtro por departamento
+        if (inventoryFilterDept !== 'All') {
+            if ((e.depto || '').toLowerCase() !== inventoryFilterDept.toLowerCase()) {
+                continue;
+            }
+        }
+        
+        // Filtro por estado
+        if (inventoryFilterStatus !== 'All') {
+            const isCat = isEqCatastrado(e);
+            if (inventoryFilterStatus === 'Catastrado' && !isCat) continue;
+            if (inventoryFilterStatus === 'Pendiente' && isCat) continue;
+            if (inventoryFilterStatus === 'Operativo' && !(e.estado || '').toLowerCase().includes('operativo')) continue;
+        }
+        
+        // Filtro por búsqueda de texto
+        if (inventoryFilterSearch) {
+            const search = inventoryFilterSearch;
+            const matchFunc = (e.funcionario || '').toLowerCase().includes(search);
+            const matchSerie = (e.serie || '').toLowerCase().includes(search);
+            const matchInv = (e.inventario || '').toLowerCase().includes(search);
+            const matchMail = (e.mail || '').toLowerCase().includes(search);
+            const matchDepto = (e.depto || '').toLowerCase().includes(search);
+            const matchMarca = (e.marca || '').toLowerCase().includes(search);
+            const matchModelo = (e.modelo || '').toLowerCase().includes(search);
+            const matchTipo = (e.tipo || '').toLowerCase().includes(search);
+            const matchContrato = e._originalRow && (e._originalRow['Contrato Arriendo'] || '').toLowerCase().includes(search);
+            const matchCod = e._originalRow && (e._originalRow['Código Arriendo'] || '').toLowerCase().includes(search);
+            const matchIP = e._originalRow && (e._originalRow['Dirección IP'] || '').toLowerCase().includes(search);
+            const matchSubDepto = e._originalRow && (e._originalRow['Subdepartamento'] || '').toLowerCase().includes(search);
+            if (!matchFunc && !matchSerie && !matchInv && !matchMail && !matchDepto && !matchMarca && !matchModelo && !matchTipo && !matchContrato && !matchCod && !matchIP && !matchSubDepto) {
+                continue;
+            }
+        }
+        
+        filteredWithIndex.push({ originalIndex: i, item: e });
+    }
+    
+    // 4. Manejo de estado vacío
+    if (filteredWithIndex.length === 0) {
+        if (tbody) tbody.innerHTML = '';
+        if (mobileContainer) mobileContainer.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (paginationBar) paginationBar.classList.add('hidden');
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    if (paginationBar) paginationBar.classList.remove('hidden');
+    
+    // 5. Calcular paginación
+    const totalItems = filteredWithIndex.length;
+    const pageSize = inventoryPerPage === 'all' ? totalItems : inventoryPerPage;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    
+    if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
+    if (inventoryCurrentPage < 1) inventoryCurrentPage = 1;
+    
+    const startIndex = (inventoryCurrentPage - 1) * pageSize;
+    const endIndex = Math.min(totalItems, startIndex + pageSize);
+    const currentPageItems = filteredWithIndex.slice(startIndex, endIndex);
+    
+    // 6. Renderizar tabla de escritorio
+    if (tbody) {
+        tbody.innerHTML = '';
+        currentPageItems.forEach((entry, rowIdx) => {
+            const item = entry.item;
+            const origIdx = entry.originalIndex;
+            const globalNumber = startIndex + rowIdx + 1;
+            const isCat = isEqCatastrado(item);
+            
+            // Badge Tipo
+            const tLower = (item.tipo || '').toLowerCase();
+            let typeBadgeClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
+            if (tLower.includes('notebook') || tLower.includes('laptop')) {
+                typeBadgeClass = 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200/50';
+            } else if (tLower.includes('aio') || tLower.includes('all in one')) {
+                typeBadgeClass = 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50';
+            } else if (tLower.includes('pc') || tLower.includes('desktop')) {
+                typeBadgeClass = 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 border border-cyan-200/50';
+            } else if (tLower.includes('impresora')) {
+                typeBadgeClass = 'bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400 border border-violet-200/50';
+            } else if (tLower.includes('scanner')) {
+                typeBadgeClass = 'bg-fuchsia-50 dark:bg-fuchsia-950/50 text-fuchsia-700 dark:text-fuchsia-400 border border-fuchsia-200/50';
+            } else if (tLower.includes('pantalla') || tLower.includes('monitor')) {
+                typeBadgeClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/50';
+            }
+            
+            // Badge Estado
+            let statusBadge = '';
+            if (isCat) {
+                statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Catastrado</span>';
+            } else if ((item.estado || '').toLowerCase().includes('operativo')) {
+                statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400 border border-sky-200/50"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Operativo</span>';
+            } else {
+                statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/50"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pendiente</span>';
+            }
+            
+            const codigoInv = item.inventario || (item._originalRow && item._originalRow['Código Arriendo']) || '—';
+            const contratoInfo = (item._originalRow && item._originalRow['Contrato Arriendo']) || item.propiedad || 'Arriendo';
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors border-b border-slate-100 dark:border-slate-800/60";
+            tr.innerHTML = `
+                <td class="py-3 px-4 font-mono text-slate-400 text-center">${globalNumber}</td>
+                <td class="py-3 px-4">
+                    <div class="font-bold text-slate-900 dark:text-slate-100 text-xs">${escapeHtml(item.funcionario || 'Sin Funcionario Asignado')}</div>
+                    <div class="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1.5 mt-0.5">
+                        <span class="truncate max-w-[180px]" title="${escapeHtml(item.depto || '')}">${escapeHtml(item.depto || 'Sin Depto')}</span>
+                        ${item.mail ? `<span class="text-indigo-400">• ${escapeHtml(item.mail)}</span>` : ''}
+                    </div>
+                </td>
+                <td class="py-3 px-4">
+                    <span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold ${typeBadgeClass}">${escapeHtml(item.tipo || 'Equipo')}</span>
+                    <div class="text-slate-500 dark:text-slate-400 font-medium text-[11px] mt-0.5">${escapeHtml(item.marca || '')} ${escapeHtml(item.modelo || '')}</div>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                        <span class="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">${escapeHtml(item.serie || 'S/N')}</span>
+                        ${item.serie ? `<button type="button" onclick="copySerialToClipboard('${escapeHtml(item.serie)}')" class="text-slate-400 hover:text-indigo-600 transition-colors" title="Copiar Serie"><i data-lucide="copy" class="w-3 h-3"></i></button>` : ''}
+                    </div>
+                </td>
+                <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 text-xs">${escapeHtml(codigoInv)}</td>
+                <td class="py-3 px-4">
+                    <span class="text-xs text-slate-700 dark:text-slate-300 font-medium truncate block max-w-[160px]" title="${escapeHtml(contratoInfo)}">${escapeHtml(contratoInfo)}</span>
+                </td>
+                <td class="py-3 px-4 text-center">${statusBadge}</td>
+                <td class="py-3 px-4 text-center">
+                    <button type="button" onclick="assignEquipmentToForm(${origIdx})" class="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] inline-flex items-center gap-1 shadow-sm transition-all hover:scale-105 active:scale-95" title="Asignar y Cargar en el Formulario Oficial">
+                        <i data-lucide="file-signature" class="w-3.5 h-3.5"></i>
+                        <span>Asignar</span>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    
+    // 7. Renderizar tarjetas móviles
+    if (mobileContainer) {
+        mobileContainer.innerHTML = '';
+        currentPageItems.forEach((entry, rowIdx) => {
+            const item = entry.item;
+            const origIdx = entry.originalIndex;
+            const globalNumber = startIndex + rowIdx + 1;
+            const isCat = isEqCatastrado(item);
+            
+            const card = document.createElement('div');
+            card.className = "p-4 space-y-2.5 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors border-b border-slate-100 dark:border-slate-800/60";
+            card.innerHTML = `
+                <div class="flex items-start justify-between gap-2">
+                    <div class="space-y-0.5 min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-[10px] font-mono text-slate-400">#${globalNumber}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300">${escapeHtml(item.tipo || 'Equipo')}</span>
+                            ${isCat 
+                                ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400">Catastrado</span>'
+                                : '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">Pendiente</span>'
+                            }
+                        </div>
+                        <h4 class="font-bold text-slate-900 dark:text-slate-100 text-sm leading-tight truncate mt-1">${escapeHtml(item.funcionario || 'Sin Funcionario')}</h4>
+                        <p class="text-[11px] text-slate-400 dark:text-slate-500 truncate">${escapeHtml(item.depto || 'Sin Departamento')} ${item.mail ? `• ${escapeHtml(item.mail)}` : ''}</p>
+                    </div>
+                    <button type="button" onclick="assignEquipmentToForm(${origIdx})" class="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm">
+                        <i data-lucide="file-signature" class="w-3.5 h-3.5"></i>
+                        <span>Asignar</span>
+                    </button>
+                </div>
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-800/50 flex items-center justify-between text-xs font-mono">
+                    <span class="text-slate-600 dark:text-slate-300 font-bold">S/N: ${escapeHtml(item.serie || 'S/N')}</span>
+                    <span class="text-slate-400 text-[11px]">${escapeHtml(item.marca || '')} ${escapeHtml(item.modelo || '')}</span>
+                </div>
+            `;
+            mobileContainer.appendChild(card);
+        });
+    }
+    
+    // 8. Actualizar barra de paginación
+    const countSummary = document.getElementById('inventory-count-summary');
+    if (countSummary) {
+        countSummary.innerText = `Mostrando ${startIndex + 1} - ${endIndex} de ${totalItems} equipos`;
+    }
+    
+    const prevBtn = document.getElementById('inventory-prev-btn');
+    const nextBtn = document.getElementById('inventory-next-btn');
+    if (prevBtn) prevBtn.disabled = inventoryCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = inventoryCurrentPage >= totalPages;
+    
+    const pageNumbersContainer = document.getElementById('inventory-page-numbers');
+    if (pageNumbersContainer) {
+        pageNumbersContainer.innerHTML = '';
+        
+        // Generar botones de páginas numéricas inteligentes (con elipsis)
+        const maxButtons = 5;
+        let startPage = Math.max(1, inventoryCurrentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        
+        if (endPage - startPage < maxButtons - 1) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+        
+        if (startPage > 1) {
+            const btn1 = document.createElement('button');
+            btn1.className = "w-8 h-8 rounded-xl font-semibold text-xs transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800";
+            btn1.innerText = "1";
+            btn1.onclick = () => goToInventoryPage(1);
+            pageNumbersContainer.appendChild(btn1);
+            
+            if (startPage > 2) {
+                const dots = document.createElement('span');
+                dots.className = "px-1 text-slate-400";
+                dots.innerText = "...";
+                pageNumbersContainer.appendChild(dots);
+            }
+        }
+        
+        for (let p = startPage; p <= endPage; p++) {
+            const btn = document.createElement('button');
+            if (p === inventoryCurrentPage) {
+                btn.className = "w-8 h-8 rounded-xl font-bold text-xs bg-indigo-600 text-white shadow-sm";
+            } else {
+                btn.className = "w-8 h-8 rounded-xl font-semibold text-xs transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800";
+            }
+            btn.innerText = p;
+            btn.onclick = () => goToInventoryPage(p);
+            pageNumbersContainer.appendChild(btn);
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dots = document.createElement('span');
+                dots.className = "px-1 text-slate-400";
+                dots.innerText = "...";
+                pageNumbersContainer.appendChild(dots);
+            }
+            const btnLast = document.createElement('button');
+            btnLast.className = "w-8 h-8 rounded-xl font-semibold text-xs transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800";
+            btnLast.innerText = totalPages;
+            btnLast.onclick = () => goToInventoryPage(totalPages);
+            pageNumbersContainer.appendChild(btnLast);
+        }
+    }
+    
+    lucide.createIcons();
+}
+

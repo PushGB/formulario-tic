@@ -1,4 +1,4 @@
-# Gestión de Equipamiento TIC - ISP Chile (v5.2.0)
+# Gestión de Equipamiento TIC - ISP Chile (v5.3.0)
 
 Sistema web institucional y Progressive Web App (PWA) de página única (SPA) diseñado para digitalizar y gestionar el **Formulario de Asignación, Traspaso y/o Devolución de Equipamiento Tecnológico** de la Oficina de TIC del Instituto de Salud Pública de Chile, bajo el código oficial **RG-02-IT-140.03-004 versión 5**.
 
@@ -51,13 +51,24 @@ El sistema cuenta con un control de accesos por roles:
    - Vista aislada y confidencial: solo muestra el formulario oficial limpio para registrar datos o estampar firma receptora.
    - Oculta completamente el panel de registros, métricas y datos de otros funcionarios.
 2. 💻 **Modo Técnico TIC (Operativo):**
-   - Desbloquea el Panel de Registros, Catastro Excel, Kits Rápidos, Generador de Links y Firmas TIC.
+   - Desbloquea el Panel de Registros, **Inventario de Catastro (+900 Equipos)**, Catastro Excel, Kits Rápidos, Generador de Links y Firmas TIC.
    - *(Clave por defecto: `tecnico123` o `1234`)*.
 3. 🛡️ **Modo Administrador (Control Total):**
-   - Acceso total a todas las funciones, métricas de avance, eliminación de registros, exportación CSV y respaldos JSON.
+   - Acceso total a todas las funciones, métricas de avance, visor de inventario completo, eliminación de registros, exportación CSV/Excel y respaldos JSON.
    - *(Clave por defecto: `admin123` o `9999`)*.
 4. 🔑 **Personalización de Contraseñas:**
    - Desde el modal de acceso, los administradores pueden definir y guardar sus propias contraseñas personalizadas en `localStorage`.
+
+---
+
+## 📦 Módulo de Inventario de Catastro (+900 Equipos)
+
+- **Visor Masivo:** Visualiza los **872 computadores** (Notebooks, AIO, PCs) y **97 impresoras/scanners** precargados desde el Excel institucional.
+- **Búsqueda Reactiva en Tiempo Real:** Filtra instantáneamente por Serie, Funcionario, RUT, Departamento, Modelo, Correo o Contrato (Ricoh, Netnow, Brother, etc.).
+- **Filtros por Tipo, Estado y Unidad:** Selectores dinámicos con los más de 300 departamentos del ISP.
+- **Asignación Rápida (1 Clic):** Botón `[ Asignar ]` en cada fila que carga automáticamente los datos del equipo y funcionario en el formulario oficial listo para firmas.
+- **Paginación Ágil:** Configurable a 25, 50, 100 o Todos los equipos por página.
+- **Exportación Filtrada a Excel:** Descarga planillas `.xlsx` con los resultados exactos del filtro activo.
 
 ---
 
@@ -65,7 +76,7 @@ El sistema cuenta con un control de accesos por roles:
 
 - **Tarjetas Táctiles Inteligentes:** En smartphones, la tabla se convierte automáticamente en tarjetas limpias con ticket, fecha, funcionario y estado.
 - **Action Sheet Emergente:** Al tocar cualquier tarjeta o el botón `[ ⋮ ]`, se despliega un menú táctil inferior con botones grandes para Editar, Generar Link, Clonar, Imprimir PDF y Eliminar.
-- **Barra Inferior Rápida (Bottom Bar):** Los administradores y técnicos disponen de una barra inferior fija para alternar con un toque entre Registros, Métricas y Nueva Solicitud.
+- **Barra Inferior Rápida (Bottom Bar):** Los administradores y técnicos disponen de una barra inferior fija para alternar con un toque entre Registros, Catastro (+900), Métricas y Nueva Solicitud.
 
 ---
 

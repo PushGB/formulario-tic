@@ -1358,63 +1358,6 @@ function syncPrintTemplate() {
         imgReceptor.src = '';
         imgReceptor.classList.add('hidden');
     }
-
-    // ================= SEGURIDAD: HASH SHA-256 Y CÓDIGOS QR DE VERIFICACIÓN =================
-    const subId = activeSubmissionId || ('ACTA_' + Date.now());
-    const ticket = document.getElementById('form-ticket').value.trim() || 'S/N';
-    const funcNombre = document.getElementById('func-nombre').value.trim() || 'ISP';
-    const funcRut = document.getElementById('func-rut').value.trim() || '';
-    const fecha = document.getElementById('form-fecha').value || new Date().toISOString().split('T')[0];
-    
-    // Hash de integridad del contenido del acta
-    const integrityPayload = `${subId}|${ticket}|${funcNombre}|${funcRut}|${fecha}|${items.map(e => e.serie).join(',')}`;
-    const docHash = generateDocumentIntegrityHash(integrityPayload);
-    const shortHash = docHash.substring(0, 16) + '...' + docHash.substring(48);
-    const timestampStr = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
-    
-    // Asignar a página 1
-    const elHashP1 = document.getElementById('print-doc-hash-p1');
-    if (elHashP1) elHashP1.textContent = shortHash;
-    const elTimeP1 = document.getElementById('print-doc-timestamp-p1');
-    if (elTimeP1) elTimeP1.textContent = timestampStr;
-    
-    // Asignar a página 2
-    const elHashP2 = document.getElementById('print-doc-hash-p2');
-    if (elHashP2) elHashP2.textContent = shortHash;
-    const elTimeP2 = document.getElementById('print-doc-timestamp-p2');
-    if (elTimeP2) elTimeP2.textContent = timestampStr;
-    const elIdP2 = document.getElementById('print-doc-id-p2');
-    if (elIdP2) elIdP2.textContent = subId.toUpperCase();
-    
-    // Generar Códigos QR oficiales
-    const verificationUrl = `https://formulario-tic.vercel.app/?verify=${encodeURIComponent(subId)}&hash=${docHash.substring(0, 12)}`;
-    
-    try {
-        const qrP1 = document.getElementById('print-qr-p1');
-        if (qrP1 && typeof QRCode !== 'undefined') {
-            qrP1.innerHTML = '';
-            new QRCode(qrP1, {
-                text: verificationUrl,
-                width: 42,
-                height: 42,
-                colorDark: '#0f172a',
-                colorLight: '#ffffff'
-            });
-        }
-        const qrP2 = document.getElementById('print-qr-p2');
-        if (qrP2 && typeof QRCode !== 'undefined') {
-            qrP2.innerHTML = '';
-            new QRCode(qrP2, {
-                text: verificationUrl,
-                width: 42,
-                height: 42,
-                colorDark: '#0f172a',
-                colorLight: '#ffffff'
-            });
-        }
-    } catch (qrErr) {
-        console.warn("Aviso al renderizar código QR:", qrErr);
-    }
 }
 
 // Generador determinista de Hash SHA-256 para actas oficiales

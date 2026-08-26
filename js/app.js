@@ -1,6 +1,6 @@
 // ================= CONTROL DE VERSIONES Y ACTUALIZACIÓN AUTOMÁTICA =================
-const APP_VERSION = '5.5.0';
-const APP_BUILD_TIMESTAMP = '20260826_1450';
+const APP_VERSION = '5.6.0';
+const APP_BUILD_TIMESTAMP = '20260826_1555';
 
 // ================= CONTROL DE ROLES Y ACCESOS (ADMIN / TÉCNICO / FUNCIONARIO) =================
 let currentUserRole = localStorage.getItem('tic_user_role') || 'funcionario';
@@ -2344,6 +2344,51 @@ function normalizeKey(key) {
               .replace(/[^a-z0-9]/g, '');                      // mantener solo caracteres alfanuméricos
 }
 
+// Normalizar nombres de personas para evitar duplicidad de actas por tildes/espacios
+function normalizePersonKey(name) {
+    return String(name || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Limpiar formato de nombre de persona
+function cleanPersonName(name) {
+    return String(name || '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Normalizar y sanear número de serie
+function normalizeSerial(serie, codArriendo, contrato) {
+    let s = String(serie || '').trim();
+    let ca = String(codArriendo || '').trim();
+    const cStr = String(contrato || '');
+
+    // Corregir columnas desplazadas en contratos (ej. '7', 'False', 'NO ENTREGÓ', 'N/A')
+    if (s === '7' || s.toLowerCase() === 'false' || s.toLowerCase().includes('entreg') || s.toUpperCase() === 'N/A' || s === '') {
+        if (ca.length > 3) {
+            s = ca;
+        }
+    }
+
+    // Expandir números de serie de Acer Veriton AIO si vienen recortados
+    if (/^[0-9A-F]{8}$/i.test(s) && (cStr.includes('Netnow') || cStr.includes('2023'))) {
+        s = 'DQVUYAL0082380' + s.toUpperCase();
+    } else if (s.includes(' ')) {
+        s = s.replace(/\s+/g, '');
+    }
+
+    if (s === '7' || s.toLowerCase() === 'false' || s.toUpperCase() === 'N/A' || s === '-' || !s) {
+        s = 'S/N';
+    }
+
+    return s;
+}
+
 // Convertir fila genérica a un formato estructurado y limpio
 function cleanRowData(row, sourceSheet) {
     const cleaned = {
@@ -2366,19 +2411,39 @@ function cleanRowData(row, sourceSheet) {
         const norm = normalizeKey(key);
         const val = String(row[key] || '').trim();
         if (norm === 'n') cleaned.n = val;
-        else if (norm === 'ninventarioisp') cleaned.inventario = val;
-        else if (norm === 'nserie') cleaned.serie = val;
-        else if (norm === 'tipopcnotebookaio' || norm === 'tipoimpresorascannermfp') cleaned.tipo = val;
+        else if (norm === 'ninventarioisp' || norm === 'ninventario') cleaned.inventario = val;
+        else if (norm === 'nserie' || norm === 'serie') cleaned.serie = val;
+        else if (norm === 'tipopcnotebookaio' || norm === 'tipoimpresorascannermfp' || norm === 'tipo') cleaned.tipo = val;
         else if (norm === 'marca') cleaned.marca = val;
         else if (norm === 'modelo') cleaned.modelo = val;
-        else if (norm === 'propiedadarriendoisp') cleaned.propiedad = val;
-        else if (norm === 'funcionarioa') cleaned.funcionario = val;
-        else if (norm === 'mail') cleaned.mail = val;
-        else if (norm === 'unidaddepto') cleaned.depto = val;
+        else if (norm === 'propiedadarriendoisp' || norm === 'propiedad') cleaned.propiedad = val;
+        else if (norm === 'funcionarioa' || norm === 'nombrefuncionario' || norm === 'funcionario' || norm === 'nombre') cleaned.funcionario = val;
+        else if (norm === 'mail' || norm === 'correo') cleaned.mail = val;
+        else if (norm === 'unidaddepto' || norm === 'departamento' || norm === 'unidad') cleaned.depto = val;
         else if (norm === 'estado') cleaned.estado = val;
-        else if (norm === 'observaciones') cleaned.observaciones = val;
+        else if (norm === 'observaciones' || norm === 'observacion') cleaned.observaciones = val;
     }
     cleaned.sheet = sourceSheet;
+
+    const contrato = String(row['Contrato Arriendo'] || '');
+    const codArriendo = String(row['Código Arriendo'] || '').trim();
+
+    cleaned.serie = normalizeSerial(cleaned.serie, codArriendo, contrato);
+
+    if (cleaned.serie.startsWith('DQV')) {
+        cleaned.marca = 'Acer';
+        cleaned.modelo = cleaned.modelo || 'Veriton AIO';
+        cleaned.tipo = 'All In One';
+    }
+
+    // Corregir cuando el email quedó en Unidad/Depto y el departamento en Ubicación física / Subdepartamento
+    if (cleaned.depto && cleaned.depto.includes('@')) {
+        cleaned.mail = cleaned.depto;
+        const ubicacion = String(row['Ubicación física'] || row['Subdepartamento'] || row['Sección'] || '').trim();
+        cleaned.depto = ubicacion || 'ISP';
+    }
+
+    cleaned.funcionario = cleanPersonName(cleaned.funcionario);
     return cleaned;
 }
 
@@ -2446,7 +2511,7 @@ function handleExcelUpload(event) {
             
             processWorkbookData();
             
-            showToast("Planilla Excel cargada y lista para auto-relleno.", "success");
+            showToast("Planilla Excel cargada y depurada exitosamente.", "success");
             
         } catch (error) {
             console.error("Error al procesar Excel:", error);
@@ -2469,18 +2534,12 @@ function preloadExcelData() {
             const prints = data.printers || [];
             loadedAllEquipments = [...comps, ...prints];
             
-            // Si hay solicitudes en el JSON, integrarlas
+            // Si hay solicitudes en el JSON, sincronizarlas limpiamente preservando solicitudes manuales
             if (data.submissions && Array.isArray(data.submissions)) {
-                let imported = 0;
-                data.submissions.forEach(sub => {
-                    if (!submissions.some(s => s.id === sub.id)) {
-                        submissions.push(sub);
-                        imported++;
-                    }
-                });
-                if (imported > 0) {
-                    saveSubmissionsToStorage();
-                }
+                const manualSubs = submissions.filter(s => !s.id.startsWith('sub_excel_'));
+                const excelSubs = data.submissions;
+                submissions = [...manualSubs, ...excelSubs];
+                saveSubmissionsToStorage();
             }
             
             // Actualizar interfaz instantáneamente
@@ -2494,11 +2553,11 @@ function preloadExcelData() {
                 badge.innerHTML = `
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-450 border border-emerald-200/50 dark:border-emerald-800 text-xs font-semibold shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Catastro Ultrarrápido: ${comps.length} Computadores y ${prints.length} Impresoras disponibles (${submissions.length} Formularios Generados).
+                        Catastro Depurado: ${comps.length} Computadores y ${prints.length} Impresoras disponibles (${submissions.length} Actas Consolidadas sin Duplicados).
                     </div>
                 `;
             }
-            console.log(`Catastro JSON ultra-rápido cargado: ${loadedAllEquipments.length} equipos, ${submissions.length} solicitudes.`);
+            console.log(`Catastro JSON depurado cargado: ${loadedAllEquipments.length} equipos, ${submissions.length} actas consolidadas.`);
         })
         .catch(err => {
             console.log("Cargando Catastro desde Excel institucional...", err.message);
@@ -2531,7 +2590,7 @@ function processWorkbookData() {
         const compRows = XLSX.utils.sheet_to_json(compSheet, { range: 3 });
         computers = compRows
             .filter(row => {
-                const serie = row['N° Serie'] || row['N° de Serie'] || row['Serie'];
+                const serie = row['N° Serie'] || row['N° de Serie'] || row['Serie'] || row['Código Arriendo'];
                 return serie && String(serie).trim().length > 0 && !String(serie).startsWith('▶');
             })
             .map(row => cleanRowData(row, 'Computadores'));
@@ -2552,8 +2611,31 @@ function processWorkbookData() {
     
     loadedAllEquipments = [...computers, ...printers];
     
-    // 3. Procesar todas las hojas (Equipos, Computadores e Impresoras) para generar las solicitudes/formularios de cada funcionario
+    // 3. Procesar todas las hojas (Equipos, Computadores e Impresoras) agrupando por funcionario único
     const grouped = {};
+
+    function getOrCreateGroup(rawName, rut, cargo, depto, propiedad) {
+        const cleanName = cleanPersonName(rawName);
+        const key = normalizePersonKey(cleanName);
+        if (!key) return null;
+
+        if (!grouped[key]) {
+            grouped[key] = {
+                id: 'sub_excel_' + key.replace(/[^a-z0-9]/g, '_'),
+                nombre: cleanName,
+                rut: rut || '',
+                cargo: cargo || '',
+                depto: depto || '',
+                propiedad: propiedad || 'En Arriendo',
+                equipos: []
+            };
+        } else {
+            if (!grouped[key].rut && rut) grouped[key].rut = rut;
+            if (!grouped[key].cargo && cargo) grouped[key].cargo = cargo;
+            if (!grouped[key].depto && depto) grouped[key].depto = depto;
+        }
+        return grouped[key];
+    }
     
     // A. Primero incorporar datos de la hoja 'Equipos' (si contiene RUT, Cargo y Departamento)
     const equiposSheet = uploadedWorkbook.Sheets['Equipos'];
@@ -2562,18 +2644,17 @@ function processWorkbookData() {
         rawEquipos.forEach(item => {
             const nombre = item['Nombre Funcionario'] || item['Nombre'];
             const serie = item['Serie'] || item['N° Serie'];
-            if (!nombre || String(nombre).trim().length === 0) return;
-            const key = String(nombre).trim().toLowerCase();
-            if (!grouped[key]) {
-                grouped[key] = {
-                    nombre: String(nombre).trim(),
-                    rut: String(item['Rut'] || item['RUT'] || '').trim(),
-                    cargo: String(item['Cargo'] || '').trim(),
-                    depto: String(item['Departamento'] || item['Unidad'] || '').trim(),
-                    propiedad: item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo',
-                    equipos: []
-                };
-            }
+            if (!nombre) return;
+
+            const group = getOrCreateGroup(
+                nombre,
+                item['Rut'] || item['RUT'],
+                item['Cargo'],
+                item['Departamento'] || item['Unidad'],
+                item['EsInventario'] === true || String(item['EsInventario']).toLowerCase() === 'true' ? 'Propiedad ISP' : 'En Arriendo'
+            );
+            if (!group) return;
+
             if (serie && String(serie).trim().length > 0) {
                 const rawEq = {
                     tipo: String(item['Tipo (AIO Notebook o Pantalla)'] || 'Equipo').trim(),
@@ -2585,8 +2666,8 @@ function processWorkbookData() {
                 };
                 const splitEqs = splitEquipmentIfCombined(rawEq);
                 splitEqs.forEach(eq => {
-                    if (!grouped[key].equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
-                        grouped[key].equipos.push(eq);
+                    if (!group.equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
+                        group.equipos.push(eq);
                     }
                 });
             }
@@ -2595,34 +2676,29 @@ function processWorkbookData() {
 
     // B. Procesar e incorporar todos los Computadores
     computers.forEach(item => {
-        const nombre = item.funcionario;
-        if (!nombre || String(nombre).trim().length === 0) return;
-        const key = String(nombre).trim().toLowerCase();
-        if (!grouped[key]) {
-            grouped[key] = {
-                nombre: String(nombre).trim(),
-                rut: '',
-                cargo: '',
-                depto: String(item.depto || '').trim(),
-                propiedad: (item.propiedad || '').toLowerCase().includes('arriendo') ? 'En Arriendo' : 'Propiedad ISP',
-                equipos: []
-            };
-        } else {
-            if (!grouped[key].depto && item.depto) grouped[key].depto = String(item.depto).trim();
-        }
-        if (item.serie && String(item.serie).trim().length > 0) {
+        if (!item.funcionario) return;
+        const group = getOrCreateGroup(
+            item.funcionario,
+            '',
+            '',
+            item.depto,
+            (item.propiedad || '').toLowerCase().includes('arriendo') ? 'En Arriendo' : 'Propiedad ISP'
+        );
+        if (!group) return;
+
+        if (item.serie && item.serie !== 'S/N') {
             const rawEq = {
                 tipo: item.tipo || 'Computador',
                 marca: item.marca || 'Lenovo',
                 modelo: item.modelo || (item._originalRow && item._originalRow['Código Arriendo'] ? item._originalRow['Código Arriendo'] : ''),
-                serie: String(item.serie).trim(),
-                inventario: String(item.inventario || (item._originalRow && item._originalRow['Código Arriendo'] ? item._originalRow['Código Arriendo'] : '')).trim(),
-                observacion: String(item.observaciones || '').trim()
+                serie: item.serie,
+                inventario: item.inventario,
+                observacion: item.observaciones
             };
             const splitEqs = splitEquipmentIfCombined(rawEq);
             splitEqs.forEach(eq => {
-                if (!grouped[key].equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
-                    grouped[key].equipos.push(eq);
+                if (!group.equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
+                    group.equipos.push(eq);
                 }
             });
         }
@@ -2630,56 +2706,58 @@ function processWorkbookData() {
 
     // C. Procesar e incorporar todas las Impresoras
     printers.forEach(item => {
-        const nombre = item.funcionario;
-        if (!nombre || String(nombre).trim().length === 0) return;
-        const key = String(nombre).trim().toLowerCase();
-        if (!grouped[key]) {
-            grouped[key] = {
-                nombre: String(nombre).trim(),
-                rut: '',
-                cargo: '',
-                depto: String(item.depto || '').trim(),
-                propiedad: (item.propiedad || '').toLowerCase().includes('arriendo') ? 'En Arriendo' : 'Propiedad ISP',
-                equipos: []
-            };
-        }
-        if (item.serie && String(item.serie).trim().length > 0) {
+        if (!item.funcionario) return;
+        const group = getOrCreateGroup(
+            item.funcionario,
+            '',
+            '',
+            item.depto,
+            (item.propiedad || '').toLowerCase().includes('arriendo') ? 'En Arriendo' : 'Propiedad ISP'
+        );
+        if (!group) return;
+
+        if (item.serie && item.serie !== 'S/N') {
             const rawEq = {
                 tipo: item.tipo || 'Impresora',
                 marca: item.marca || 'Brother',
                 modelo: item.modelo || '',
-                serie: String(item.serie).trim(),
-                inventario: String(item.inventario || '').trim(),
-                observacion: String(item.observaciones || '').trim()
+                serie: item.serie,
+                inventario: item.inventario,
+                observacion: item.observaciones
             };
             const splitEqs = splitEquipmentIfCombined(rawEq);
             splitEqs.forEach(eq => {
-                if (!grouped[key].equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
-                    grouped[key].equipos.push(eq);
+                if (!group.equipos.some(e => e.serie && e.serie.toLowerCase() === eq.serie.toLowerCase())) {
+                    group.equipos.push(eq);
                 }
             });
         }
     });
 
     let importedCount = 0;
-    Object.keys(grouped).forEach(key => {
-        const group = grouped[key];
-        const subId = 'sub_excel_' + key.replace(/[^a-z0-9]/g, '_');
-        
-        // Si ya existe la solicitud, actualizar equipamiento si faltaba
-        const existingIdx = submissions.findIndex(s => s.id === subId);
-        if (existingIdx !== -1) {
-            if (!submissions[existingIdx].equipamiento || submissions[existingIdx].equipamiento.length === 0) {
-                submissions[existingIdx].equipamiento = group.equipos;
+    const excelSubmissions = Object.values(grouped).map(group => {
+        const cats = [];
+        group.equipos.forEach(eq => {
+            const t = (eq.tipo || '').toLowerCase();
+            if (t === 'pc' || t.includes('desktop') || t.includes('torre')) {
+                if (!cats.includes('PC')) cats.push('PC');
             }
-            if (!submissions[existingIdx].funcionario.depto && group.depto) {
-                submissions[existingIdx].funcionario.depto = group.depto;
+            if (t.includes('notebook') || t.includes('laptop')) {
+                if (!cats.includes('Notebook')) cats.push('Notebook');
             }
-            return;
-        }
-        
-        const sub = {
-            id: subId,
+            if (t.includes('aio') || t.includes('all in one')) {
+                if (!cats.includes('All In One')) cats.push('All In One');
+            }
+            if (t.includes('monitor') || t.includes('pantalla')) {
+                if (!cats.includes('Monitor')) cats.push('Monitor');
+            }
+            if (t.includes('impresora') || t.includes('scanner') || t.includes('mfp')) {
+                if (!cats.includes('Impresora')) cats.push('Impresora');
+            }
+        });
+
+        return {
+            id: group.id,
             fecha: new Date().toISOString().split('T')[0],
             ticket: 'S/N',
             funcionario: {
@@ -2690,7 +2768,7 @@ function processWorkbookData() {
             },
             tipo_solicitud: 'Asignacion',
             propiedad_equipamiento: group.propiedad,
-            equipamiento_categorias: [],
+            equipamiento_categorias: cats,
             otros_detalles: '',
             traspaso: null,
             equipamiento: group.equipos,
@@ -2705,48 +2783,14 @@ function processWorkbookData() {
                 receptor: null
             }
         };
-        
-        // Deducir categorías en base a todos los equipos cargados
-        group.equipos.forEach(eq => {
-            const tipoLower = (eq.tipo || '').toLowerCase();
-            
-            if (tipoLower === 'pc' || tipoLower.includes('desktop') || tipoLower.includes('computador') || tipoLower.includes('torre')) {
-                if (!sub.equipamiento_categorias.includes('PC')) sub.equipamiento_categorias.push('PC');
-            }
-            if (tipoLower.includes('notebook') || tipoLower.includes('laptop')) {
-                if (!sub.equipamiento_categorias.includes('Notebook')) sub.equipamiento_categorias.push('Notebook');
-            }
-            if (tipoLower.includes('aio') || tipoLower.includes('all in one') || tipoLower.includes('all-in-one')) {
-                if (!sub.equipamiento_categorias.includes('All In One')) sub.equipamiento_categorias.push('All In One');
-            }
-            if (tipoLower.includes('pantalla') || tipoLower.includes('monitor') || tipoLower.includes('display')) {
-                if (!sub.equipamiento_categorias.includes('Monitor')) sub.equipamiento_categorias.push('Monitor');
-            }
-            if (tipoLower.includes('celular') || tipoLower.includes('movil') || tipoLower.includes('smartphone')) {
-                if (!sub.equipamiento_categorias.includes('Celular')) sub.equipamiento_categorias.push('Celular');
-            }
-            if (tipoLower.includes('telefono')) {
-                if (!sub.equipamiento_categorias.includes('Telefono IP')) sub.equipamiento_categorias.push('Telefono IP');
-            }
-            if (tipoLower.includes('simcard') || tipoLower.includes('chip')) {
-                if (!sub.equipamiento_categorias.includes('SIMCARD')) sub.equipamiento_categorias.push('SIMCARD');
-            }
-            if (tipoLower.includes('bam') || tipoLower.includes('modem')) {
-                if (!sub.equipamiento_categorias.includes('BAM')) sub.equipamiento_categorias.push('BAM');
-            }
-            if (tipoLower.includes('impresora') || tipoLower.includes('scanner') || tipoLower.includes('mfp')) {
-                if (!sub.equipamiento_categorias.includes('Impresora')) sub.equipamiento_categorias.push('Impresora');
-            }
-        });
-        
-        submissions.push(sub);
-        importedCount++;
     });
+
+    const manualSubs = submissions.filter(s => !s.id.startsWith('sub_excel_'));
+    submissions = [...manualSubs, ...excelSubmissions];
+    importedCount = excelSubmissions.length;
     
-    if (importedCount > 0) {
-        saveSubmissionsToStorage();
-        renderTable();
-    }
+    saveSubmissionsToStorage();
+    renderTable();
     
     // 4. Actualizar estado de interfaz
     const badge = document.getElementById('excel-status-badge');
@@ -3100,8 +3144,9 @@ function splitEquipmentIfCombined(rawEq) {
     const inventario = String(rawEq.inventario || '').trim();
     const observacion = String(rawEq.observacion || '').trim();
 
-    const hasSlashTipo = tipo.includes('/');
-    const hasSlashSerie = serie.includes('/');
+    const isNA = serie.toUpperCase() === 'N/A' || serie.toUpperCase() === 'S/N' || serie.toUpperCase() === 'N/D';
+    const hasSlashTipo = tipo.includes('/') && !isNA;
+    const hasSlashSerie = serie.includes('/') && !isNA;
 
     const isCombined = hasSlashTipo || hasSlashSerie || 
                        (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')));
@@ -3112,10 +3157,10 @@ function splitEquipmentIfCombined(rawEq) {
 
     const splitTipo = hasSlashTipo ? tipo.split('/') : [tipo];
     const splitSerie = hasSlashSerie ? serie.split('/') : [serie];
-    const splitMarca = marca.includes('/') ? marca.split('/') : [marca];
-    const splitModelo = modelo.includes('/') ? modelo.split('/') : [modelo];
-    const splitInventario = inventario.includes('/') ? inventario.split('/') : [inventario];
-    const splitObservacion = observacion.includes('/') ? observacion.split('/') : [observacion];
+    const splitMarca = marca.includes('/') && !isNA ? marca.split('/') : [marca];
+    const splitModelo = modelo.includes('/') && !isNA ? modelo.split('/') : [modelo];
+    const splitInventario = inventario.includes('/') && !isNA ? inventario.split('/') : [inventario];
+    const splitObservacion = observacion.includes('/') && !isNA ? observacion.split('/') : [observacion];
 
     let numItems = Math.max(splitTipo.length, splitSerie.length);
     if (numItems === 1 && (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')))) {

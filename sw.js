@@ -1,5 +1,5 @@
 // Service Worker para PWA Gestión de Equipamiento TIC - ISP
-const CACHE_NAME = 'tic-isp-pwa-v5.2.0';
+const CACHE_NAME = 'tic-isp-pwa-v5.3.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

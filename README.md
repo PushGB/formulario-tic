@@ -1,4 +1,4 @@
-# Gestión de Equipamiento TIC - ISP Chile (v5.3.0)
+# Gestión de Equipamiento TIC - ISP Chile (v5.5.0)
 
 Sistema web institucional y Progressive Web App (PWA) de página única (SPA) diseñado para digitalizar y gestionar el **Formulario de Asignación, Traspaso y/o Devolución de Equipamiento Tecnológico** de la Oficina de TIC del Instituto de Salud Pública de Chile, bajo el código oficial **RG-02-IT-140.03-004 versión 5**.
 
@@ -13,14 +13,18 @@ Formulario/
 │
 ├── index.html          # Interfaz de usuario interactiva y plantillas de impresión (HTML5)
 ├── manifest.json       # Manifiesto PWA para instalación nativa en Android, iOS y Windows
-├── sw.js               # Service Worker con caché inteligente offline y actualización continua
+├── sw.js               # Service Worker v5.5.0 con caché inteligente offline y actualización continua
 ├── vercel.json         # Configuración de despliegue y headers para producción en Vercel
+│
+├── data/
+│   └── catastro.json   # Catálogo precargado de 969 equipos y 879 actas en JSON instantáneo (<5ms)
 │
 ├── css/
 │   └── styles.css      # Estilos visuales personalizados y directivas CSS para impresión (@media print)
 │
 ├── js/
-│   ├── app.js          # Lógica integral: roles, canvas de firmas, catastro, PWA y validaciones
+│   ├── app.js          # Lógica integral: roles, canvas de firmas, catastro, PWA, QR y validaciones
+│   ├── qrcode.min.js   # Generador local y autónomo de Códigos QR para actas oficiales
 │   └── xlsx.full.min.js# Librería SheetJS para lectura y parsing local de archivos Excel
 │
 ├── img/

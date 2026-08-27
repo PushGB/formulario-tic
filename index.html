@@ -59,7 +59,7 @@
                         <i data-lucide="sparkles" class="w-4 h-4 animate-pulse"></i>
                     </div>
                     <div>
-                        <span class="font-bold text-white tracking-wide">¡Actualización del Sistema TIC Disponible! (<span id="banner-version-tag" class="text-indigo-300 font-mono">v5.6.0</span>)</span>
+                        <span class="font-bold text-white tracking-wide">¡Actualización del Sistema TIC Disponible! (<span id="banner-version-tag" class="text-indigo-300 font-mono">v5.7.0</span>)</span>
                         <span class="text-slate-300 block sm:inline sm:ml-2">Se han aplicado nuevas mejoras y optimizaciones.</span>
                     </div>
                 </div>
@@ -213,7 +213,7 @@
                 </div>
 
                 <div class="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                    <span>Versión v5.2.0</span>
+                    <span>Versión v5.7.0</span>
                     <span class="font-mono text-[10px]">Oficina TIC</span>
                 </div>
             </div>
@@ -234,6 +234,10 @@
                         <button onclick="exportToCSV()" class="whitespace-nowrap shrink-0 bg-slate-600 hover:bg-slate-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Exportar historial en formato CSV">
                             <i data-lucide="download" class="w-4 h-4"></i>
                             <span>Exportar CSV</span>
+                        </button>
+                        <button onclick="syncAllToSupabase()" class="whitespace-nowrap shrink-0 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Sincronizar todas las actas con Supabase en la nube">
+                            <i data-lucide="cloud" class="w-4 h-4 text-emerald-300"></i>
+                            <span>Sincronizar Nube</span>
                         </button>
                         <button onclick="exportBackupJSON()" class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Descargar copia de seguridad completa en JSON">
                             <i data-lucide="database" class="w-4 h-4 text-indigo-300"></i>
@@ -1767,6 +1771,7 @@
     <!-- External Scripts containing Libraries & Application Logic -->
     <script src="js/xlsx.full.min.js"></script>
     <script src="js/qrcode.min.js"></script>
+    <script src="js/supabase.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

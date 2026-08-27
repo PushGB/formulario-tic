@@ -1,6 +1,316 @@
 // ================= CONTROL DE VERSIONES Y ACTUALIZACIÓN AUTOMÁTICA =================
-const APP_VERSION = '5.6.0';
-const APP_BUILD_TIMESTAMP = '20260826_1555';
+const APP_VERSION = '5.7.0';
+const APP_BUILD_TIMESTAMP = '20260827_1020';
+
+// ================= INTEGRACIÓN SUPABASE (SINCRONIZACIÓN EN LA NUBE Y TIEMPO REAL) =================
+const SUPABASE_URL = 'https://likdtkpavilbrdlslhyr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxpa2R0a3BhdmlsYnJkbHNsaHlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTA1OTEsImV4cCI6MjA5NjE4NjU5MX0.wHTdEk-ZIAT7S57c-AsX0o5KXspFWG0QmK09xuwLE3c';
+let supabaseClient = null;
+let isSupabaseReady = false;
+let realtimeChannel = null;
+
+function initSupabase() {
+    try {
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            isSupabaseReady = true;
+            console.log('✅ Supabase Client inicializado exitosamente.');
+            
+            // Cargar datos remotos desde Supabase
+            fetchSubmissionsFromSupabase();
+            
+            // Suscribirse a cambios en tiempo real
+            subscribeToSupabaseRealtime();
+            
+            // Sincronizar actas pendientes que se hayan creado offline
+            syncPendingOfflineSubmissions();
+        } else {
+            console.warn('⚠️ Librería de Supabase no disponible en ventana global.');
+        }
+    } catch (err) {
+        console.error('Error al inicializar Supabase:', err);
+    }
+}
+
+async function fetchSubmissionsFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        updateCloudStatusBadge('syncing');
+        const { data, error } = await supabaseClient
+            .from('formularios')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.warn('Aviso Supabase al consultar formularios:', error.message || error);
+            if (error.code === 'PGRST205' || (error.message && error.message.includes('schema cache'))) {
+                updateCloudStatusBadge('table_missing');
+            } else {
+                updateCloudStatusBadge('error');
+            }
+            return;
+        }
+
+        if (data && Array.isArray(data)) {
+            console.log(`☁️ ${data.length} actas obtenidas desde Supabase.`);
+            mergeSubmissionsFromSupabase(data);
+            updateCloudStatusBadge('connected');
+        }
+    } catch (e) {
+        console.warn('Error de red al consultar Supabase:', e.message);
+        updateCloudStatusBadge('offline');
+    }
+}
+
+function mergeSubmissionsFromSupabase(cloudRows) {
+    if (!cloudRows || !Array.isArray(cloudRows)) return;
+    
+    // Mapear filas de Supabase a objetos de acta
+    const cloudSubs = cloudRows.map(row => {
+        if (row.data && typeof row.data === 'object') {
+            return row.data;
+        }
+        return row;
+    });
+
+    const cloudMap = new Map();
+    cloudSubs.forEach(s => {
+        if (s && s.id) cloudMap.set(s.id, s);
+    });
+
+    // Separar envíos locales manuales que aún no están en la nube
+    const localManualNotSynced = submissions.filter(s => !s.id.startsWith('sub_excel_') && !cloudMap.has(s.id));
+    
+    // Separar actas base del catastro Excel que no fueron sobrescritas en la nube
+    const baseExcelSubs = submissions.filter(s => s.id.startsWith('sub_excel_') && !cloudMap.has(s.id));
+
+    // Consolidar: primero las actas en nube (más recientes), luego las manuales locales no sincronizadas, luego el catálogo base
+    submissions = [...cloudSubs, ...localManualNotSynced, ...baseExcelSubs];
+
+    saveSubmissionsToStorage();
+    renderTable();
+    updateStats();
+}
+
+function subscribeToSupabaseRealtime() {
+    if (!supabaseClient) return;
+    try {
+        if (realtimeChannel) {
+            supabaseClient.removeChannel(realtimeChannel);
+        }
+
+        realtimeChannel = supabaseClient
+            .channel('public:formularios')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'formularios' }, (payload) => {
+                console.log('⚡ Evento en tiempo real de Supabase:', payload);
+                handleSupabaseRealtimeEvent(payload);
+            })
+            .subscribe((status) => {
+                console.log('Estado de suscripción Realtime Supabase:', status);
+                if (status === 'SUBSCRIBED') {
+                    updateCloudStatusBadge('connected');
+                }
+            });
+    } catch (e) {
+        console.warn('Aviso al suscribir Realtime de Supabase:', e);
+    }
+}
+
+function handleSupabaseRealtimeEvent(payload) {
+    const eventType = payload.eventType;
+    const newRecord = payload.new;
+    const oldRecord = payload.old;
+
+    if (eventType === 'INSERT' && newRecord) {
+        const subData = newRecord.data || newRecord;
+        if (subData && subData.id) {
+            const exists = submissions.some(s => s.id === subData.id);
+            if (!exists) {
+                submissions.unshift(subData);
+                saveSubmissionsToStorage();
+                renderTable();
+                updateStats();
+                showToast(`☁️ Nueva acta (${subData.ticket || 'S/N'}) sincronizada en tiempo real.`, 'info');
+            }
+        }
+    } else if (eventType === 'UPDATE' && newRecord) {
+        const subData = newRecord.data || newRecord;
+        if (subData && subData.id) {
+            const idx = submissions.findIndex(s => s.id === subData.id);
+            if (idx !== -1) {
+                submissions[idx] = subData;
+            } else {
+                submissions.unshift(subData);
+            }
+            saveSubmissionsToStorage();
+            renderTable();
+            updateStats();
+            showToast(`🔄 Acta (${subData.ticket || 'S/N'}) actualizada en tiempo real.`, 'info');
+        }
+    } else if (eventType === 'DELETE' && oldRecord) {
+        const idToDelete = oldRecord.id;
+        if (idToDelete) {
+            submissions = submissions.filter(s => s.id !== idToDelete);
+            saveSubmissionsToStorage();
+            renderTable();
+            updateStats();
+            showToast(`🗑️ Acta eliminada en tiempo real.`, 'info');
+        }
+    }
+}
+
+async function syncSubmissionToSupabase(submissionData) {
+    if (!submissionData || !submissionData.id) return;
+
+    // Si no está disponible Supabase o no hay internet, registrar como pendiente
+    if (!supabaseClient || !navigator.onLine) {
+        queuePendingOfflineSubmission(submissionData);
+        return;
+    }
+
+    try {
+        const payload = {
+            id: submissionData.id,
+            ticket: submissionData.ticket || 'S/N',
+            fecha: submissionData.fecha || '',
+            tipo_solicitud: submissionData.tipo_solicitud || '',
+            funcionario_nombre: submissionData.funcionario?.nombre || '',
+            funcionario_rut: submissionData.funcionario?.rut || '',
+            funcionario_depto: submissionData.funcionario?.depto || '',
+            data: submissionData,
+            updated_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabaseClient
+            .from('formularios')
+            .upsert(payload);
+
+        if (error) {
+            console.warn('Error al sincronizar con Supabase:', error.message);
+            queuePendingOfflineSubmission(submissionData);
+            if (error.code === 'PGRST205' || (error.message && error.message.includes('schema cache'))) {
+                showToast("⚠️ La tabla 'formularios' no existe aún en Supabase. Se guardó localmente.", "warning");
+                updateCloudStatusBadge('table_missing');
+            }
+        } else {
+            console.log('✅ Acta sincronizada en Supabase con éxito:', submissionData.id);
+            removePendingOfflineSubmission(submissionData.id);
+            showToast("☁️ Guardado y sincronizado con Supabase en tiempo real.", "success");
+            updateCloudStatusBadge('connected');
+        }
+    } catch (e) {
+        console.warn('Excepción al enviar a Supabase:', e);
+        queuePendingOfflineSubmission(submissionData);
+    }
+}
+
+async function deleteSubmissionFromSupabase(id) {
+    if (!id || !supabaseClient || !navigator.onLine) return;
+    try {
+        const { error } = await supabaseClient
+            .from('formularios')
+            .delete()
+            .eq('id', id);
+        if (error) {
+            console.warn('Error al eliminar en Supabase:', error);
+        } else {
+            console.log('🗑️ Acta eliminada en Supabase:', id);
+        }
+    } catch (e) {
+        console.warn('Excepción al eliminar en Supabase:', e);
+    }
+}
+
+function queuePendingOfflineSubmission(submissionData) {
+    try {
+        let pending = JSON.parse(localStorage.getItem('tic_pending_sync_subs') || '[]');
+        pending = pending.filter(p => p.id !== submissionData.id);
+        pending.push(submissionData);
+        localStorage.setItem('tic_pending_sync_subs', JSON.stringify(pending));
+    } catch (e) {
+        console.warn('Error en cola offline:', e);
+    }
+}
+
+function removePendingOfflineSubmission(id) {
+    try {
+        let pending = JSON.parse(localStorage.getItem('tic_pending_sync_subs') || '[]');
+        pending = pending.filter(p => p.id !== id);
+        localStorage.setItem('tic_pending_sync_subs', JSON.stringify(pending));
+    } catch (e) {}
+}
+
+async function syncPendingOfflineSubmissions() {
+    if (!supabaseClient || !navigator.onLine) return;
+    try {
+        const pending = JSON.parse(localStorage.getItem('tic_pending_sync_subs') || '[]');
+        if (pending.length === 0) return;
+        console.log(`Sincronizando ${pending.length} actas pendientes con Supabase...`);
+        for (const sub of pending) {
+            await syncSubmissionToSupabase(sub);
+        }
+    } catch (e) {
+        console.warn('Error al sincronizar pendientes:', e);
+    }
+}
+
+// Sincronizar manualmente todas las actas locales a Supabase
+async function syncAllToSupabase() {
+    if (!supabaseClient) {
+        showToast("Supabase no está conectado.", "error");
+        return;
+    }
+    if (!navigator.onLine) {
+        showToast("No tienes conexión a internet para sincronizar.", "warning");
+        return;
+    }
+
+    const manualSubs = submissions.filter(s => !s.id.startsWith('sub_excel_'));
+    if (manualSubs.length === 0) {
+        showToast("Sincronizando registros con Supabase...", "info");
+        await fetchSubmissionsFromSupabase();
+        showToast("Registros sincronizados con la nube.", "success");
+        return;
+    }
+
+    showToast(`Subiendo ${manualSubs.length} actas a la nube de Supabase...`, "info");
+    let count = 0;
+    for (const sub of manualSubs) {
+        await syncSubmissionToSupabase(sub);
+        count++;
+    }
+    await fetchSubmissionsFromSupabase();
+    showToast(`¡${count} actas sincronizadas exitosamente con Supabase!`, "success");
+}
+
+function updateCloudStatusBadge(state) {
+    const badge = document.getElementById('network-status-badge');
+    const dot = document.getElementById('network-status-dot');
+    const text = document.getElementById('network-status-text');
+    if (!badge || !dot || !text) return;
+
+    if (state === 'connected') {
+        badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/40';
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        text.textContent = 'Supabase En Vivo';
+        badge.title = 'Conectado a la nube Supabase en tiempo real';
+    } else if (state === 'syncing') {
+        badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-950/60 text-indigo-300 border border-indigo-500/40';
+        dot.className = 'w-2 h-2 rounded-full bg-indigo-400 animate-spin';
+        text.textContent = 'Sincronizando...';
+        badge.title = 'Sincronizando registros con Supabase';
+    } else if (state === 'table_missing') {
+        badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-950/60 text-amber-300 border border-amber-500/40 cursor-pointer';
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = 'Supabase: Crear Tabla';
+        badge.title = 'Falta crear la tabla formularios en Supabase';
+    } else if (state === 'offline') {
+        badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-950/60 text-amber-300 border border-amber-500/40';
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = 'Modo Terreno (Offline)';
+        badge.title = 'Sin conexión a internet. Guardando localmente.';
+    }
+}
 
 // ================= CONTROL DE ROLES Y ACCESOS (ADMIN / TÉCNICO / FUNCIONARIO) =================
 let currentUserRole = localStorage.getItem('tic_user_role') || 'funcionario';
@@ -57,6 +367,9 @@ window.addEventListener('load', () => {
 
     // Intentar precargar el catastro Excel desde el servidor local automáticamente
     preloadExcelData();
+
+    // Inicializar cliente Supabase para sincronización en tiempo real
+    initSupabase();
 
     // Comprobar si se abrió con parámetros URL (ej. Enlace de funcionario compartido)
     checkUrlParameters();
@@ -295,6 +608,11 @@ function initNetworkMonitoring() {
     window.addEventListener('online', () => {
         updateNetworkStatus();
         showToast("Conexión a internet restablecida.", "success");
+        if (isSupabaseReady) {
+            fetchSubmissionsFromSupabase();
+            syncPendingOfflineSubmissions();
+            subscribeToSupabaseRealtime();
+        }
     });
     window.addEventListener('offline', updateNetworkStatus);
     updateNetworkStatus();
@@ -1219,6 +1537,7 @@ function saveForm(event) {
     }
 
     saveSubmissionsToStorage();
+    syncSubmissionToSupabase(submissionData);
     activeSubmissionId = submissionData.id;
     
     // Habilitar impresión tras guardar exitosamente
@@ -1922,6 +2241,7 @@ async function deleteSubmission(id) {
             activeSubmissionId = null;
         }
         saveSubmissionsToStorage();
+        deleteSubmissionFromSupabase(id);
         renderTable();
         showToast("Registro eliminado del historial.", "success");
     }
@@ -2115,6 +2435,9 @@ function importBackupJSON(event) {
             saveSubmissionsToStorage();
             renderTable();
             showToast(`Restauración exitosa: ${added} agregados, ${updated} actualizados.`, "success");
+            if (isSupabaseReady && navigator.onLine) {
+                importedList.forEach(item => syncSubmissionToSupabase(item));
+            }
         } catch (err) {
             console.error("Error al importar JSON", err);
             showToast("El archivo seleccionado no es un JSON válido.", "error");
@@ -2547,6 +2870,11 @@ function preloadExcelData() {
             renderInventoryTable();
             renderTable();
             updateStats();
+            
+            // Sincronizar actas de la nube de Supabase sobre el catálogo cargado
+            if (isSupabaseReady) {
+                fetchSubmissionsFromSupabase();
+            }
             
             const badge = document.getElementById('excel-status-badge');
             if (badge) {

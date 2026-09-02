@@ -97,7 +97,13 @@
                             <img src="img/logo-isp.svg" alt="ISP Chile" class="h-7 sm:h-8 w-auto object-contain">
                         </div>
                         <div class="truncate">
-                            <span class="font-bold text-sm sm:text-lg tracking-wide block leading-tight truncate">Soporte TIC</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-sm sm:text-lg tracking-wide block leading-tight truncate">Soporte TIC</span>
+                                <button type="button" onclick="openSystemInfoModal()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 transition-all cursor-pointer" title="Ver información del sistema y novedades (v5.7.0)">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                    <span>v5.7.0</span>
+                                </button>
+                            </div>
                             <span class="text-[10px] sm:text-xs text-indigo-300 block font-mono leading-tight truncate">RG-02-IT-140.03-004 V5</span>
                         </div>
                     </div>
@@ -118,7 +124,7 @@
                         </button>
                     </div>
 
-                    <!-- Acciones Rápidas (Rol, Limpiar Caché, Modo Oscuro) -->
+                    <!-- Acciones Rápidas (Rol, Versión/Info, Limpiar Caché, Modo Oscuro) -->
                     <div class="flex items-center space-x-1.5 sm:space-x-2">
                         <!-- Indicador de Red / Conectividad -->
                         <div id="network-status-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/50 text-emerald-300 border border-emerald-500/30" title="Estado de la Conexión">
@@ -132,9 +138,17 @@
                             <span id="nav-role-text" class="hidden sm:inline">Modo Técnico</span>
                             <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-60"></i>
                         </button>
-                        <button onclick="clearCacheAndReload()" class="hidden sm:inline-flex px-2 sm:px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors items-center gap-1.5 text-xs font-semibold" title="Limpiar Caché y Recargar el Sistema">
+
+                        <!-- Botón Información de Versión y Novedades -->
+                        <button onclick="openSystemInfoModal()" class="hidden md:inline-flex px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 transition-all items-center gap-1.5 shadow-sm" title="Información de Versión y Novedades">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                            <span class="font-mono text-xs text-indigo-300 font-bold">v5.7.0</span>
+                        </button>
+
+                        <!-- Botón Actualizar / Limpiar Caché -->
+                        <button onclick="clearCacheAndReload()" class="hidden sm:inline-flex px-2 sm:px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors items-center gap-1.5 text-xs font-semibold" title="Limpiar Caché y Comprobar Actualizaciones">
                             <i data-lucide="rotate-cw" class="w-4 h-4 text-emerald-400"></i>
-                            <span class="hidden lg:inline">Limpiar Caché</span>
+                            <span class="hidden lg:inline">Actualizar</span>
                         </button>
                         <button onclick="toggleTheme()" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" title="Cambiar Tema">
                             <span id="theme-toggle-icon"><i data-lucide="moon" class="w-5 h-5"></i></span>
@@ -1520,6 +1534,85 @@
                 <div class="flex items-center gap-3">
                     <button type="button" onclick="closePrintPreview()" class="text-slate-300 hover:text-white underline">
                         ← Volver a modificar datos
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE INFORMACIÓN DEL SISTEMA, VERSIÓN Y NOVEDADES -->
+        <div id="system-info-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity duration-300">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 relative overflow-hidden">
+                <!-- Luz decorativa -->
+                <div class="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+                <!-- Encabezado -->
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0">
+                            <i data-lucide="info" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span>Sistema de Gestión TIC</span>
+                                <span class="text-xs font-mono font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700/50">v5.7.0</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Instituto de Salud Pública de Chile • Oficina TIC</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeSystemInfoModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Estado de Actualización -->
+                <div class="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <div>
+                            <strong class="block text-xs text-emerald-900 dark:text-emerald-200 font-bold">Sistema Actualizado y al Día</strong>
+                            <span class="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">Versión instalada: v5.7.0 (Compilación Local Electron)</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeSystemInfoModal(); clearCacheAndReload();" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm shrink-0 inline-flex items-center gap-1">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>Comprobar</span>
+                    </button>
+                </div>
+
+                <!-- Novedades de la Versión -->
+                <div class="space-y-2.5">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i> Novedades y Mejoras en v5.7.0:
+                    </h4>
+                    <ul class="space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Aplicación de Escritorio Offline:</strong> Ejecución nativa sin internet con guardado local ultrarrápido.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Formato Oficial Oficio / Circular:</strong> Impresión y exportación nativa a PDF en 216 mm × 330 mm (2 páginas exactas).</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Firma Oficial Precargada:</strong> Firma estampada por defecto de <em>Eduardo Wess (Jefe Oficina TIC)</em> e identificación en Página 2.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Visor de Previsualización en Vivo:</strong> Vista previa completa antes de mandar a imprimir o guardar PDF.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Matriz de Permisos por Rol:</strong> Modo Administrador, Técnico TIC y Funcionario Solicitante.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Pie del Modal -->
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400 font-mono">Formulario RG-02-IT-140.03-004 V5</span>
+                    <button type="button" onclick="closeSystemInfoModal()" class="px-5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition-colors">
+                        Entendido
                     </button>
                 </div>
             </div>

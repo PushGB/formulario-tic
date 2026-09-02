@@ -4642,4 +4642,34 @@ if (window.electronAPI) {
             showToast('Error al generar PDF: ' + e.message, 'error');
         }
     });
+
+    // Escuchar menú nativo para Acerca de / Novedades
+    if (typeof window.electronAPI.onTriggerOpenAbout === 'function') {
+        window.electronAPI.onTriggerOpenAbout(() => {
+            openSystemInfoModal();
+        });
+    }
+
+    // Escuchar menú nativo para Comprobar Actualizaciones
+    if (typeof window.electronAPI.onTriggerCheckUpdate === 'function') {
+        window.electronAPI.onTriggerCheckUpdate(() => {
+            clearCacheAndReload();
+        });
+    }
+}
+
+// ================= MODAL DE INFORMACIÓN Y NOVEDADES =================
+function openSystemInfoModal() {
+    const modal = document.getElementById('system-info-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+    }
+}
+
+function closeSystemInfoModal() {
+    const modal = document.getElementById('system-info-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
 }

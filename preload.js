@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loadJsonBackup: () => ipcRenderer.invoke('load-json-backup'),
     getAppInfo: () => ipcRenderer.invoke('get-app-info'),
     onTriggerPrint: (callback) => ipcRenderer.on('trigger-print', () => callback()),
-    onTriggerExportPdf: (callback) => ipcRenderer.on('trigger-export-pdf', () => callback())
+    onTriggerExportPdf: (callback) => ipcRenderer.on('trigger-export-pdf', () => callback()),
+    onTriggerOpenAbout: (callback) => ipcRenderer.on('trigger-open-about', () => callback()),
+    onTriggerCheckUpdate: (callback) => ipcRenderer.on('trigger-check-update', () => callback())
 });

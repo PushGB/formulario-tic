@@ -10,7 +10,7 @@ function createWindow() {
         height: 850,
         minWidth: 960,
         minHeight: 650,
-        title: "Gestión de Equipamiento TIC - ISP Chile",
+        title: `Gestión de Equipamiento TIC - ISP Chile (v${app.getVersion()})`,
         icon: path.join(__dirname, 'img', 'icon-512.png'),
         backgroundColor: '#0f172a',
         webPreferences: {
@@ -93,15 +93,28 @@ function createWindow() {
             label: 'Ayuda',
             submenu: [
                 {
-                    label: 'Acerca de Formulario TIC',
+                    label: `Acerca de Formulario TIC (v${app.getVersion()})...`,
                     click: () => {
                         dialog.showMessageBox(mainWindow, {
                             type: 'info',
                             title: 'Acerca de Gestión TIC',
-                            message: 'Gestión de Equipamiento TIC - ISP Chile',
-                            detail: `Versión: ${app.getVersion()}\nOficina de Tecnologías de la Información y Comunicaciones (TIC)\nInstituto de Salud Pública de Chile.`,
+                            message: `Gestión de Equipamiento TIC - ISP Chile (v${app.getVersion()})`,
+                            detail: `Versión Actual: ${app.getVersion()}\nEstado: Sistema Operativo y Local\nOficina de Tecnologías de la Información y Comunicaciones (TIC)\nInstituto de Salud Pública de Chile.`,
                             buttons: ['Aceptar']
                         });
+                    }
+                },
+                {
+                    label: 'Ver Novedades de la Versión...',
+                    click: () => {
+                        if (mainWindow) mainWindow.webContents.send('trigger-open-about');
+                    }
+                },
+                {
+                    label: 'Comprobar Actualizaciones y Limpiar Caché...',
+                    accelerator: 'F5',
+                    click: () => {
+                        if (mainWindow) mainWindow.webContents.send('trigger-check-update');
                     }
                 }
             ]

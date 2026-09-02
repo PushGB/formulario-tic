@@ -3,7 +3,11 @@ name: Compilar Aplicación macOS, Windows y Android (APK)
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-macos:
@@ -95,4 +99,49 @@ jobs:
         with:
           name: Formulario-TIC-Android-APK
           path: dist_apk/Formulario_TIC_ISP_v5.7.0.apk
+
+  publish-release:
+    name: Publicar Release Oficial Multiplataforma
+    needs: [build-macos, build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar Código
+        uses: actions/checkout@v4
+
+      - name: Descargar Artefactos macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: Formulario-TIC-macOS
+          path: release_assets/
+
+      - name: Descargar Artefactos Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: Formulario-TIC-Windows
+          path: release_assets/
+
+      - name: Descargar Artefactos Android
+        uses: actions/download-artifact@v4
+        with:
+          name: Formulario-TIC-Android-APK
+          path: release_assets/
+
+      - name: Crear GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v5.7.0
+          name: "Formulario TIC - ISP v5.7.0 (Android APK, Windows y macOS)"
+          body: |
+            ## 🚀 Instaladores Oficiales Formulario TIC - ISP v5.7.0
+            
+            Descarga el instalador correspondiente para tu dispositivo:
+            - 🤖 **Android (APK):** `Formulario_TIC_ISP_v5.7.0.apk`
+            - 🪟 **Windows Instalador (Setup):** `Formulario TIC - ISP Setup 5.7.0.exe`
+            - 🪟 **Windows Portable:** `Formulario_TIC_ISP_Portable_v5.7.0.exe`
+            - 🍏 **macOS:** `Formulario_TIC_ISP_macOS_v5.7.0.dmg`
+            
+            🌐 **Acceso Web en Vivo:** https://formulario-tic.vercel.app/
+          files: release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

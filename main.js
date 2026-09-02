@@ -93,25 +93,13 @@ function createWindow() {
             label: 'Ayuda',
             submenu: [
                 {
-                    label: `Acerca de Formulario TIC (v${app.getVersion()})...`,
-                    click: () => {
-                        dialog.showMessageBox(mainWindow, {
-                            type: 'info',
-                            title: 'Acerca de Gestión TIC',
-                            message: `Gestión de Equipamiento TIC - ISP Chile (v${app.getVersion()})`,
-                            detail: `Versión Actual: ${app.getVersion()}\nEstado: Sistema Operativo y Local\nOficina de Tecnologías de la Información y Comunicaciones (TIC)\nInstituto de Salud Pública de Chile.`,
-                            buttons: ['Aceptar']
-                        });
-                    }
-                },
-                {
-                    label: 'Ver Novedades de la Versión...',
+                    label: `Información del Sistema y Novedades (v${app.getVersion()})...`,
                     click: () => {
                         if (mainWindow) mainWindow.webContents.send('trigger-open-about');
                     }
                 },
                 {
-                    label: 'Comprobar Actualizaciones y Limpiar Caché...',
+                    label: 'Comprobar Actualizaciones (Barra de Progreso)...',
                     accelerator: 'F5',
                     click: () => {
                         if (mainWindow) mainWindow.webContents.send('trigger-check-update');

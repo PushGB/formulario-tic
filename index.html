@@ -1841,13 +1841,14 @@
                 <!-- Recuadro Firma Emisor (Caja de borde independiente, replicando Word 1:1) -->
                 <table class="w-full border-collapse border border-black text-xs mb-4">
                     <tr>
-                        <td class="border border-black p-4 w-[50%] text-center align-middle" style="height: 140px; position: relative; background-color: white;">
-                            <div class="relative w-56 h-20 mx-auto flex items-end justify-center border-b border-black">
+                        <td class="border border-black p-3 w-[50%] text-center align-middle" style="height: 140px; position: relative; background-color: white;">
+                            <div class="relative w-56 h-16 mx-auto flex items-end justify-center border-b border-black">
                                 <!-- Firma digital si existe -->
-                                <img id="print-sig-emisor-img" class="hidden h-full object-contain absolute bottom-0 max-h-[75px]" src="" alt="Firma Emisor">
+                                <img id="print-sig-emisor-img" class="hidden h-full object-contain absolute bottom-0 max-h-[60px]" src="" alt="Firma Emisor">
                             </div>
-                            <div class="font-bold mt-2 uppercase tracking-wide print-tnr-10" style="font-size: 9px;">NOMBRE, FIRMA Y RUT</div>
-                            <div class="font-medium print-tnr-10" style="font-size: 9px;">Funcionario(a) Responsable (Emisor)</div>
+                            <div id="print-sig-emisor-nombre-txt" class="font-bold text-[10px] mt-1 text-slate-900 font-mono">-</div>
+                            <div class="font-bold uppercase tracking-wide print-tnr-10" style="font-size: 8.5px;">NOMBRE, FIRMA Y RUT</div>
+                            <div class="font-medium print-tnr-10" style="font-size: 8.5px;">Funcionario(a) Responsable (Emisor)</div>
                         </td>
                         <td class="border border-black p-4 w-[50%] text-left align-middle text-[9px] leading-relaxed bg-white print-tnr-10">
                             <p><strong>Consideraciones:</strong> Al firmar y recibir éste(os) equipamiento(s) me hago responsable de su uso y cuidado.</p>
@@ -1859,13 +1860,14 @@
                 <!-- Recuadro Firma Receptor (Caja de borde independiente, replicando Word 1:1) -->
                 <table class="w-full border-collapse border border-black text-xs mb-4">
                     <tr>
-                        <td class="border border-black p-4 w-[50%] text-center align-middle" style="height: 140px; position: relative; background-color: white;">
-                            <div class="relative w-56 h-20 mx-auto flex items-end justify-center border-b border-black">
+                        <td class="border border-black p-3 w-[50%] text-center align-middle" style="height: 140px; position: relative; background-color: white;">
+                            <div class="relative w-56 h-16 mx-auto flex items-end justify-center border-b border-black">
                                 <!-- Firma digital si existe -->
-                                <img id="print-sig-receptor-img" class="hidden h-full object-contain absolute bottom-0 max-h-[75px]" src="" alt="Firma Receptor">
+                                <img id="print-sig-receptor-img" class="hidden h-full object-contain absolute bottom-0 max-h-[60px]" src="" alt="Firma Receptor">
                             </div>
-                            <div class="font-bold mt-2 uppercase tracking-wide print-tnr-10" style="font-size: 9px;">NOMBRE, FIRMA Y RUT</div>
-                            <div class="font-medium print-tnr-10" style="font-size: 9px;">Funcionario(a) Responsable (Receptor)</div>
+                            <div id="print-sig-receptor-nombre-txt" class="font-bold text-[10px] mt-1 text-slate-900 font-mono">-</div>
+                            <div class="font-bold uppercase tracking-wide print-tnr-10" style="font-size: 8.5px;">NOMBRE, FIRMA Y RUT</div>
+                            <div class="font-medium print-tnr-10" style="font-size: 8.5px;">Funcionario(a) Responsable (Receptor)</div>
                         </td>
                         <td class="border border-black p-4 w-[50%] text-left align-middle text-[9px] leading-relaxed bg-white print-tnr-10">
                             <p><strong>Consideraciones:</strong> Al firmar y recibir éste(os) equipamiento(s) me hago responsable de su uso y cuidado.</p>

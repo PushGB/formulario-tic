@@ -1778,20 +1778,37 @@ function syncPrintTemplate() {
     const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked')?.value || 'digital';
     const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked')?.value || 'digital';
     
-    // TIC (Página 1) - Predeterminada: Firma Eduardo Wess (Jefe TIC)
+    // ================= 1. FIRMA PROFESIONAL TIC (PÁGINA 1) =================
     const imgTic = document.getElementById('print-sig-tic-img');
     const manualTic = document.getElementById('print-sig-tic-manual');
+    
     if (sigModeTic === 'manual') {
         if (imgTic) imgTic.classList.add('hidden');
         if (manualTic) manualTic.classList.remove('hidden');
-    } else if (sigModeTic === 'digital' && drawingStates.tic.hasSigned) {
-        if (imgTic) {
-            imgTic.src = document.getElementById('canvas-tic').toDataURL();
-            imgTic.classList.remove('hidden');
+    } else if (sigModeTic === 'digital') {
+        let dataUrlTic = (drawingStates.tic && drawingStates.tic.hasSigned) ? document.getElementById('canvas-tic')?.toDataURL() : null;
+        if (!dataUrlTic && activeSubmissionId) {
+            const sub = submissions.find(s => s.id === activeSubmissionId);
+            if (sub && sub.firmas && sub.firmas.tic && sub.firmas.tic.startsWith('data:image')) {
+                dataUrlTic = sub.firmas.tic;
+            }
         }
-        if (manualTic) manualTic.classList.add('hidden');
+        if (dataUrlTic && dataUrlTic.startsWith('data:image')) {
+            if (imgTic) {
+                imgTic.src = dataUrlTic;
+                imgTic.classList.remove('hidden');
+            }
+            if (manualTic) manualTic.classList.add('hidden');
+        } else {
+            // Si está vacío, estampar firma oficial Eduardo Wess
+            if (imgTic) {
+                imgTic.src = 'img/firma-eduardo-wess.png';
+                imgTic.classList.remove('hidden');
+            }
+            if (manualTic) manualTic.classList.add('hidden');
+        }
     } else {
-        // Por defecto o modo 'oficial': Firma Oficial Eduardo Wess
+        // MODO OFICIAL (Por Defecto): Firma Eduardo Wess (Jefe TIC)
         if (imgTic) {
             imgTic.src = 'img/firma-eduardo-wess.png';
             imgTic.classList.remove('hidden');
@@ -1799,24 +1816,61 @@ function syncPrintTemplate() {
         if (manualTic) manualTic.classList.add('hidden');
     }
     
-    // Emisor (Página 2)
+    // ================= 2. FIRMA EMISOR (PÁGINA 2) =================
     const imgEmisor = document.getElementById('print-sig-emisor-img');
-    if (sigModeEmisor === 'digital' && drawingStates.emisor.hasSigned) {
-        imgEmisor.src = document.getElementById('canvas-emisor').toDataURL();
-        imgEmisor.classList.remove('hidden');
+    let dataUrlEmisor = (drawingStates.emisor && drawingStates.emisor.hasSigned) ? document.getElementById('canvas-emisor')?.toDataURL() : null;
+    if (!dataUrlEmisor && activeSubmissionId) {
+        const sub = submissions.find(s => s.id === activeSubmissionId);
+        if (sub && sub.firmas && sub.firmas.emisor && sub.firmas.emisor.startsWith('data:image')) {
+            dataUrlEmisor = sub.firmas.emisor;
+        }
+    }
+    if (sigModeEmisor === 'digital' && dataUrlEmisor && dataUrlEmisor.startsWith('data:image')) {
+        if (imgEmisor) {
+            imgEmisor.src = dataUrlEmisor;
+            imgEmisor.classList.remove('hidden');
+        }
     } else {
-        imgEmisor.src = '';
-        imgEmisor.classList.add('hidden');
+        if (imgEmisor) {
+            imgEmisor.src = '';
+            imgEmisor.classList.add('hidden');
+        }
     }
     
-    // Receptor (Página 2)
+    // ================= 3. FIRMA RECEPTOR (PÁGINA 2) =================
     const imgReceptor = document.getElementById('print-sig-receptor-img');
-    if (sigModeReceptor === 'digital' && drawingStates.receptor.hasSigned) {
-        imgReceptor.src = document.getElementById('canvas-receptor').toDataURL();
-        imgReceptor.classList.remove('hidden');
+    let dataUrlReceptor = (drawingStates.receptor && drawingStates.receptor.hasSigned) ? document.getElementById('canvas-receptor')?.toDataURL() : null;
+    if (!dataUrlReceptor && activeSubmissionId) {
+        const sub = submissions.find(s => s.id === activeSubmissionId);
+        if (sub && sub.firmas && sub.firmas.receptor && sub.firmas.receptor.startsWith('data:image')) {
+            dataUrlReceptor = sub.firmas.receptor;
+        }
+    }
+    if (sigModeReceptor === 'digital' && dataUrlReceptor && dataUrlReceptor.startsWith('data:image')) {
+        if (imgReceptor) {
+            imgReceptor.src = dataUrlReceptor;
+            imgReceptor.classList.remove('hidden');
+        }
     } else {
-        imgReceptor.src = '';
-        imgReceptor.classList.add('hidden');
+        if (imgReceptor) {
+            imgReceptor.src = '';
+            imgReceptor.classList.add('hidden');
+        }
+    }
+
+    // Actualizar nombre y RUT en los recuadros de firma de Página 2
+    const funcNombre = document.getElementById('func-nombre')?.value.trim() || '';
+    const funcRut = document.getElementById('func-rut')?.value.trim() || '';
+    const emisorNombre = document.getElementById('traspaso-emisor-nombre')?.value.trim() || '';
+
+    const txtReceptor = document.getElementById('print-sig-receptor-nombre-txt');
+    if (txtReceptor) {
+        txtReceptor.innerText = funcNombre ? `${funcNombre} ${funcRut ? '• ' + funcRut : ''}` : '-';
+    }
+
+    const txtEmisor = document.getElementById('print-sig-emisor-nombre-txt');
+    if (txtEmisor) {
+        txtEmisor.innerText = isTraspaso && emisorNombre ? emisorNombre : '-';
     }
 }
 
@@ -2286,15 +2340,23 @@ function viewAndEditForm(id) {
     document.getElementById('form-observaciones').value = s.observaciones_generales || '';
 
     // Rellenar modos de firma (Oficial / Digital / Manual)
-    const sigModes = s.firmas || { tic_mode: 'oficial', emisor_mode: 'digital', receptor_mode: 'digital' };
-    const ticTargetMode = sigModes.tic_mode || (sigModes.tic ? 'digital' : 'oficial');
+    const sigModes = s.firmas || {};
+    let ticTargetMode = 'oficial';
+    if (sigModes.tic_mode) {
+        ticTargetMode = sigModes.tic_mode;
+    } else if (sigModes.tic && sigModes.tic.startsWith('data:image')) {
+        ticTargetMode = 'digital';
+    } else {
+        ticTargetMode = 'oficial';
+    }
+
     const ticRadio = document.querySelector(`input[name="sig_mode_tic"][value="${ticTargetMode}"]`) || document.querySelector('input[name="sig_mode_tic"][value="oficial"]');
     if (ticRadio) ticRadio.checked = true;
     
-    const emisorRadio = document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`);
+    const emisorRadio = document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || (sigModes.emisor ? 'digital' : 'manual')}"]`);
     if (emisorRadio) emisorRadio.checked = true;
     
-    const receptorRadio = document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`);
+    const receptorRadio = document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || (sigModes.receptor ? 'digital' : 'manual')}"]`);
     if (receptorRadio) receptorRadio.checked = true;
     
     toggleSigMode('tic');
@@ -2310,23 +2372,25 @@ function viewAndEditForm(id) {
     setTimeout(() => {
         resizeAllCanvases();
         setTimeout(() => {
-            if (sigModes.tic_mode === 'digital') drawSavedSignature('tic', s.firmas.tic);
-            if (sigModes.emisor_mode === 'digital') drawSavedSignature('emisor', s.firmas.emisor);
-            if (sigModes.receptor_mode === 'digital') drawSavedSignature('receptor', s.firmas.receptor);
+            if (ticTargetMode === 'digital' && s.firmas?.tic) drawSavedSignature('tic', s.firmas.tic);
+            if (sigModes.emisor_mode === 'digital' && s.firmas?.emisor) drawSavedSignature('emisor', s.firmas.emisor);
+            if (sigModes.receptor_mode === 'digital' && s.firmas?.receptor) drawSavedSignature('receptor', s.firmas.receptor);
         }, 120);
     }, 120);
 }
 
 // Función para renderizar firmas almacenadas en los paneles canvas respetando devicePixelRatio
 function drawSavedSignature(id, dataUrl) {
-    if (!dataUrl) {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) {
         clearCanvas(id);
         return;
     }
     const canvas = document.getElementById(`canvas-${id}`);
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (drawingStates[id]) drawingStates[id].hasSigned = true;
     
     const img = new Image();
     img.onload = function() {
@@ -2334,7 +2398,7 @@ function drawSavedSignature(id, dataUrl) {
         const width = canvas.width / ratio;
         const height = canvas.height / ratio;
         ctx.drawImage(img, 0, 0, width, height);
-        drawingStates[id].hasSigned = true;
+        if (drawingStates[id]) drawingStates[id].hasSigned = true;
         updateSignatureFeedback(id);
     };
     img.src = dataUrl;

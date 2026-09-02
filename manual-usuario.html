@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Manual de Usuario - Sistema de Gestión de Equipamiento TIC - ISP Chile</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 16mm 14mm 18mm 14mm;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            line-height: 1.55;
+            font-size: 9.8pt;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+        .page-break {
+            page-break-after: always;
+            break-after: page;
+        }
+        .no-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        
+        /* PORTADA */
+        .cover {
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 25mm 15mm 20mm 15mm;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 60%, #f1f5f9 100%);
+        }
+        .cover-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .cover-header img {
+            height: 52px;
+            width: auto;
+        }
+        .cover-badge {
+            display: inline-block;
+            background-color: #e0e7ff;
+            color: #3730a3;
+            font-weight: 700;
+            font-size: 8.5pt;
+            padding: 4px 14px;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 15px;
+            border: 1px solid #c7d2fe;
+        }
+        .cover-title {
+            font-size: 24pt;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.15;
+            margin: 10px 0;
+            letter-spacing: -0.02em;
+        }
+        .cover-subtitle {
+            font-size: 12pt;
+            color: #475569;
+            font-weight: 500;
+            margin: 10px auto;
+            max-width: 600px;
+        }
+        .cover-card {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 16px 24px;
+            max-width: 520px;
+            margin: 25px auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            text-align: left;
+            font-size: 9pt;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        .cover-card span {
+            display: block;
+            color: #64748b;
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .cover-card strong {
+            color: #0f172a;
+            font-size: 9.5pt;
+        }
+        .cover-foot {
+            border-top: 1px solid #cbd5e1;
+            padding-top: 15px;
+            font-size: 8pt;
+            color: #64748b;
+        }
+
+        /* TIPOGRAFÍA Y ESTRUCTURA */
+        h1 {
+            font-size: 15pt;
+            font-weight: 800;
+            color: #1e1b4b;
+            border-bottom: 2px solid #6366f1;
+            padding-bottom: 4px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            page-break-after: avoid;
+        }
+        h2 {
+            font-size: 12pt;
+            font-weight: 700;
+            color: #312e81;
+            margin-top: 15px;
+            margin-bottom: 6px;
+            page-break-after: avoid;
+        }
+        h3 {
+            font-size: 10.5pt;
+            font-weight: 700;
+            color: #0f172a;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            page-break-after: avoid;
+        }
+        p {
+            margin-top: 0;
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+        ul, ol {
+            margin-top: 0;
+            margin-bottom: 8px;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 3px;
+        }
+
+        /* ALERTAS */
+        .callout {
+            border-radius: 8px;
+            padding: 9px 12px;
+            margin: 10px 0;
+            font-size: 9pt;
+            border-left: 4px solid;
+            page-break-inside: avoid;
+        }
+        .callout-info { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+        .callout-success { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+        .callout-warning { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+
+        /* TABLAS */
+        table.doc-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 8.5pt;
+            page-break-inside: avoid;
+        }
+        table.doc-table th {
+            background: #1e1b4b;
+            color: #ffffff;
+            font-weight: 700;
+            text-align: left;
+            padding: 6px 8px;
+            border: 1px solid #1e1b4b;
+        }
+        table.doc-table td {
+            padding: 5px 8px;
+            border: 1px solid #cbd5e1;
+            vertical-align: top;
+        }
+        table.doc-table tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        /* CAPTURAS DE PANTALLA */
+        .screenshot {
+            margin: 10px auto;
+            text-align: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f8fafc;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            page-break-inside: avoid;
+            max-width: 96%;
+        }
+        .screenshot img {
+            width: 100%;
+            height: auto;
+            max-height: 255px;
+            object-fit: contain;
+            display: block;
+            background: #0f172a;
+        }
+        .screenshot-caption {
+            padding: 4px 8px;
+            font-size: 7.5pt;
+            color: #475569;
+            font-weight: 600;
+            background: #f1f5f9;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-block;
+            padding: 1.5px 6px;
+            border-radius: 4px;
+            font-size: 7.5pt;
+            font-weight: 700;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+        .badge-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+        .badge-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-amber { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+
+        /* ÍNDICE */
+        .toc-list { list-style: none; padding: 0; margin: 15px 0; }
+        .toc-item { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px dotted #cbd5e1; font-size: 9pt; }
+        .toc-title { font-weight: 600; color: #1e293b; }
+        .toc-page { font-weight: 700; color: #6366f1; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+    <!-- PORTADA -->
+    <div class="cover page-break">
+        <div>
+            <div class="cover-header">
+                <img src="img/logo-isp.svg" alt="Logo ISP Chile">
+                <div style="text-align: left;">
+                    <div style="font-weight: 800; font-size: 12pt; color: #0f172a;">INSTITUTO DE SALUD PÚBLICA DE CHILE</div>
+                    <div style="font-size: 8.5pt; color: #64748b; font-weight: 600;">OFICINA DE TECNOLOGÍAS DE LA INFORMACIÓN Y COMUNICACIONES (TIC)</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <span class="cover-badge">Manual Oficial de Instrucción Técnica</span>
+                <div class="cover-title">SISTEMA DE GESTIÓN DE EQUIPAMIENTO TIC</div>
+                <div class="cover-subtitle">
+                    Guía de Usuario, Operación y Protocolos de Entrega, Traspaso y Devolución de Activos Tecnológicos
+                </div>
+            </div>
+
+            <div class="cover-card">
+                <div>
+                    <span>Formulario Oficial</span>
+                    <strong>RG-02-IT-140.03-004 V5</strong>
+                </div>
+                <div>
+                    <span>Versión del Software</span>
+                    <strong>v5.7.0 (Multiplataforma)</strong>
+                </div>
+                <div>
+                    <span>Modalidad Operativa</span>
+                    <strong>Windows (.exe) • Web PWA • Offline</strong>
+                </div>
+                <div>
+                    <span>Jefatura Responsable</span>
+                    <strong>Eduardo Wess (Jefe Oficina TIC)</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="cover-foot">
+            Documento normativo de uso interno • Oficina TIC - Instituto de Salud Pública de Chile<br>
+            <strong>Santiago de Chile • Edición Oficial 2026</strong>
+        </div>
+    </div>
+
+    <!-- ÍNDICE -->
+    <div class="page-break">
+        <h1>Índice de Contenidos</h1>
+        <ul class="toc-list">
+            <li class="toc-item"><span class="toc-title">1. Introducción y Propósito del Sistema</span><span class="toc-page">Pág. 3</span></li>
+            <li class="toc-item"><span class="toc-title">2. Métodos de Acceso e Instalación (Windows, Web, Offline)</span><span class="toc-page">Pág. 4</span></li>
+            <li class="toc-item"><span class="toc-title">3. Estructura de la Interfaz y Barra de Navegación</span><span class="toc-page">Pág. 5</span></li>
+            <li class="toc-item"><span class="toc-title">4. Matriz de Roles y Permisos (Administrador, Técnico, Funcionario)</span><span class="toc-page">Pág. 6</span></li>
+            <li class="toc-item"><span class="toc-title">5. Paso a Paso: Creación de un Acta de Equipamiento</span><span class="toc-page">Pág. 7</span></li>
+            <li class="toc-item"><span class="toc-title">6. Gestión y Estampado de Firmas Oficiales</span><span class="toc-page">Pág. 9</span></li>
+            <li class="toc-item"><span class="toc-title">7. Previsualización Oficial y Flujo de Impresión (Tamaño Oficio)</span><span class="toc-page">Pág. 10</span></li>
+            <li class="toc-item"><span class="toc-title">8. Consulta de Catastro (+900 Equipos) y Métricas</span><span class="toc-page">Pág. 11</span></li>
+            <li class="toc-item"><span class="toc-title">9. Respaldos (Backup JSON) y Sincronización en la Nube</span><span class="toc-page">Pág. 12</span></li>
+            <li class="toc-item"><span class="toc-title">10. Preguntas Frecuentes y Soporte Técnico</span><span class="toc-page">Pág. 13</span></li>
+        </ul>
+
+        <div class="callout callout-info" style="margin-top: 25px;">
+            <strong>Marco Normativo:</strong> En cumplimiento del procedimiento <em>IT Pérdida de Equipamiento</em> y normativas del ISP Chile, todo retiro, traspaso o devolución de computadores, monitores, periféricos o telefonía debe quedar respaldado mediante el formulario oficial <strong>RG-02-IT-140.03-004 V5</strong> con las firmas correspondientes.
+        </div>
+
+        <div class="no-break" style="margin-top: 20px;">
+            <h2>Ficha de Control de Versiones</h2>
+            <table class="doc-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Versión</th>
+                        <th style="width: 20%;">Fecha</th>
+                        <th style="width: 25%;">Unidad</th>
+                        <th style="width: 40%;">Principales Cambios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>v5.7.0</strong></td>
+                        <td>Septiembre 2026</td>
+                        <td>Oficina TIC - ISP</td>
+                        <td>Independización offline completa (Electron), soporte tamaño Oficio Chile (216x330mm), visor en vivo 2 páginas, firma oficial Eduardo Wess, matriz de 3 roles y backups JSON.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 1: INTRODUCCIÓN -->
+    <div class="page-break">
+        <h1>1. Introducción y Propósito del Sistema</h1>
+        <p>
+            El <strong>Sistema de Gestión de Equipamiento TIC</strong> del Instituto de Salud Pública de Chile ha sido diseñado para modernizar, agilizar y asegurar la trazabilidad de los activos tecnológicos entregados en custodia a los funcionarios de la institución.
+        </p>
+
+        <h2>Objetivos Principales</h2>
+        <ul>
+            <li><strong>Digitalización Guiada:</strong> Reemplazar el llenado manual por un formulario estructurado con validación matemática de RUT chileno (algoritmo Módulo 11) y autocompletado en tiempo real de inventario.</li>
+            <li><strong>Fidelidad Documental 1:1:</strong> Generar automáticamente actas impresas que respetan rigurosamente el formato físico oficial <strong>RG-02-IT-140.03-004 V5</strong> en papel tamaño <strong>Oficio o Circular (216 mm × 330 mm)</strong> estructurado en dos páginas exactas.</li>
+            <li><strong>Operatividad 100% Offline:</strong> Permitir la operación ininterrumpida de los técnicos de terreno en caso de caídas de red o faenas sin conexión a internet mediante tecnología local (Electron & LocalStorage).</li>
+            <li><strong>Sincronización Dual:</strong> Capacidad de sincronizar automáticamente con la base de datos central en la nube (Supabase) cuando el enlace de red esté disponible.</li>
+        </ul>
+
+        <div class="screenshot">
+            <img src="img/manual/screenshot-dashboard.png" alt="Panel de Registros">
+            <div class="screenshot-caption">Figura 1.1: Panel Principal de Registros y Control de Solicitudes Guardadas.</div>
+        </div>
+
+        <h2>Tipos de Operaciones Contempladas</h2>
+        <table class="doc-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Operación</th>
+                    <th style="width: 40%;">Descripción</th>
+                    <th style="width: 35%;">Firmas Requeridas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-blue">Asignación</span></td>
+                    <td>Entrega de equipamiento tecnológico nuevo o reacondicionado a un funcionario para sus labores habituales.</td>
+                    <td>Firma Jefe TIC (Pág. 1) + Firma Funcionario Receptor (Pág. 2).</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-purple">Traspaso</span></td>
+                    <td>Transferencia formal de custodia de un equipo de un funcionario emisor a uno receptor (cambio de unidad o reemplazo).</td>
+                    <td>Firma Jefe TIC (Pág. 1) + Firma Funcionario Emisor (Pág. 2) + Firma Funcionario Receptor (Pág. 2).</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-amber">Devolución</span></td>
+                    <td>Recepción en la Oficina TIC de equipos dados de baja, reasignación o desvinculación de un funcionario.</td>
+                    <td>Firma Jefe TIC (Pág. 1) + Firma Funcionario que entrega (Pág. 2).</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- SECCIÓN 2: ACCESO E INSTALACIÓN -->
+    <div class="page-break">
+        <h1>2. Métodos de Acceso e Instalación</h1>
+        <p>El sistema se distribuye en múltiples modalidades para adaptarse a las necesidades operativas de la Oficina TIC:</p>
+
+        <h2>2.1. Aplicación de Escritorio para Windows (.exe)</h2>
+        <p>Es la modalidad principal recomendada para los técnicos del ISP. Se encuentra en la carpeta del proyecto <code>dist/</code> y ofrece dos modalidades:</p>
+        
+        <ul>
+            <li><strong>Instalador Guiado (Setup):</strong> Archivo <code>Formulario TIC - ISP Setup 5.7.0.exe</code>. Instala el programa en el sistema, añade acceso directo en el Escritorio y en el Menú Inicio de Windows.</li>
+            <li><strong>Versión Portable (Sin Instalación):</strong> Archivo <code>Formulario_TIC_ISP_Portable_v5.7.0.exe</code>. Se puede ejecutar directamente desde una memoria USB o disco local sin requerir privilegios de administrador ni conexión a internet.</li>
+        </ul>
+
+        <div class="callout callout-success">
+            <strong>Ventaja Clave Offline:</strong> Las versiones de escritorio para Windows cuentan con todas las librerías CSS, tipografías e iconos empaquetados localmente, garantizando carga instantánea incluso sin conexión de red.
+        </div>
+
+        <h2>2.2. Acceso Web Oficial & PWA</h2>
+        <p>Para acceso remoto o consultas desde cualquier equipo conectado a la red institucional:</p>
+        <ul>
+            <li><strong>URL Oficial:</strong> <a href="https://formulario-tic.vercel.app/">https://formulario-tic.vercel.app/</a></li>
+            <li><strong>Instalación PWA (Progressive Web App):</strong> Desde Google Chrome o Microsoft Edge, pulse en el icono de instalación en la barra de direcciones para anclarla como aplicación nativa en Windows, Mac o dispositivos móviles.</li>
+        </ul>
+
+        <h2>2.3. Acceso en Teléfonos y Tablets (Android)</h2>
+        <ul>
+            <li><strong>Instalador Nativo (APK):</strong> Archivo <code>Formulario_TIC_ISP_v5.7.0.apk</code> compilado para dispositivos Android.</li>
+            <li><strong>Instalación PWA en Chrome Móvil:</strong> Ingrese a la URL, abra el menú de opciones (⋮) y seleccione <em>"Instalar aplicación"</em> o <em>"Agregar a la pantalla principal"</em>.</li>
+        </ul>
+
+        <div class="screenshot">
+            <img src="img/manual/screenshot-modal-info.png" alt="Información del Sistema">
+            <div class="screenshot-caption">Figura 2.1: Ventana de Información del Sistema, Novedades y Comprobación de Versión.</div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: INTERFAZ Y NAVEGACIÓN -->
+    <div class="page-break">
+        <h1>3. Estructura de la Interfaz y Barra de Navegación</h1>
+        <p>La aplicación cuenta con una barra de navegación superior (Navbar) moderna, limpia y responsive que se adapta automáticamente a la resolución de la pantalla:</p>
+
+        <div class="screenshot">
+            <img src="img/manual/navbar.png" alt="Barra Superior de Navegación">
+            <div class="screenshot-caption">Figura 3.1: Componentes principales de la Barra de Navegación Superior.</div>
+        </div>
+
+        <h2>Elementos de la Barra Superior</h2>
+        <table class="doc-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Componente</th>
+                    <th style="width: 20%;">Ubicación</th>
+                    <th style="width: 55%;">Función</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Logo e Identidad ISP</strong></td>
+                    <td>Extremo Izquierdo</td>
+                    <td>Muestra el imagotipo oficial del Instituto de Salud Pública y el código normativo del formulario (RG-02-IT-140.03-004 V5).</td>
+                </tr>
+                <tr>
+                    <td><strong>Pestaña "Registros"</strong></td>
+                    <td>Centro (Menú)</td>
+                    <td>Accede a la tabla histórica de solicitudes guardadas, con filtros rápidos y opciones de edición, impresión y exportación.</td>
+                </tr>
+                <tr>
+                    <td><strong>Pestaña "Catastro"</strong></td>
+                    <td>Centro (Menú)</td>
+                    <td>Buscador en vivo de los más de 900 números de serie de equipos catastrados en el ISP.</td>
+                </tr>
+                <tr>
+                    <td><strong>Pestaña "Métricas"</strong></td>
+                    <td>Centro (Menú)</td>
+                    <td>Estadísticas consolidadas de asignaciones, devoluciones y stock de equipamiento.</td>
+                </tr>
+                <tr>
+                    <td><strong>Pestaña "Nueva Solicitud"</strong></td>
+                    <td>Centro (Menú)</td>
+                    <td>Limpia los campos y abre el formulario en blanco para generar una nueva acta de entrega.</td>
+                </tr>
+                <tr>
+                    <td><strong>Indicador de Conexión</strong></td>
+                    <td>Extremo Derecho</td>
+                    <td>Muestra si el sistema está operando <em>"En Línea"</em> (sincronizado con Supabase) o <em>"Modo Local"</em> (offline).</td>
+                </tr>
+                <tr>
+                    <td><strong>Selector de Rol</strong></td>
+                    <td>Extremo Derecho</td>
+                    <td>Permite autenticarse como <em>Administrador</em>, <em>Técnico TIC</em> o <em>Funcionario</em>.</td>
+                </tr>
+                <tr>
+                    <td><strong>Badge de Versión (v5.7.0)</strong></td>
+                    <td>Extremo Derecho</td>
+                    <td>Muestra la versión instalada. Al hacer clic, despliega el panel de novedades y el botón de comprobación de actualizaciones.</td>
+                </tr>
+                <tr>
+                    <td><strong>Interruptor de Tema</strong></td>
+                    <td>Extremo Derecho</td>
+                    <td>Alterna entre modo oscuro (Dark Mode) y modo claro de alto contraste.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- SECCIÓN 4: MATRIZ DE ROLES -->
+    <div class="page-break">
+        <h1>4. Matriz de Roles y Permisos (Seguridad)</h1>
+        <p>Para salvaguardar la integridad de los datos institucionales, la aplicación incorpora una <strong>matriz estricta de 3 roles</strong> de usuario, claramente diferenciados:</p>
+
+        <div class="screenshot">
+            <img src="img/manual/roles-matrix.png" alt="Matriz de Perfiles y Roles">
+            <div class="screenshot-caption">Figura 4.1: Matriz de Roles y Niveles de Acceso al Sistema.</div>
+        </div>
+
+        <h2>4.1. Detalle de Permisos por Rol</h2>
+        <table class="doc-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Acción / Función</th>
+                    <th style="width: 25%; text-align: center;">Modo Administrador</th>
+                    <th style="width: 25%; text-align: center;">Modo Técnico TIC</th>
+                    <th style="width: 25%; text-align: center;">Modo Funcionario</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Llenar y firmar nueva solicitud</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí (Solo Pág. Solicitud)</td>
+                </tr>
+                <tr>
+                    <td>Acceso a Catastro (+900 equipos)</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí (Total)</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí (Autocompletado)</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Denegado</td>
+                </tr>
+                <tr>
+                    <td>Panel de Métricas y Estadísticas</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Denegado</td>
+                </tr>
+                <tr>
+                    <td>Previsualización e Impresión Oficio</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí (Su propia acta)</td>
+                </tr>
+                <tr>
+                    <td>Editar registros existentes</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Denegado</td>
+                </tr>
+                <tr>
+                    <td>Eliminar registros individuales</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí (Exclusivo)</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Protegido</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Denegado</td>
+                </tr>
+                <tr>
+                    <td>Exportar Respaldos JSON</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Protegido</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Denegado</td>
+                </tr>
+                <tr>
+                    <td>Restaurar Respaldos / Vaciar BD</td>
+                    <td style="text-align: center; color: green; font-weight: bold;">✔ Sí (Exclusivo)</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Protegido</td>
+                    <td style="text-align: center; color: red; font-weight: bold;">✖ Denegado</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.2. Cómo Cambiar de Rol</h2>
+        <ol>
+            <li>Haga clic en el botón de rol en la barra superior (ej. <strong>"Modo Técnico"</strong>).</li>
+            <li>Seleccione el rol deseado en la ventana emergente.</li>
+            <li>Si selecciona <strong>Modo Administrador</strong>, ingrese la clave o PIN maestro de seguridad autorizado por la Oficina TIC.</li>
+            <li>El sistema actualizará la interfaz al instante ocultando o mostrando los controles administrativos.</li>
+        </ol>
+    </div>
+
+    <!-- SECCIÓN 5: PASO A PASO -->
+    <div class="page-break">
+        <h1>5. Paso a Paso: Creación de un Acta de Equipamiento</h1>
+        <p>A continuación se detalla el procedimiento oficial para registrar una nueva entrega de activos:</p>
+
+        <div class="screenshot">
+            <img src="img/manual/screenshot-formulario.png" alt="Formulario de Solicitud">
+            <div class="screenshot-caption">Figura 5.1: Formulario interactivo con autocompletado y validación de datos.</div>
+        </div>
+
+        <h2>Paso 1: Datos de Cabecera y del Funcionario</h2>
+        <ul>
+            <li><strong>Fecha:</strong> Se completa automáticamente con la fecha actual del sistema (editable si es necesario).</li>
+            <li><strong>Ticket / Folio OT:</strong> Número de ticket del helpdesk institucional (opcional).</li>
+            <li><strong>RUT del Funcionario:</strong> Ingrese el RUT (con o sin puntos y guión). El sistema:
+                <ul>
+                    <li>Formatea automáticamente los puntos y guión (ej. <code>12.345.678-9</code>).</li>
+                    <li>Valida el dígito verificador mediante el <strong>algoritmo matemático Módulo 11</strong>.</li>
+                    <li>Muestra un check verde de validación o una advertencia en rojo si el RUT no es matemáticamente válido.</li>
+                </ul>
+            </li>
+            <li><strong>Nombre Completo, Cargo y Departamento:</strong> Datos formales del solicitante.</li>
+        </ul>
+
+        <h2>Paso 2: Tipo de Solicitud y Propiedad</h2>
+        <ul>
+            <li><strong>Tipo de Solicitud:</strong> Marque <em>Asignación</em>, <em>Traspaso</em> o <em>Devolución</em>.</li>
+            <li><strong>Propiedad del Equipamiento:</strong> Indique si el equipamiento es <em>"En Arriendo"</em> o <em>"Propiedad ISP"</em>.</li>
+            <li><strong>Categorías de Equipamiento:</strong> Marque las casillas de los tipos de equipos a entregar (PC, Notebook, All In One, Monitor, Celular, Teléfono IP, SIMCARD, BAM u Otros).</li>
+        </ul>
+
+        <h2>Paso 3: Sección Exclusiva de Traspaso (Si Aplica)</h2>
+        <p>Si seleccionó la opción <em>Traspaso</em>, el formulario desplegará automáticamente la <strong>Sección 3: Datos de Traspaso</strong>:</p>
+        <ul>
+            <li><strong>Funcionario Emisor:</strong> Nombre y departamento del funcionario que transfiere el equipo.</li>
+            <li><strong>Funcionario Receptor:</strong> Nombre y departamento del funcionario que asume la custodia.</li>
+            <li><strong>Observación del Traspaso:</strong> Motivo del cambio de equipamiento.</li>
+        </ul>
+    </div>
+
+    <!-- SECCIÓN 5 CONTINUACIÓN: EQUIPOS -->
+    <div class="page-break">
+        <h2>Paso 4: Ingreso y Autocompletado de Equipos</h2>
+        <p>La tabla de equipos permite ingresar uno o varios dispositivos en una misma acta:</p>
+
+        <div class="callout callout-info">
+            <strong>Búsqueda Inteligente en Catastro (+900 series):</strong> Al comenzar a escribir en el campo <strong>N° de Serie</strong>, el sistema busca en tiempo real en la base de datos de catastro del ISP y le ofrece sugerencias. Al hacer clic en un equipo sugerido, el sistema <strong>autocompleta de inmediato</strong> el Tipo, Marca, Modelo y N° de Inventario.
+        </div>
+
+        <table class="doc-table">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Columna</th>
+                    <th style="width: 80%;">Descripción y Reglas de Ingreso</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Tipo</strong></td>
+                    <td>Seleccione del listado: Notebook, PC Escritorio, Monitor, All in One, Celular, etc.</td>
+                </tr>
+                <tr>
+                    <td><strong>Marca</strong></td>
+                    <td>Fabricante del hardware (ej. HP, Lenovo, Dell, Samsung).</td>
+                </tr>
+                <tr>
+                    <td><strong>Modelo</strong></td>
+                    <td>Modelo técnico exacto (ej. ProBook 450 G8, ThinkCentre M70q).</td>
+                </tr>
+                <tr>
+                    <td><strong>N° Serie</strong></td>
+                    <td>Identificador alfanumérico único de fábrica (Serial Number).</td>
+                </tr>
+                <tr>
+                    <td><strong>N° Inventario</strong></td>
+                    <td>Código interno de inventario institucional asignado por el ISP.</td>
+                </tr>
+                <tr>
+                    <td><strong>Estado / Obs</strong></td>
+                    <td>Condición física y operativa del equipo (ej. "Excelente", "Nuevo", "Con cargador original").</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <ul>
+            <li>Para añadir más dispositivos, pulse el botón <strong>"+ Añadir Fila de Equipo"</strong>.</li>
+            <li>Para eliminar un equipo no deseado, pulse el icono de papelera a la derecha de la fila.</li>
+        </ul>
+
+        <h2>Paso 5: Accesorios y Observaciones Generales</h2>
+        <ul>
+            <li><strong>Accesorios:</strong> Detalle los complementos entregados (ej. <em>"Mochila HP, transformador 65W, mouse USB, candado de seguridad Kensington"</em>).</li>
+            <li><strong>Observaciones Generales:</strong> Cualquier condición contractual o técnica relevante para el acta.</li>
+        </ul>
+    </div>
+
+    <!-- SECCIÓN 6: FIRMAS OFICIALES -->
+    <div class="page-break">
+        <h1>6. Gestión y Estampado de Firmas Oficiales</h1>
+        <p>El sistema cuenta con una arquitectura de firmas híbrida que cubre tanto la firma digital en pantalla como la firma física tradicional:</p>
+
+        <h2>6.1. Firma del Profesional Oficina TIC (Página 1)</h2>
+        <p>Representa la aprobación formal de la Oficina TIC para la salida del equipo:</p>
+        <ul>
+            <li><strong>Firma Oficial de Eduardo Wess (Por Defecto):</strong> Viene seleccionada automáticamente la opción <em>"Firma Oficial"</em>. Estampa el trazo oficial exacto de la jefatura de TIC de forma nítida sobre la línea de firma en la Página 1 del acta.</li>
+            <li><strong>Dibujar en Pantalla (Digital):</strong> Habilita un canvas táctil para que el técnico o profesional firme con el mouse, lápiz óptico o dedo.</li>
+            <li><strong>Firma Manual:</strong> Oculta cualquier imagen digital y deja la línea limpia para estampar firma física con bolígrafo y timbre en papel.</li>
+        </ul>
+
+        <div class="no-break" style="text-align: center; margin: 15px auto; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; width: 280px; background: white;">
+            <img src="img/manual/firma-wess.png" alt="Firma Eduardo Wess" style="max-height: 45px; margin-bottom: 4px;">
+            <div style="border-bottom: 1px solid black; width: 200px; margin: 0 auto;"></div>
+            <div style="font-size: 8pt; font-weight: bold; margin-top: 4px;">Nombre y Firma Profesional Oficina TIC</div>
+            <div style="font-size: 7.5pt; color: #334155;">Eduardo Wess • Jefe Oficina TIC</div>
+        </div>
+
+        <h2>6.2. Firmas de Emisor y Receptor (Página 2)</h2>
+        <p>Ubicadas en los recuadros oficiales de responsabilidad de la Página 2 del acta:</p>
+        <ul>
+            <li><strong>Firma Funcionario Responsable Receptor:</strong> Corresponde al funcionario que recibe los equipos. Puede firmar digitalmente en el panel o dejarse en modo manual para que firme al recibir el documento impreso.</li>
+            <li><strong>Firma Funcionario Responsable Emisor:</strong> Aplica en solicitudes de tipo <em>Traspaso</em> para acreditar la entrega del funcionario anterior.</li>
+            <li><strong>Rotulación Automática:</strong> Bajo la línea de firma, el sistema imprime automáticamente en tipografía oficial el <strong>Nombre Completo y RUT</strong> del funcionario correspondiente, garantizando la individualización del firmante.</li>
+        </ul>
+
+        <div class="callout callout-warning">
+            <strong>Consideraciones Legales Impresas:</strong> Todo recuadro de firma de la Página 2 incluye la cláusula obligatoria: <em>"Al firmar y recibir éste(os) equipamiento(s) me hago responsable de su uso y cuidado. En caso de pérdida, se debe seguir lo indicado en IT Pérdida de Equipamiento"</em>.
+        </div>
+    </div>
+
+    <!-- SECCIÓN 7: PREVISUALIZACIÓN E IMPRESIÓN -->
+    <div class="page-break">
+        <h1>7. Previsualización Oficial y Flujo de Impresión</h1>
+        <p>Uno de los mayores avances del sistema es el <strong>Visor de Previsualización en Vivo de 2 Páginas</strong>, que permite verificar con total fidelidad el documento antes de imprimirlo o guardarlo:</p>
+
+        <div class="screenshot">
+            <img src="img/manual/screenshot-print-preview.png" alt="Visor de Previsualización en Vivo">
+            <div class="screenshot-caption">Figura 7.1: Visor interactivo en vivo con formato oficial Oficio Chile.</div>
+        </div>
+
+        <h2>7.1. Controles del Visor de Previsualización</h2>
+        <ul>
+            <li><strong>Filtro de Páginas:</strong> Botones para alternar entre <em>"Todas las Páginas"</em>, <em>"Página 1 (Acta y Equipos)"</em> y <em>"Página 2 (Firmas y Consideraciones)"</em>.</li>
+            <li><strong>Guardar PDF:</strong> Genera y descarga directamente el archivo PDF vectorial sin necesidad de abrir el diálogo de impresión de Windows.</li>
+            <li><strong>Imprimir Acta:</strong> Abre la ventana de impresión nativa con los estilos oficiales ya inyectados.</li>
+            <li><strong>Volver a Editar:</strong> Cierra el visor y regresa al formulario sin perder ningún dato ingresado.</li>
+        </ul>
+
+        <h2>7.2. Configuración de Papel Oficio / Circular Chile</h2>
+        <p>El documento está diseñado con reglas CSS de alta precisión (<code>@page { size: 216mm 330mm; }</code>) para que cada página se ajuste con exactitud milimétrica:</p>
+        <ul>
+            <li><strong>Página 1:</strong> Logotipo ISP, Ficha de Solicitud (Sec. 1), Tipos de Solicitud y Equipamiento (Sec. 2), Datos de Traspaso (Sec. 3), Tabla de Equipamiento con bordes oficiales (Sec. 4), Observaciones y Firma del Jefe TIC.</li>
+            <li><strong>Página 2:</strong> Cuadros independientes de responsabilidad de <em>Firma Emisor</em> y <em>Firma Receptor</em> con nombres impresos y advertencia legal final.</li>
+        </ul>
+
+        <div class="callout callout-success">
+            <strong>Cero Desbordes:</strong> La diagramación garantiza que el documento nunca se corte a mitad de tabla ni genere una tercera hoja en blanco accidental.
+        </div>
+    </div>
+
+    <!-- SECCIÓN 8: CATASTRO Y MÉTRICAS -->
+    <div class="page-break">
+        <h1>8. Consulta de Catastro (+900 Equipos) y Métricas</h1>
+
+        <h2>8.1. Buscador Central de Catastro</h2>
+        <p>La pestaña <strong>Catastro (+900)</strong> permite auditar y verificar rápidamente el inventario general del Instituto de Salud Pública:</p>
+
+        <div class="screenshot">
+            <img src="img/manual/screenshot-catastro.png" alt="Catastro de Equipamiento">
+            <div class="screenshot-caption">Figura 8.1: Módulo de Catastro Centralizado con buscador en vivo.</div>
+        </div>
+
+        <ul>
+            <li><strong>Búsqueda Instantánea:</strong> Filtre por N° de Serie, Marca, Modelo, Tipo de Equipo o Nombre de Funcionario asignado.</li>
+            <li><strong>Filtro por Categorías:</strong> Botones rápidos para visualizar solo <em>Notebooks</em>, <em>PCs</em>, <em>Monitores</em>, etc.</li>
+            <li><strong>Acción "Crear Solicitud con este Equipo":</strong> Al hacer clic sobre un equipo del catastro, puede transferir sus datos directamente a un nuevo formulario de asignación sin tener que digitar nada.</li>
+        </ul>
+
+        <h2>8.2. Panel de Métricas de Gestión</h2>
+        <p>La pestaña <strong>Métricas</strong> consolida en gráficos y resúmenes cuantitativos el movimiento tecnológico:</p>
+        <ul>
+            <li>Total de asignaciones vs traspasos vs devoluciones acumuladas.</li>
+            <li>Distribución porcentual por categoría de equipamiento (Notebooks vs PCs vs Telefonía).</li>
+            <li>Equipos en custodia institucional vs equipos entregados.</li>
+        </ul>
+
+        <div class="screenshot">
+            <img src="img/manual/screenshot-metricas.png" alt="Métricas y Estadísticas">
+            <div class="screenshot-caption">Figura 8.2: Tablero Estadístico y Métricas de Gestión TIC.</div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 9: RESPALDOS Y MANTENIMIENTO -->
+    <div class="page-break">
+        <h1>9. Respaldos (Backup JSON) y Sincronización en la Nube</h1>
+
+        <h2>9.1. Generación de Copias de Seguridad (Backup)</h2>
+        <p>Para resguardar los registros sin depender de servidores externos, los usuarios administradores pueden exportar en cualquier momento una copia íntegra de la base de datos:</p>
+        <ol>
+            <li>Inicie sesión en <strong>Modo Administrador</strong>.</li>
+            <li>En la parte superior de la tabla de registros, pulse el botón <strong>"Exportar Backup JSON"</strong>.</li>
+            <li>El sistema descargará un archivo con formato <code>backup_formulario_tic_ISP_YYYY-MM-DD.json</code> que contiene todas las actas, firmas, tablas de equipos e historial.</li>
+            <li>Almacene este archivo en una unidad segura de red o disco de respaldo.</li>
+        </ol>
+
+        <h2>9.2. Restauración de Copias de Seguridad</h2>
+        <ol>
+            <li>En <strong>Modo Administrador</strong>, pulse en <strong>"Restaurar Backup"</strong>.</li>
+            <li>Seleccione el archivo <code>.json</code> previamente exportado.</li>
+            <li>El sistema validará la estructura de los datos y restaurará los registros inmediatamente.</li>
+        </ol>
+
+        <div class="callout callout-warning">
+            <strong>Precaución de Seguridad:</strong> La función de restauración solo está autorizada para la Jefatura o Administradores TIC, ya que reemplaza los datos locales por los del archivo de respaldo.
+        </div>
+
+        <h2>9.3. Sincronización con Supabase (Nube)</h2>
+        <ul>
+            <li>Cuando la aplicación detecta enlace a internet, el badge superior mostrará <strong>🟢 En Línea / Supabase En Vivo</strong>.</li>
+            <li>Cualquier formulario guardado o modificado se replica de forma segura en la base de datos PostgreSQL de Supabase en tiempo real.</li>
+            <li>Si se pierde la conexión, el sistema continúa funcionando localmente sin interrupciones, guardando todo en el almacenamiento del equipo.</li>
+        </ul>
+    </div>
+
+    <!-- SECCIÓN 10: PREGUNTAS FRECUENTES -->
+    <div class="page-break">
+        <h1>10. Preguntas Frecuentes y Soporte Técnico</h1>
+
+        <div class="no-break" style="margin-bottom: 12px;">
+            <h3>¿Qué hago si el RUT aparece con borde rojo al ingresarlo?</h3>
+            <p>
+                El sistema valida el RUT con el algoritmo oficial de Registro Civil (Módulo 11). Si aparece en rojo, verifique que no haya invertido dígitos o que el dígito verificador sea correcto. El formulario no permitirá guardar hasta que el RUT sea matemáticamente válido.
+            </p>
+        </div>
+
+        <div class="no-break" style="margin-bottom: 12px;">
+            <h3>¿Cómo imprimo el documento en papel Oficio sin que se corte?</h3>
+            <p>
+                Al abrir la ventana de previsualización y pulsar <em>"Imprimir Acta"</em>, en el cuadro de diálogo de la impresora seleccione tamaño de papel <strong>Oficio / Folio / Legal (216 mm × 330 mm)</strong> y escala <em>"Predeterminado"</em> o <em>"100%"</em>. Los márgenes están calculados para ajustarse automáticamente a dos hojas exactas.
+            </p>
+        </div>
+
+        <div class="no-break" style="margin-bottom: 12px;">
+            <h3>¿Puedo utilizar el programa en un computador que no tiene internet?</h3>
+            <p>
+                <strong>Sí, absolutamente.</strong> Ejecute el archivo <code>Formulario_TIC_ISP_Portable_v5.7.0.exe</code>. La aplicación contiene todas las librerías, catastro de 900 equipos y plantillas dentro del ejecutable, por lo que funciona al 100% sin internet.
+            </p>
+        </div>
+
+        <div class="no-break" style="margin-bottom: 12px;">
+            <h3>¿Por qué no puedo eliminar un registro desde mi usuario?</h3>
+            <p>
+                Por motivos de auditoría y control de inventario, el botón de eliminar registros y vaciar base de datos está restringido de forma exclusiva para el <strong>Modo Administrador</strong>. Si necesita dar de baja un registro erróneo, solicite la intervención del Administrador TIC.
+            </p>
+        </div>
+
+        <div class="callout callout-info" style="margin-top: 25px;">
+            <strong>Mesa de Ayuda y Soporte Técnico:</strong><br>
+            Oficina de Tecnologías de la Información y Comunicaciones (TIC)<br>
+            Instituto de Salud Pública de Chile (ISP)<br>
+            Jefatura: <strong>Eduardo Wess</strong> • Correo institucional de soporte TIC.
+        </div>
+    </div>
+
+</body>
+</html>

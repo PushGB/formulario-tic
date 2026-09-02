@@ -1,4 +1,4 @@
-name: Compilar Aplicación macOS y Windows
+name: Compilar Aplicación macOS, Windows y Android (APK)
 
 on:
   push:
@@ -51,3 +51,48 @@ jobs:
         with:
           name: Formulario-TIC-Windows
           path: dist/*.exe
+
+  build-android:
+    name: Compilar APK Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Sincronizar Capacitor Android
+        run: npm run build:android
+
+      - name: Compilar APK con Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Renombrar APK
+        run: |
+          mkdir -p dist_apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist_apk/Formulario_TIC_ISP_v5.7.0.apk
+
+      - name: Subir Instalador Android (APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Formulario-TIC-Android-APK
+          path: dist_apk/Formulario_TIC_ISP_v5.7.0.apk
+

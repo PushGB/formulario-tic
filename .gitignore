@@ -2,3 +2,10 @@
 .env*
 node_modules
 dist
+dist_apk
+www
+.gradle
+android/.gradle
+android/app/build
+android/build
+

@@ -478,13 +478,73 @@ function updateThemeIcon() {
 }
 
 // ================= SISTEMA DE CONTROL DE ACTUALIZACIONES Y CACHÉ =================
+function showSystemUpdateModal(targetVersion = APP_VERSION, callback = null) {
+    const modal = document.getElementById('update-progress-modal');
+    const versionEl = document.getElementById('update-modal-version');
+    const statusEl = document.getElementById('update-modal-status');
+    const barEl = document.getElementById('update-modal-progress-bar');
+    const percentEl = document.getElementById('update-modal-percent');
+    const stepEl = document.getElementById('update-modal-step');
+    
+    if (!modal) {
+        if (callback) callback();
+        return;
+    }
+    
+    const cleanVersion = targetVersion.toString().replace(/^v/, '');
+    if (versionEl) versionEl.innerText = `v${cleanVersion}`;
+    if (barEl) barEl.style.width = '0%';
+    if (percentEl) percentEl.innerText = '0%';
+    if (stepEl) stepEl.innerText = 'Iniciando actualización...';
+    if (statusEl) statusEl.innerText = 'Cargando nueva versión y optimizando base de datos local...';
+    
+    modal.classList.remove('hidden');
+    lucide.createIcons();
+    
+    const steps = [
+        { percent: 20, step: "Comprobando catálogo institucional...", status: "Sincronizando catastro de equipamiento TIC..." },
+        { percent: 50, step: "Cargando nuevos módulos y componentes...", status: "Optimizando plantillas de actas y firmas oficiales..." },
+        { percent: 80, step: "Actualizando almacenamiento local...", status: "Consolidando registros de inventario y configuración..." },
+        { percent: 95, step: "Depurando memoria caché...", status: "Finalizando optimización del sistema..." },
+        { percent: 100, step: "¡Actualización completada!", status: "El sistema está listo para su uso." }
+    ];
+    
+    let stepIndex = 0;
+    
+    function proceedStep() {
+        if (stepIndex < steps.length) {
+            const current = steps[stepIndex];
+            if (barEl) barEl.style.width = `${current.percent}%`;
+            if (percentEl) percentEl.innerText = `${current.percent}%`;
+            if (stepEl) stepEl.innerText = current.step;
+            if (statusEl) statusEl.innerText = current.status;
+            
+            stepIndex++;
+            const delay = stepIndex === steps.length ? 700 : 450;
+            setTimeout(proceedStep, delay);
+        } else {
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                if (callback) {
+                    callback();
+                } else {
+                    showToast(`Sistema actualizado a la versión v${cleanVersion} con éxito.`, "success");
+                }
+            }, 600);
+        }
+    }
+    
+    setTimeout(proceedStep, 200);
+}
+
 function checkAppVersion() {
     const lastVersion = localStorage.getItem('tic_installed_app_version');
     
     // Si la versión guardada es diferente a la versión del código actual
     if (lastVersion && lastVersion !== APP_VERSION) {
-        showUpdateBanner(APP_VERSION);
-        showToast(`Sistema actualizado a la versión v${APP_VERSION}.`, "info");
+        showSystemUpdateModal(APP_VERSION, () => {
+            showToast(`Sistema actualizado a la versión v${APP_VERSION}.`, "success");
+        });
     }
     
     // Guardar versión actual en el almacenamiento local
@@ -533,39 +593,39 @@ function dismissUpdateBanner() {
     if (banner) banner.classList.add('hidden');
 }
 
-// Limpiar caché y recargar forzosamente la aplicación
+// Limpiar caché y recargar forzosamente la aplicación con barra de progreso
 async function clearCacheAndReload() {
-    showToast("Limpiando memoria caché y recargando el sistema...", "info");
-
-    try {
-        // 1. Limpiar Cachés API del navegador si existen
-        if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            await Promise.all(cacheNames.map(name => caches.delete(name)));
-        }
-
-        // 2. Limpiar Service Workers si existieran
-        if ('serviceWorker' in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            for (let reg of registrations) {
-                await reg.unregister();
+    showSystemUpdateModal(APP_VERSION, async () => {
+        try {
+            // 1. Limpiar Cachés API del navegador si existen
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
             }
-        }
-    } catch (e) {
-        console.warn("Aviso al limpiar caché:", e);
-    }
 
-    // 3. Guardar versión
-    localStorage.setItem('tic_installed_app_version', APP_VERSION);
-
-    // 4. Forzar recarga limpia
-    setTimeout(() => {
-        if (window.location.protocol.startsWith('http')) {
-            window.location.href = window.location.pathname + '?r=' + Date.now();
-        } else {
-            window.location.reload();
+            // 2. Limpiar Service Workers si existieran
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let reg of registrations) {
+                    await reg.unregister();
+                }
+            }
+        } catch (e) {
+            console.warn("Aviso al limpiar caché:", e);
         }
-    }, 400);
+
+        // 3. Guardar versión
+        localStorage.setItem('tic_installed_app_version', APP_VERSION);
+
+        // 4. Forzar recarga limpia
+        setTimeout(() => {
+            if (window.location.protocol.startsWith('http')) {
+                window.location.href = window.location.pathname + '?r=' + Date.now();
+            } else {
+                window.location.reload();
+            }
+        }, 300);
+    });
 }
 
 // Alias para el botón del banner de actualización
@@ -1033,8 +1093,14 @@ function openNewForm() {
     eqContainer.innerHTML = '';
     addEquipmentRow();
     
-    // Establecer modos de firma por defecto a digital
-    document.querySelectorAll('input[value="digital"]').forEach(input => input.checked = true);
+    // Establecer modos de firma por defecto: TIC oficial (Eduardo Wess), Emisor/Receptor digital
+    const ticOficialRadio = document.querySelector('input[name="sig_mode_tic"][value="oficial"]');
+    if (ticOficialRadio) ticOficialRadio.checked = true;
+    const emisorDigRadio = document.querySelector('input[name="sig_mode_emisor"][value="digital"]');
+    if (emisorDigRadio) emisorDigRadio.checked = true;
+    const receptorDigRadio = document.querySelector('input[name="sig_mode_receptor"][value="digital"]');
+    if (receptorDigRadio) receptorDigRadio.checked = true;
+    
     toggleSigMode('tic');
     toggleSigMode('emisor');
     toggleSigMode('receptor');
@@ -1130,20 +1196,39 @@ function handleRutInput(element) {
     }
 }
 
-// Alternar modo de firma (Digital / Manual)
+// Alternar modo de firma (Oficial / Digital / Manual)
 function toggleSigMode(id) {
-    const mode = document.querySelector(`input[name="sig_mode_${id}"]:checked`).value;
+    const mode = document.querySelector(`input[name="sig_mode_${id}"]:checked`)?.value || 'digital';
     const container = document.getElementById(`sig-container-${id}`);
     const placeholder = document.getElementById(`sig-manual-placeholder-${id}`);
+    const oficialPlaceholder = document.getElementById(`sig-oficial-placeholder-${id}`);
     
-    if (mode === 'digital') {
-        container.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-        setTimeout(() => resizeAllCanvases(), 50);
+    if (id === 'tic') {
+        if (mode === 'oficial') {
+            if (oficialPlaceholder) oficialPlaceholder.classList.remove('hidden');
+            if (container) container.classList.add('hidden');
+            if (placeholder) placeholder.classList.add('hidden');
+        } else if (mode === 'digital') {
+            if (oficialPlaceholder) oficialPlaceholder.classList.add('hidden');
+            if (container) container.classList.remove('hidden');
+            if (placeholder) placeholder.classList.add('hidden');
+            setTimeout(() => resizeAllCanvases(), 50);
+        } else {
+            if (oficialPlaceholder) oficialPlaceholder.classList.add('hidden');
+            if (container) container.classList.add('hidden');
+            if (placeholder) placeholder.classList.remove('hidden');
+            clearCanvas(id);
+        }
     } else {
-        container.classList.add('hidden');
-        placeholder.classList.remove('hidden');
-        clearCanvas(id); // Limpiar firmas digitales previas al cambiar a manual
+        if (mode === 'digital') {
+            if (container) container.classList.remove('hidden');
+            if (placeholder) placeholder.classList.add('hidden');
+            setTimeout(() => resizeAllCanvases(), 50);
+        } else {
+            if (container) container.classList.add('hidden');
+            if (placeholder) placeholder.classList.remove('hidden');
+            clearCanvas(id); // Limpiar firmas digitales previas al cambiar a manual
+        }
     }
 }
 
@@ -1483,8 +1568,8 @@ function saveForm(event) {
         return;
     }
 
-    // Capturar firmas como Base64 PNG
-    const firma_tic = sigModeTic === 'digital' ? document.getElementById('canvas-tic').toDataURL() : null;
+    // Capturar firmas como Base64 PNG o referencia oficial
+    const firma_tic = sigModeTic === 'digital' ? document.getElementById('canvas-tic').toDataURL() : (sigModeTic === 'oficial' ? 'img/firma-eduardo-wess.png' : null);
     const firma_emisor = (sigModeEmisor === 'digital' && drawingStates.emisor.hasSigned) ? document.getElementById('canvas-emisor').toDataURL() : null;
     const firma_receptor = sigModeReceptor === 'digital' ? document.getElementById('canvas-receptor').toDataURL() : null;
 
@@ -1644,21 +1729,32 @@ function syncPrintTemplate() {
     document.getElementById('print-observaciones').innerText = document.getElementById('form-observaciones').value.trim() || 'Sin observaciones.';
     
     // Renderizar firmas de acuerdo a la modalidad
-    const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked').value;
-    const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked').value;
-    const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked').value;
+    const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked')?.value || 'oficial';
+    const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked')?.value || 'digital';
+    const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked')?.value || 'digital';
     
-    // TIC (Pagina 1)
+    // TIC (Página 1) - Predeterminada: Firma Eduardo Wess (Jefe TIC)
     const imgTic = document.getElementById('print-sig-tic-img');
-    if (sigModeTic === 'digital' && drawingStates.tic.hasSigned) {
-        imgTic.src = document.getElementById('canvas-tic').toDataURL();
-        imgTic.classList.remove('hidden');
+    const manualTic = document.getElementById('print-sig-tic-manual');
+    if (sigModeTic === 'manual') {
+        if (imgTic) imgTic.classList.add('hidden');
+        if (manualTic) manualTic.classList.remove('hidden');
+    } else if (sigModeTic === 'digital' && drawingStates.tic.hasSigned) {
+        if (imgTic) {
+            imgTic.src = document.getElementById('canvas-tic').toDataURL();
+            imgTic.classList.remove('hidden');
+        }
+        if (manualTic) manualTic.classList.add('hidden');
     } else {
-        imgTic.src = '';
-        imgTic.classList.add('hidden');
+        // Por defecto o modo 'oficial': Firma Oficial Eduardo Wess
+        if (imgTic) {
+            imgTic.src = 'img/firma-eduardo-wess.png';
+            imgTic.classList.remove('hidden');
+        }
+        if (manualTic) manualTic.classList.add('hidden');
     }
     
-    // Emisor (Pagina 2)
+    // Emisor (Página 2)
     const imgEmisor = document.getElementById('print-sig-emisor-img');
     if (sigModeEmisor === 'digital' && drawingStates.emisor.hasSigned) {
         imgEmisor.src = document.getElementById('canvas-emisor').toDataURL();
@@ -1668,7 +1764,7 @@ function syncPrintTemplate() {
         imgEmisor.classList.add('hidden');
     }
     
-    // Receptor (Pagina 2)
+    // Receptor (Página 2)
     const imgReceptor = document.getElementById('print-sig-receptor-img');
     if (sigModeReceptor === 'digital' && drawingStates.receptor.hasSigned) {
         imgReceptor.src = document.getElementById('canvas-receptor').toDataURL();
@@ -2135,11 +2231,17 @@ function viewAndEditForm(id) {
     document.getElementById('form-accesorios').value = s.accesorios || '';
     document.getElementById('form-observaciones').value = s.observaciones_generales || '';
 
-    // Rellenar modos de firma (Digital vs Manual)
-    const sigModes = s.firmas || { tic_mode: 'digital', emisor_mode: 'digital', receptor_mode: 'digital' };
-    document.querySelector(`input[name="sig_mode_tic"][value="${sigModes.tic_mode || 'digital'}"]`).checked = true;
-    document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`).checked = true;
-    document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`).checked = true;
+    // Rellenar modos de firma (Oficial / Digital / Manual)
+    const sigModes = s.firmas || { tic_mode: 'oficial', emisor_mode: 'digital', receptor_mode: 'digital' };
+    const ticTargetMode = sigModes.tic_mode || (sigModes.tic ? 'digital' : 'oficial');
+    const ticRadio = document.querySelector(`input[name="sig_mode_tic"][value="${ticTargetMode}"]`) || document.querySelector('input[name="sig_mode_tic"][value="oficial"]');
+    if (ticRadio) ticRadio.checked = true;
+    
+    const emisorRadio = document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || 'digital'}"]`);
+    if (emisorRadio) emisorRadio.checked = true;
+    
+    const receptorRadio = document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || 'digital'}"]`);
+    if (receptorRadio) receptorRadio.checked = true;
     
     toggleSigMode('tic');
     toggleSigMode('emisor');
@@ -4300,3 +4402,31 @@ function renderInventoryTable() {
     lucide.createIcons();
 }
 
+// ================= INTEGRACIÓN NATIVA CON ELECTRON =================
+if (window.electronAPI) {
+    console.log('⚡ Entorno de escritorio Electron detectado.');
+    
+    // Escuchar atajo de teclado o menú nativo para Imprimir
+    window.electronAPI.onTriggerPrint(() => {
+        triggerPrintMode();
+    });
+
+    // Escuchar atajo o menú para Exportar a PDF directamente
+    window.electronAPI.onTriggerExportPdf(async () => {
+        try {
+            syncPrintTemplate();
+            const rut = document.getElementById('rut_receptor')?.value || 'ACTA';
+            const folio = document.getElementById('ticket_ot')?.value || 'TIC';
+            const defaultName = `Acta_TIC_${folio}_${rut}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+            
+            showToast('Generando archivo PDF nativo...', 'info');
+            const result = await window.electronAPI.savePdf(defaultName);
+            if (result.success) {
+                showToast(`Acta guardada exitosamente en: ${result.filePath}`, 'success');
+            }
+        } catch (e) {
+            console.error('Error al exportar PDF nativo:', e);
+            showToast('Error al generar PDF: ' + e.message, 'error');
+        }
+    });
+}

@@ -11,9 +11,12 @@ Sistema web institucional y Progressive Web App (PWA) de página única (SPA) di
 ```text
 Formulario/
 │
+├── main.js             # Proceso principal Electron para escritorio nativo Windows/macOS/Linux
+├── preload.js          # Puente seguro IPC entre Node.js y el proceso de renderizado
 ├── index.html          # Interfaz de usuario interactiva y plantillas de impresión (HTML5)
 ├── manifest.json       # Manifiesto PWA para instalación nativa en Android, iOS y Windows
 ├── sw.js               # Service Worker v5.7.0 con caché inteligente offline y actualización continua
+├── package.json        # Configuración de dependencias Electron y scripts de empaquetado
 ├── vercel.json         # Configuración de despliegue y headers para producción en Vercel
 │
 ├── data/
@@ -23,19 +26,46 @@ Formulario/
 │   └── styles.css      # Estilos visuales personalizados y directivas CSS para impresión (@media print)
 │
 ├── js/
-│   ├── app.js          # Lógica integral: Supabase Realtime, roles, canvas de firmas, catastro y QR
+│   ├── app.js          # Lógica integral: Supabase Realtime, roles, canvas de firmas, catastro, QR y Electron IPC
 │   ├── supabase.js     # Cliente Supabase JS autónomo para sincronización en tiempo real y offline
 │   ├── qrcode.min.js   # Generador local y autónomo de Códigos QR para actas oficiales
-│   └── xlsx.full.min.js# Librería SheetJS para lectura y parsing local de archivos Excel
+│   ├── xlsx.full.min.js# Librería SheetJS para lectura y parsing local de archivos Excel
+│   ├── tailwind.min.js # Motor Tailwind CSS local 100% offline
+│   └── lucide.min.js   # Librería de Iconos Lucide local 100% offline
 │
 ├── img/
 │   ├── logo-isp.svg    # Logotipo institucional vectorizado (SVG) del ISP de Chile
 │   ├── icon-192.png    # Icono PWA de alta resolución (192x192)
-│   └── icon-512.png    # Icono PWA de alta resolución (512x512)
+│   └── icon-512.png    # Icono de alta resolución para aplicación de escritorio
 │
 ├── Catastro_ISP_2025_PRECARGADO.xlsx # Base de datos inicial precargada de inventario TIC
 └── README.md           # Este manual de instrucciones y documentación técnica
 ```
+
+---
+
+## 🖥️ Aplicación de Escritorio Nativa (Electron)
+
+El sistema puede ejecutarse y compilarse como aplicación de escritorio autónoma para Windows:
+
+### Comandos de Desarrollo y Compilación:
+- **Ejecutar en modo escritorio:**
+  ```bash
+  npm start
+  ```
+- **Compilar Ejecutable Portable (`.exe` directo para pendrives):**
+  ```bash
+  npm run dist
+  ```
+- **Compilar Instalador de Windows (`Setup.exe` NSIS):**
+  ```bash
+  npm run dist:installer
+  ```
+
+### Características en Modo Escritorio:
+- **100% Offline e Independiente:** Todos los scripts, estilos y catastro están empaquetados localmente.
+- **Exportación Directa a PDF:** Genera actas oficiales en PDF directamente con diálogo nativo de Windows.
+- **Persistencia Local Segura:** Almacenamiento continuo en el perfil de usuario del sistema operativo (`%APPDATA%`).
 
 ---
 

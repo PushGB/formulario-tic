@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Gestión de Equipamiento TIC - ISP</title>
-    <!-- Tailwind CSS with custom configuration -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons for modern iconography -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tailwind CSS (Local offline bundle) -->
+    <script src="js/tailwind.min.js"></script>
+    <!-- Lucide Icons (Local offline bundle) -->
+    <script src="js/lucide.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -957,13 +957,18 @@
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <!-- Firma Profesional TIC -->
                                     <div class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
-                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-2">Firma Profesional Oficina TIC</span>
+                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-1">Firma Profesional Oficina TIC</span>
+                                        <span class="block text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold text-center mb-2">Eduardo Wess (Jefe TIC)</span>
                                         
                                         <!-- Modalidad selector -->
                                         <div class="flex gap-2 justify-center mb-3">
                                             <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
-                                                <input type="radio" name="sig_mode_tic" value="digital" checked onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
-                                                Digital
+                                                <input type="radio" name="sig_mode_tic" value="oficial" checked onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Firma Oficial
+                                            </label>
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_tic" value="digital" onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Dibujar
                                             </label>
                                             <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
                                                 <input type="radio" name="sig_mode_tic" value="manual" onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
@@ -971,8 +976,16 @@
                                             </label>
                                         </div>
 
-                                        <!-- Contenedor del Canvas -->
-                                        <div id="sig-container-tic" class="signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                        <!-- Vista Previa Firma Oficial Eduardo Wess -->
+                                        <div id="sig-oficial-placeholder-tic" class="flex flex-col items-center justify-center border-2 border-indigo-200 dark:border-indigo-900/60 bg-white dark:bg-slate-950 w-full aspect-[4/3] max-w-xs mx-auto rounded-2xl p-3 text-center shadow-sm">
+                                            <img src="img/firma-eduardo-wess.png" alt="Firma Eduardo Wess" class="max-h-24 object-contain">
+                                            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1 flex items-center gap-1">
+                                                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Firma Oficial de Eduardo Wess
+                                            </span>
+                                        </div>
+
+                                        <!-- Contenedor del Canvas para dibujar -->
+                                        <div id="sig-container-tic" class="hidden signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
                                             <!-- CSS Guide Line -->
                                             <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
                                             <canvas id="canvas-tic" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>
@@ -988,7 +1001,7 @@
                                             <span class="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5">Se imprimirá un recuadro en blanco para firma física con lápiz</span>
                                         </div>
 
-                                        <span class="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono">Firmar sobre la línea</span>
+                                        <span class="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono">Oficina TIC - ISP Chile</span>
                                     </div>
 
                                     <!-- Firma Funcionario Emisor -->
@@ -1392,6 +1405,51 @@
             </div>
         </div>
 
+        <!-- Modal de Actualización del Sistema con Barra de Progreso -->
+        <div id="update-progress-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity duration-300">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative overflow-hidden transform transition-all">
+                <!-- Luces de fondo decorativas -->
+                <div class="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-20 -left-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="relative z-10 text-center space-y-4">
+                    <!-- Icono animado -->
+                    <div class="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/80 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
+                        <i data-lucide="refresh-cw" class="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400"></i>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2">
+                            <span>Actualizando Sistema TIC</span>
+                            <span id="update-modal-version" class="text-xs font-mono bg-indigo-100 dark:bg-indigo-900/70 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-700/50">v5.7.0</span>
+                        </h3>
+                        <p id="update-modal-status" class="text-xs text-slate-500 dark:text-slate-400 mt-2 min-h-[36px] flex items-center justify-center leading-relaxed">
+                            Cargando nueva versión y optimizando base de datos local...
+                        </p>
+                    </div>
+
+                    <!-- Barra de progreso interactiva -->
+                    <div class="space-y-2 pt-1">
+                        <div class="w-full h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-slate-700">
+                            <div id="update-modal-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 rounded-full transition-all duration-300 shadow-sm relative overflow-hidden" style="width: 0%;">
+                                <div class="absolute inset-0 bg-white/25 animate-[pulse_1.2s_infinite]"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-[11px] font-mono text-slate-400 dark:text-slate-500 px-1">
+                            <span id="update-modal-step" class="truncate max-w-[260px] text-left">Iniciando actualización...</span>
+                            <span id="update-modal-percent" class="font-bold text-indigo-600 dark:text-indigo-400">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500 italic">
+                            Por favor no cierre la aplicación mientras se aplican los cambios.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Barra de Pestañas Inferior para Móviles (Visible solo en smartphones cuando está en Modo Admin o Técnico) -->
         <div id="mobile-tab-bar" class="hidden md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
             <button onclick="switchTab('dashboard')" id="mobile-tab-dashboard" class="flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-bold text-indigo-400 bg-indigo-950/80 transition-all">
@@ -1628,13 +1686,13 @@
                 </table>
 
                 <!-- Signature area Oficina TIC (Página 1, Sin borde lateral) -->
-                <div class="w-full relative mb-1" style="height: 90px; font-family: Arial, sans-serif;">
-                    <div class="absolute bottom-1 right-8 w-64 text-center flex flex-col items-center">
-                        <div class="relative w-56 h-14 flex items-end justify-center border-b border-black">
-                            <!-- Firma Digital si existe -->
-                            <img id="print-sig-tic-img" class="hidden h-full object-contain absolute bottom-0 max-h-[50px]" src="" alt="Firma TIC">
+                <div class="w-full relative mb-1 flex justify-end pr-8" style="height: 90px; font-family: Arial, sans-serif;">
+                    <div class="w-64 text-center flex flex-col items-center justify-end">
+                        <img id="print-sig-tic-img" class="h-20 object-contain" src="img/firma-eduardo-wess.png" alt="Nombre y Firma Profesional Oficina TIC - Eduardo Wess">
+                        <div id="print-sig-tic-manual" class="hidden w-full text-center flex flex-col items-center">
+                            <div class="w-56 h-12 border-b border-black"></div>
+                            <div class="font-bold mt-1.5 text-[9px]" style="font-family: Arial, sans-serif;">Nombre y Firma Profesional Oficina TIC</div>
                         </div>
-                        <div class="font-bold mt-1.5 text-[9px]" style="font-family: Arial, sans-serif;">Nombre y Firma Profesional Oficina TIC</div>
                     </div>
                 </div>
 

@@ -51,9 +51,11 @@ body {
         box-sizing: border-box;
         width: 216mm;
         height: 330mm;
-        padding: 15mm 15mm !important; /* Añadimos márgenes internos fijos */
+        max-height: 330mm;
+        padding: 12mm 15mm !important; /* Margen interno óptimo para Oficio */
         margin: 0 auto !important;
         background-color: white !important;
+        overflow: hidden !important;
     }
     /* Forzar fondos e imágenes a imprimirse exactamente */
     .print-exact {

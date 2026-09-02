@@ -1,0 +1,53 @@
+name: Compilar Aplicación macOS y Windows
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Descargar Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Compilar Instalador macOS (.dmg y .zip)
+        run: npm run dist:mac
+
+      - name: Subir Instaladores de Mac
+        uses: actions/upload-artifact@v4
+        with:
+          name: Formulario-TIC-macOS
+          path: dist/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Compilar Instaladores Windows (.exe y Portable)
+        run: npm run dist
+
+      - name: Subir Instaladores de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Formulario-TIC-Windows
+          path: dist/*.exe

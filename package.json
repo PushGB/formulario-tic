@@ -1,9 +1,68 @@
 {
-  "name": "formulario-tic",
+  "name": "formulario-tic-isp",
   "version": "5.7.0",
+  "description": "Sistema Local de Gestión de Equipamiento TIC - ISP Chile",
+  "author": "Oficina TIC - Instituto de Salud Pública de Chile",
+  "main": "main.js",
   "private": true,
   "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable",
+    "dist:win": "electron-builder --win portable",
+    "dist:installer": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:all": "electron-builder --win --mac",
     "build": "echo Build complete",
     "vercel-build": "echo Build complete"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "cl.gob.ispch.formulariotic",
+    "productName": "Formulario TIC - ISP",
+    "copyright": "Copyright © 2026 ISP Chile",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "data/**/*",
+      "img/**/*"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "img/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Formulario TIC ISP"
+    },
+    "portable": {
+      "artifactName": "Formulario_TIC_ISP_Portable_v${version}.exe"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "img/icon-512.png",
+      "category": "public.app-category.business",
+      "artifactName": "Formulario_TIC_ISP_macOS_v${version}.${ext}"
+    },
+    "dmg": {
+      "title": "Formulario TIC - ISP",
+      "artifactName": "Formulario_TIC_ISP_macOS_v${version}.dmg"
+    }
   }
 }

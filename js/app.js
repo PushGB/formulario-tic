@@ -927,9 +927,23 @@ function applyRolePermissions() {
     const cancelBtn = document.getElementById('form-cancel-btn');
     const mobileTabBar = document.getElementById('mobile-tab-bar');
 
+    // Botones de acciones administrativas en Dashboard
+    const btnBackupJson = document.getElementById('btn-backup-json');
+    const labelRestoreJson = document.getElementById('label-restore-json');
+    const btnClearDb = document.getElementById('btn-clear-db');
+    const btnExportCsv = document.getElementById('btn-export-csv');
+    const btnSyncCloud = document.getElementById('btn-sync-cloud');
+    const labelExcelUpload = document.getElementById('label-excel-upload');
+    const btnGenerateLink = document.getElementById('btn-generate-link');
+
+    // Secciones de firmas en formulario
+    const sigCardTic = document.getElementById('sig-card-tic');
+    const sigCardEmisor = document.getElementById('sig-card-emisor');
+
     if (currentUserRole === 'admin') {
+        // 1. MODO ADMINISTRADOR (CONTROL TOTAL)
         if (roleText) roleText.innerText = 'Modo Admin';
-        if (drawerRoleLabel) drawerRoleLabel.innerText = 'Admin (Activo)';
+        if (drawerRoleLabel) drawerRoleLabel.innerText = 'Admin (Control Total)';
         if (roleIcon) roleIcon.setAttribute('data-lucide', 'shield-check');
         if (roleBadge) {
             roleBadge.className = "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/40";
@@ -942,9 +956,22 @@ function applyRolePermissions() {
         if (drawerMetrics) drawerMetrics.classList.remove('hidden');
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         if (mobileTabBar) mobileTabBar.classList.remove('hidden');
+
+        // Controles de Admin habilitados
+        if (btnBackupJson) btnBackupJson.classList.remove('hidden');
+        if (labelRestoreJson) labelRestoreJson.classList.remove('hidden');
+        if (btnClearDb) btnClearDb.classList.remove('hidden');
+        if (btnExportCsv) btnExportCsv.classList.remove('hidden');
+        if (btnSyncCloud) btnSyncCloud.classList.remove('hidden');
+        if (labelExcelUpload) labelExcelUpload.classList.remove('hidden');
+        if (btnGenerateLink) btnGenerateLink.classList.remove('hidden');
+
+        if (sigCardTic) sigCardTic.classList.remove('hidden');
+        if (sigCardEmisor) sigCardEmisor.classList.remove('hidden');
     } else if (currentUserRole === 'tecnico') {
+        // 2. MODO TÉCNICO TIC (OPERATIVO)
         if (roleText) roleText.innerText = 'Modo Técnico';
-        if (drawerRoleLabel) drawerRoleLabel.innerText = 'Técnico (Activo)';
+        if (drawerRoleLabel) drawerRoleLabel.innerText = 'Técnico TIC (Operativo)';
         if (roleIcon) roleIcon.setAttribute('data-lucide', 'wrench');
         if (roleBadge) {
             roleBadge.className = "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/30";
@@ -957,10 +984,22 @@ function applyRolePermissions() {
         if (drawerMetrics) drawerMetrics.classList.remove('hidden');
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         if (mobileTabBar) mobileTabBar.classList.remove('hidden');
+
+        // Técnico: Operativo (Sin eliminación ni restauración destructiva)
+        if (btnBackupJson) btnBackupJson.classList.remove('hidden');
+        if (labelRestoreJson) labelRestoreJson.classList.add('hidden'); // Solo Admin restaura
+        if (btnClearDb) btnClearDb.classList.add('hidden');             // Solo Admin vacía BD
+        if (btnExportCsv) btnExportCsv.classList.remove('hidden');
+        if (btnSyncCloud) btnSyncCloud.classList.remove('hidden');
+        if (labelExcelUpload) labelExcelUpload.classList.remove('hidden');
+        if (btnGenerateLink) btnGenerateLink.classList.remove('hidden');
+
+        if (sigCardTic) sigCardTic.classList.remove('hidden');
+        if (sigCardEmisor) sigCardEmisor.classList.remove('hidden');
     } else {
-        // Modo Funcionario / Público
-        if (roleText) roleText.innerText = 'Iniciar Sesión TIC';
-        if (drawerRoleLabel) drawerRoleLabel.innerText = 'Iniciar Sesión TIC';
+        // 3. MODO FUNCIONARIO / SOLICITANTE (PÚBLICO Y RESTRINGIDO)
+        if (roleText) roleText.innerText = 'Acceso Funcionarios';
+        if (drawerRoleLabel) drawerRoleLabel.innerText = 'Modo Funcionario (Público)';
         if (roleIcon) roleIcon.setAttribute('data-lucide', 'lock');
         if (roleBadge) {
             roleBadge.className = "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700";
@@ -974,10 +1013,16 @@ function applyRolePermissions() {
         if (cancelBtn) cancelBtn.classList.add('hidden');
         if (mobileTabBar) mobileTabBar.classList.add('hidden');
 
-        // Modo Funcionario siempre muestra exclusivamente el formulario limpio
+        // Ocultar acciones del panel
+        if (btnBackupJson) btnBackupJson.classList.add('hidden');
+        if (labelRestoreJson) labelRestoreJson.classList.add('hidden');
+        if (btnClearDb) btnClearDb.classList.add('hidden');
+
+        // Forzar vista exclusiva al formulario limpio
         switchTab('form-view');
     }
 
+    renderTable();
     lucide.createIcons();
 }
 
@@ -1993,9 +2038,10 @@ function renderTable() {
                             <button onclick="cloneSubmission('${s.id}')" class="p-2 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors" title="Duplicar / Clonar en Nueva Solicitud">
                                 <i data-lucide="copy" class="w-4.5 h-4.5"></i>
                             </button>
-                            <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar Registro">
+                            ${currentUserRole === 'admin' ? `
+                            <button onclick="deleteSubmission('${s.id}')" class="p-2 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors" title="Eliminar Registro (Solo Admin)">
                                 <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
-                            </button>
+                            </button>` : ''}
                         </div>
                     </td>
                 `;
@@ -2086,10 +2132,18 @@ function openMobileActions(id) {
         closeMobileActions();
         printDirectSubmission(id);
     };
-    document.getElementById('m-btn-delete').onclick = () => {
-        closeMobileActions();
-        deleteSubmission(id);
-    };
+    const mDelete = document.getElementById('m-btn-delete');
+    if (mDelete) {
+        if (currentUserRole === 'admin') {
+            mDelete.classList.remove('hidden');
+            mDelete.onclick = () => {
+                closeMobileActions();
+                deleteSubmission(id);
+            };
+        } else {
+            mDelete.classList.add('hidden');
+        }
+    }
 
     modal.classList.remove('hidden');
     lucide.createIcons();
@@ -2329,8 +2383,12 @@ function showConfirmModal(title, message, confirmText = "Confirmar", isDanger = 
     });
 }
 
-// Eliminar Registro con modal moderno
+// Eliminar Registro con modal moderno (Solo Admin)
 async function deleteSubmission(id) {
+    if (currentUserRole !== 'admin') {
+        showToast("Solo los usuarios con rol de Administrador pueden eliminar registros.", "error");
+        return;
+    }
     const confirmed = await showConfirmModal(
         "Eliminar Registro",
         "¿Está seguro de que desea eliminar permanentemente este registro del historial local?",
@@ -2349,8 +2407,12 @@ async function deleteSubmission(id) {
     }
 }
 
-// Limpiar Base de Datos completa
+// Limpiar Base de Datos completa (Solo Admin)
 async function clearAllSubmissions() {
+    if (currentUserRole !== 'admin') {
+        showToast("Solo los usuarios con rol de Administrador pueden vaciar la base de datos.", "error");
+        return;
+    }
     if (submissions.length === 0) {
         showToast("No hay registros en la base de datos para eliminar.", "info");
         return;
@@ -2485,8 +2547,13 @@ function exportBackupJSON() {
     showToast(`Copia de seguridad descargada (${submissions.length} registros).`, "success");
 }
 
-// Restaurar copia de seguridad desde un archivo JSON
+// Restaurar copia de seguridad desde un archivo JSON (Solo Admin)
 function importBackupJSON(event) {
+    if (currentUserRole !== 'admin') {
+        showToast("Solo los usuarios con rol de Administrador pueden restaurar copias de seguridad.", "error");
+        event.target.value = '';
+        return;
+    }
     const file = event.target.files[0];
     if (!file) return;
 

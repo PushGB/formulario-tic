@@ -231,24 +231,24 @@
                         <p class="text-sm text-slate-500 dark:text-slate-400">Historial y estado de asignaciones de equipamiento tecnológico institucional.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                        <button onclick="exportToCSV()" class="whitespace-nowrap shrink-0 bg-slate-600 hover:bg-slate-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Exportar historial en formato CSV">
+                        <button id="btn-export-csv" onclick="exportToCSV()" class="whitespace-nowrap shrink-0 bg-slate-600 hover:bg-slate-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Exportar historial en formato CSV">
                             <i data-lucide="download" class="w-4 h-4"></i>
                             <span>Exportar CSV</span>
                         </button>
-                        <button onclick="syncAllToSupabase()" class="whitespace-nowrap shrink-0 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Sincronizar todas las actas con Supabase en la nube">
+                        <button id="btn-sync-cloud" onclick="syncAllToSupabase()" class="whitespace-nowrap shrink-0 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Sincronizar todas las actas con Supabase en la nube">
                             <i data-lucide="cloud" class="w-4 h-4 text-emerald-300"></i>
                             <span>Sincronizar Nube</span>
                         </button>
-                        <button onclick="exportBackupJSON()" class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Descargar copia de seguridad completa en JSON">
+                        <button id="btn-backup-json" onclick="exportBackupJSON()" class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Descargar copia de seguridad completa en JSON (Solo Admin)">
                             <i data-lucide="database" class="w-4 h-4 text-indigo-300"></i>
                             <span>Respaldar JSON</span>
                         </button>
-                        <label class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0 cursor-pointer" title="Restaurar copia de seguridad desde un archivo JSON">
+                        <label id="label-restore-json" class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0 cursor-pointer" title="Restaurar copia de seguridad desde un archivo JSON (Solo Admin)">
                             <i data-lucide="folder-input" class="w-4 h-4 text-emerald-400"></i>
                             <span>Restaurar JSON</span>
                             <input type="file" id="json-backup-input" class="hidden" accept=".json" onchange="importBackupJSON(event)">
                         </label>
-                        <label class="whitespace-nowrap shrink-0 bg-violet-600 hover:bg-violet-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0 cursor-pointer" title="Cargar archivo Excel de Catastro institucional">
+                        <label id="label-excel-upload" class="whitespace-nowrap shrink-0 bg-violet-600 hover:bg-violet-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0 cursor-pointer" title="Cargar archivo Excel de Catastro institucional">
                             <i data-lucide="upload" class="w-4 h-4"></i>
                             <span>Catastro Excel</span>
                             <input type="file" id="excel-file-input" class="hidden" accept=".xlsx" onchange="handleExcelUpload(event)">
@@ -257,15 +257,15 @@
                             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
                             <span>Catastro Actualizado</span>
                         </button>
-                        <button onclick="generateOfficerLink()" class="whitespace-nowrap shrink-0 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Generar link para que el funcionario complete/firme">
+                        <button id="btn-generate-link" onclick="generateOfficerLink()" class="whitespace-nowrap shrink-0 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Generar link para que el funcionario complete/firme">
                             <i data-lucide="link" class="w-4 h-4"></i>
                             <span>Generar Link para Funcionario</span>
                         </button>
-                        <button onclick="clearAllSubmissions()" class="whitespace-nowrap shrink-0 bg-rose-600/90 hover:bg-rose-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Vaciar la base de datos local">
+                        <button id="btn-clear-db" onclick="clearAllSubmissions()" class="whitespace-nowrap shrink-0 bg-rose-600/90 hover:bg-rose-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Vaciar la base de datos local (Solo Admin)">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                             <span>Limpiar Base de Datos</span>
                         </button>
-                        <button onclick="openNewForm()" class="whitespace-nowrap shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-md shadow-indigo-600/25 transition-all hover:translate-y-[-1px] active:translate-y-0">
+                        <button id="btn-create-solicitud" onclick="openNewForm()" class="whitespace-nowrap shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-md shadow-indigo-600/25 transition-all hover:translate-y-[-1px] active:translate-y-0">
                             <i data-lucide="plus" class="w-4.5 h-4.5"></i>
                             <span>Crear Solicitud</span>
                         </button>
@@ -956,7 +956,7 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <!-- Firma Profesional TIC -->
-                                    <div class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                                    <div id="sig-card-tic" class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
                                         <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-1">Firma Profesional Oficina TIC</span>
                                         <span class="block text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold text-center mb-2">Eduardo Wess (Jefe TIC)</span>
                                         
@@ -1005,7 +1005,7 @@
                                     </div>
 
                                     <!-- Firma Funcionario Emisor -->
-                                    <div class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                                    <div id="sig-card-emisor" class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
                                         <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-2">Firma Funcionario Emisor</span>
                                         
                                         <!-- Modalidad selector -->
@@ -1041,7 +1041,7 @@
                                     </div>
 
                                     <!-- Firma Funcionario Receptor -->
-                                    <div class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                                    <div id="sig-card-receptor" class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
                                         <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-2">Firma Funcionario Receptor</span>
                                         
                                         <!-- Modalidad selector -->

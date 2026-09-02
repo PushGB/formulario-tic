@@ -77,3 +77,36 @@ body {
         font-weight: normal !important;
     }
 }
+
+/* ================= VISOR DE VISTA PREVIA EN VIVO ================= */
+#print-preview-sheets-wrapper .print-page {
+    width: 216mm !important;
+    min-height: 330mm !important;
+    max-height: 330mm !important;
+    height: 330mm !important;
+    background-color: white !important;
+    color: black !important;
+    padding: 12mm 15mm !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+    border-radius: 4px !important;
+    margin: 0 auto 30px auto !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+@media (max-width: 900px) {
+    #print-preview-sheets-wrapper {
+        transform: scale(0.78);
+        transform-origin: top center;
+        margin-bottom: -150px;
+    }
+}
+
+@media (max-width: 640px) {
+    #print-preview-sheets-wrapper {
+        transform: scale(0.48);
+        transform-origin: top center;
+        margin-bottom: -360px;
+    }
+}
+

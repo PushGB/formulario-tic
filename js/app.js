@@ -2705,14 +2705,96 @@ function checkEquipmentCategory(catValue) {
     if (cb) cb.checked = true;
 }
 
-// Trigger del modo impresión con guía preventiva
+// ================= VISTA PREVIA OFICIAL EN VIVO =================
 function triggerPrintMode() {
-    const hideGuide = localStorage.getItem('isp_hide_print_guide') === 'true';
-    if (hideGuide) {
+    openPrintPreview();
+}
+
+function openPrintPreview() {
+    // 1. Sincronizar todos los datos del formulario al template de impresion
+    syncPrintTemplate();
+
+    const container = document.getElementById('print-only-container');
+    const wrapper = document.getElementById('print-preview-sheets-wrapper');
+    const modal = document.getElementById('print-preview-modal');
+
+    if (!container || !wrapper || !modal) {
         proceedToPrint();
+        return;
+    }
+
+    // 2. Clonar el contenido de impresion dentro del visor
+    wrapper.innerHTML = container.innerHTML;
+
+    // 3. Abrir el modal
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    filterPreviewPage('all');
+    lucide.createIcons();
+}
+
+function closePrintPreview() {
+    const modal = document.getElementById('print-preview-modal');
+    if (modal) modal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function filterPreviewPage(page) {
+    const wrapper = document.getElementById('print-preview-sheets-wrapper');
+    if (!wrapper) return;
+    const pages = wrapper.querySelectorAll('.print-page');
+    
+    // Resetear botones
+    ['all', 'p1', 'p2'].forEach(id => {
+        const btn = document.getElementById(`preview-btn-${id}`);
+        if (btn) {
+            btn.className = "px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition-all";
+        }
+    });
+
+    if (page === 'all') {
+        pages.forEach(p => p.classList.remove('hidden'));
+        const btn = document.getElementById('preview-btn-all');
+        if (btn) btn.className = "px-2.5 py-1 rounded-lg font-semibold bg-indigo-600 text-white transition-all";
+    } else if (page === 1) {
+        if (pages[0]) pages[0].classList.remove('hidden');
+        if (pages[1]) pages[1].classList.add('hidden');
+        const btn = document.getElementById('preview-btn-p1');
+        if (btn) btn.className = "px-2.5 py-1 rounded-lg font-semibold bg-indigo-600 text-white transition-all";
+    } else if (page === 2) {
+        if (pages[0]) pages[0].classList.add('hidden');
+        if (pages[1]) pages[1].classList.remove('hidden');
+        const btn = document.getElementById('preview-btn-p2');
+        if (btn) btn.className = "px-2.5 py-1 rounded-lg font-semibold bg-indigo-600 text-white transition-all";
+    }
+}
+
+function confirmPrintFromPreview() {
+    closePrintPreview();
+    setTimeout(() => {
+        proceedToPrint();
+    }, 150);
+}
+
+async function exportPdfFromPreview() {
+    if (window.electronAPI && typeof window.electronAPI.savePdf === 'function') {
+        try {
+            syncPrintTemplate();
+            const rut = document.getElementById('rut_receptor')?.value || 'ACTA';
+            const folio = document.getElementById('ticket_ot')?.value || 'TIC';
+            const defaultName = `Acta_TIC_${folio}_${rut}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+            
+            showToast('Generando archivo PDF oficial...', 'info');
+            const result = await window.electronAPI.savePdf(defaultName);
+            if (result.success) {
+                showToast(`Acta guardada exitosamente en: ${result.filePath}`, 'success');
+            }
+        } catch (e) {
+            console.error('Error al exportar PDF:', e);
+            showToast('Error al generar PDF: ' + e.message, 'error');
+        }
     } else {
-        const modal = document.getElementById('print-guide-modal');
-        if (modal) modal.classList.remove('hidden');
+        confirmPrintFromPreview();
     }
 }
 

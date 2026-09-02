@@ -1780,11 +1780,11 @@ function syncPrintTemplate() {
     
     // ================= 1. FIRMA PROFESIONAL TIC (PÁGINA 1) =================
     const imgTic = document.getElementById('print-sig-tic-img');
-    const manualTic = document.getElementById('print-sig-tic-manual');
+    const labelTic = document.getElementById('print-sig-tic-name-label');
     
     if (sigModeTic === 'manual') {
         if (imgTic) imgTic.classList.add('hidden');
-        if (manualTic) manualTic.classList.remove('hidden');
+        if (labelTic) labelTic.innerText = 'Profesional Oficina TIC';
     } else if (sigModeTic === 'digital') {
         let dataUrlTic = (drawingStates.tic && drawingStates.tic.hasSigned) ? document.getElementById('canvas-tic')?.toDataURL() : null;
         if (!dataUrlTic && activeSubmissionId) {
@@ -1798,14 +1798,14 @@ function syncPrintTemplate() {
                 imgTic.src = dataUrlTic;
                 imgTic.classList.remove('hidden');
             }
-            if (manualTic) manualTic.classList.add('hidden');
+            if (labelTic) labelTic.innerText = 'Profesional Oficina TIC';
         } else {
             // Si está vacío, estampar firma oficial Eduardo Wess
             if (imgTic) {
                 imgTic.src = 'img/firma-eduardo-wess.png';
                 imgTic.classList.remove('hidden');
             }
-            if (manualTic) manualTic.classList.add('hidden');
+            if (labelTic) labelTic.innerText = 'Eduardo Wess • Jefe Oficina TIC';
         }
     } else {
         // MODO OFICIAL (Por Defecto): Firma Eduardo Wess (Jefe TIC)
@@ -1813,7 +1813,7 @@ function syncPrintTemplate() {
             imgTic.src = 'img/firma-eduardo-wess.png';
             imgTic.classList.remove('hidden');
         }
-        if (manualTic) manualTic.classList.add('hidden');
+        if (labelTic) labelTic.innerText = 'Eduardo Wess • Jefe Oficina TIC';
     }
     
     // ================= 2. FIRMA EMISOR (PÁGINA 2) =================

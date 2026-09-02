@@ -13,7 +13,7 @@
     "dist:installer": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg zip",
     "dist:all": "electron-builder --win --mac",
-    "build:android": "node scripts/prepare-www.js && cap sync android",
+    "build:android": "node scripts/prepare-www.js && npx cap sync android",
     "build": "node scripts/prepare-www.js",
     "vercel-build": "node scripts/prepare-www.js"
   },

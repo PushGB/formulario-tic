@@ -19,10 +19,10 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Instalar Dependencias
-        run: npm ci
+        run: npm install
 
       - name: Compilar Instalador macOS (.dmg y .zip)
         run: npm run dist:mac
@@ -42,10 +42,10 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Instalar Dependencias
-        run: npm ci
+        run: npm install
 
       - name: Compilar Instaladores Windows (.exe y Portable)
         run: npm run dist
@@ -66,7 +66,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Configurar Java 17
         uses: actions/setup-java@v4
@@ -78,7 +78,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Instalar Dependencias
-        run: npm ci
+        run: npm install
 
       - name: Sincronizar Capacitor Android
         run: npm run build:android
@@ -104,30 +104,35 @@ jobs:
     name: Publicar Release Oficial Multiplataforma
     needs: [build-macos, build-windows, build-android]
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Descargar Código
         uses: actions/checkout@v4
 
       - name: Descargar Artefactos macOS
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: Formulario-TIC-macOS
           path: release_assets/
 
       - name: Descargar Artefactos Windows
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: Formulario-TIC-Windows
           path: release_assets/
 
       - name: Descargar Artefactos Android
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: Formulario-TIC-Android-APK
           path: release_assets/
 
       - name: Crear GitHub Release
         uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
           tag_name: v5.7.0
           name: "Formulario TIC - ISP v5.7.0 (Android APK, Windows y macOS)"

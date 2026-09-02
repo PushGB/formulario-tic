@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Gestión de Equipamiento TIC - ISP</title>
+    <!-- Tailwind CSS (Local offline bundle) -->
+    <script src="js/tailwind.min.js"></script>
+    <!-- Lucide Icons (Local offline bundle) -->
+    <script src="js/lucide.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- PWA Progressive Web App Manifest & Icons -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Soporte TIC">
+    <link rel="apple-touch-icon" href="img/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="img/logo-isp.svg">
+
+    <!-- External Custom Stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+    <!-- CONTENEDOR DE PANTALLA INTERACTIVA (Se oculta al imprimir) -->
+    <div class="print:hidden">
+        
+        <!-- BANNER DE ACTUALIZACIÓN DEL SISTEMA / FORZAR RECARGA -->
+        <div id="update-banner" class="hidden sticky top-0 z-50 bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 text-white px-4 py-2.5 shadow-xl border-b border-indigo-500/40">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-3">
+                    <div class="p-1.5 rounded-xl bg-indigo-500/20 text-amber-300 border border-indigo-400/30 flex items-center justify-center">
+                        <i data-lucide="sparkles" class="w-4 h-4 animate-pulse"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-white tracking-wide">¡Actualización del Sistema TIC Disponible! (<span id="banner-version-tag" class="text-indigo-300 font-mono">v5.7.0</span>)</span>
+                        <span class="text-slate-300 block sm:inline sm:ml-2">Se han aplicado nuevas mejoras y optimizaciones.</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button onclick="clearCacheAndReload()" class="bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs transition-all shadow-md shadow-indigo-500/30 inline-flex items-center gap-1.5">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>Actualizar y Limpiar Caché</span>
+                    </button>
+                    <button onclick="dismissUpdateBanner()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="Descartar">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sistema de Notificaciones / Toast -->
+        <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none">
+            <div class="bg-slate-900 dark:bg-slate-850 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3">
+                <span id="toast-icon"></span>
+                <span id="toast-message" class="text-sm font-medium"></span>
+            </div>
+        </div>
+
+        <!-- Barra de Navegación Superior -->
+        <nav class="bg-slate-900 dark:bg-slate-950 text-white shadow-md border-b border-slate-800 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16 gap-2">
+                    <!-- Brand / Logo (Nunca se comprime ni trunca) -->
+                    <div class="flex items-center space-x-2.5 shrink-0">
+                        <!-- Botón Hamburguesa para Móvil -->
+                        <button type="button" onclick="toggleMobileDrawer()" class="md:hidden p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none transition-colors" aria-label="Abrir Menú">
+                            <i data-lucide="menu" class="w-5 h-5"></i>
+                        </button>
+                        <div class="bg-white p-1 rounded-xl shadow-sm border border-slate-200/20 flex items-center justify-center shrink-0">
+                            <img src="img/logo-isp.svg" alt="ISP Chile" class="h-7 w-auto object-contain">
+                        </div>
+                        <div class="flex flex-col shrink-0">
+                            <span class="font-bold text-sm sm:text-base tracking-wide leading-tight whitespace-nowrap">Soporte TIC</span>
+                            <span class="text-[10px] text-indigo-300 font-mono leading-tight whitespace-nowrap">RG-02-IT-140.03-004 V5</span>
+                        </div>
+                    </div>
+
+                    <!-- Enlaces de Navegación de Escritorio -->
+                    <div class="hidden md:flex items-center space-x-1 lg:space-x-1.5">
+                        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30">
+                            <span class="flex items-center gap-1.5"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Registros</span>
+                        </button>
+                        <button onclick="switchTab('inventory')" id="nav-inventory" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
+                            <span class="flex items-center gap-1.5"><i data-lucide="boxes" class="w-4 h-4"></i> Catastro</span>
+                        </button>
+                        <button onclick="switchTab('metrics')" id="nav-metrics" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
+                            <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2" class="w-4 h-4"></i> Métricas</span>
+                        </button>
+                        <button onclick="openNewForm()" id="nav-form" class="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800">
+                            <span class="flex items-center gap-1.5"><i data-lucide="file-plus" class="w-4 h-4"></i> Nueva Solicitud</span>
+                        </button>
+                    </div>
+
+                    <!-- Acciones Rápidas (Rol, Versión Única, Modo Oscuro) -->
+                    <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                        <!-- Indicador de Red / Conectividad -->
+                        <div id="network-status-badge" class="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/50 text-emerald-300 border border-emerald-500/30" title="Estado de la Conexión">
+                            <span id="network-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span id="network-status-text">En Línea</span>
+                        </div>
+
+                        <!-- Botón Selector de Rol / Login -->
+                        <button onclick="openAuthModal()" id="nav-role-badge" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-sm bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/30" title="Cambiar Modo / Iniciar Sesión">
+                            <i id="nav-role-icon" data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                            <span id="nav-role-text" class="hidden sm:inline">Modo Técnico</span>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-60"></i>
+                        </button>
+
+                        <!-- Botón Único de Versión, Novedades y Actualizaciones -->
+                        <button onclick="openSystemInfoModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer" title="Ver Novedades y Comprobar Actualizaciones">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span class="font-mono text-xs font-bold text-indigo-300">v5.7.0</span>
+                        </button>
+
+                        <!-- Botón Modo Oscuro / Claro -->
+                        <button onclick="toggleTheme()" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" title="Cambiar Tema">
+                            <span id="theme-toggle-icon"><i data-lucide="moon" class="w-4 h-4"></i></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Sidebar / Drawer Deslizable para Smartphones (Mobile Drawer) -->
+        <div id="mobile-drawer" class="hidden fixed inset-0 z-50 md:hidden">
+            <!-- Fondo Oscuro Backdrop -->
+            <div onclick="toggleMobileDrawer()" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm transition-opacity"></div>
+            
+            <!-- Panel Lateral del Drawer -->
+            <div class="fixed inset-y-0 left-0 max-w-xs w-full bg-slate-900 text-white shadow-2xl flex flex-col justify-between p-5 border-r border-slate-800 z-10 animate-in slide-in-from-left duration-200">
+                <div class="space-y-6">
+                    <!-- Cabecera del Drawer -->
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="bg-white p-1 rounded-xl shadow-sm">
+                                <img src="img/logo-isp.svg" alt="ISP Logo" class="h-7 w-auto object-contain">
+                            </div>
+                            <div>
+                                <span class="font-bold text-sm text-white block">Soporte TIC</span>
+                                <span class="text-[10px] text-indigo-300 font-mono block">ISP Chile</span>
+                            </div>
+                        </div>
+                        <button onclick="toggleMobileDrawer()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Enlaces de Navegación Móvil -->
+                    <div class="space-y-2">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider px-2">Navegación</span>
+                        <button onclick="switchTab('dashboard'); toggleMobileDrawer();" id="drawer-nav-dashboard" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors bg-indigo-600 text-white">
+                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            <span>Panel de Registros</span>
+                        </button>
+                        <button onclick="switchTab('inventory'); toggleMobileDrawer();" id="drawer-nav-inventory" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800">
+                            <i data-lucide="boxes" class="w-5 h-5"></i>
+                            <span>Inventario Catastro (+900)</span>
+                        </button>
+                        <button onclick="switchTab('metrics'); toggleMobileDrawer();" id="drawer-nav-metrics" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800">
+                            <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+                            <span>Métricas de Catastro</span>
+                        </button>
+                        <button onclick="openNewForm(); toggleMobileDrawer();" id="drawer-nav-form" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800">
+                            <i data-lucide="file-plus" class="w-5 h-5"></i>
+                            <span>Nueva Solicitud</span>
+                        </button>
+                    </div>
+
+                    <!-- Herramientas y Modo en Móvil -->
+                    <div class="space-y-2 pt-2 border-t border-slate-800">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider px-2">Seguridad y Herramientas</span>
+                        <!-- Botón de Instalación PWA (Visible cuando esté disponible para instalar como App) -->
+                        <button id="drawer-pwa-install-btn" onclick="installPWA(); toggleMobileDrawer();" class="hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition-all">
+                            <i data-lucide="download-cloud" class="w-4 h-4 text-indigo-200"></i>
+                            <span>Instalar App en el Celular</span>
+                        </button>
+
+                        <button onclick="openAuthModal(); toggleMobileDrawer();" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                                <span id="drawer-role-label">Cambiar Modo / Rol</span>
+                            </span>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+                        </button>
+                        <button onclick="clearCacheAndReload();" class="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-slate-800 transition-colors">
+                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                            <span>Limpiar Caché y Recargar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                    <span>Versión v5.7.0</span>
+                    <span class="font-mono text-[10px]">Oficina TIC</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido Principal -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- ================= PANEL DE REGISTROS (DASHBOARD) ================= -->
+            <section id="tab-dashboard" class="space-y-6">
+                <!-- Encabezado & Estadísticas -->
+                <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 pb-1">
+                    <div class="space-y-1">
+                        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Control de Entregas y Traspasos de Equipos</h1>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Historial y estado de asignaciones de equipamiento tecnológico institucional.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                        <button id="btn-export-csv" onclick="exportToCSV()" class="whitespace-nowrap shrink-0 bg-slate-600 hover:bg-slate-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Exportar historial en formato CSV">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Exportar CSV</span>
+                        </button>
+                        <button id="btn-sync-cloud" onclick="syncAllToSupabase()" class="whitespace-nowrap shrink-0 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Sincronizar todas las actas con Supabase en la nube">
+                            <i data-lucide="cloud" class="w-4 h-4 text-emerald-300"></i>
+                            <span>Sincronizar Nube</span>
+                        </button>
+                        <button id="btn-backup-json" onclick="exportBackupJSON()" class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Descargar copia de seguridad completa en JSON (Solo Admin)">
+                            <i data-lucide="database" class="w-4 h-4 text-indigo-300"></i>
+                            <span>Respaldar JSON</span>
+                        </button>
+                        <label id="label-restore-json" class="whitespace-nowrap shrink-0 bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0 cursor-pointer" title="Restaurar copia de seguridad desde un archivo JSON (Solo Admin)">
+                            <i data-lucide="folder-input" class="w-4 h-4 text-emerald-400"></i>
+                            <span>Restaurar JSON</span>
+                            <input type="file" id="json-backup-input" class="hidden" accept=".json" onchange="importBackupJSON(event)">
+                        </label>
+                        <label id="label-excel-upload" class="whitespace-nowrap shrink-0 bg-violet-600 hover:bg-violet-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0 cursor-pointer" title="Cargar archivo Excel de Catastro institucional">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            <span>Catastro Excel</span>
+                            <input type="file" id="excel-file-input" class="hidden" accept=".xlsx" onchange="handleExcelUpload(event)">
+                        </label>
+                        <button id="excel-export-btn" onclick="exportUpdatedExcel()" class="hidden whitespace-nowrap shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                            <span>Catastro Actualizado</span>
+                        </button>
+                        <button id="btn-generate-link" onclick="generateOfficerLink()" class="whitespace-nowrap shrink-0 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Generar link para que el funcionario complete/firme">
+                            <i data-lucide="link" class="w-4 h-4"></i>
+                            <span>Generar Link para Funcionario</span>
+                        </button>
+                        <button id="btn-clear-db" onclick="clearAllSubmissions()" class="whitespace-nowrap shrink-0 bg-rose-600/90 hover:bg-rose-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0" title="Vaciar la base de datos local (Solo Admin)">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            <span>Limpiar Base de Datos</span>
+                        </button>
+                        <button id="btn-create-solicitud" onclick="openNewForm()" class="whitespace-nowrap shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-md shadow-indigo-600/25 transition-all hover:translate-y-[-1px] active:translate-y-0">
+                            <i data-lucide="plus" class="w-4.5 h-4.5"></i>
+                            <span>Crear Solicitud</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status bar for loaded Excel -->
+                <div id="excel-status-badge" class="mt-2"></div>
+
+                <!-- Tarjetas de Estadísticas Rápidas -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Total Solicitudes</span>
+                            <span id="stat-total" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                        </div>
+                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-xl text-indigo-600 dark:text-indigo-400"><i data-lucide="files" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Asignaciones</span>
+                            <span id="stat-asignaciones" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                        </div>
+                        <div class="bg-blue-50 dark:bg-blue-950/40 p-3 rounded-xl text-blue-600 dark:text-blue-400"><i data-lucide="user-plus" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Traspasos</span>
+                            <span id="stat-traspasos" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                        </div>
+                        <div class="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl text-amber-600 dark:text-amber-400"><i data-lucide="git-compare" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between transition-all hover:shadow-md">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Devoluciones</span>
+                            <span id="stat-devoluciones" class="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1 block">0</span>
+                        </div>
+                        <div class="bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl text-rose-600 dark:text-rose-400"><i data-lucide="user-minus" class="w-6 h-6"></i></div>
+                    </div>
+                </div>
+
+                <!-- Buscador y Filtros -->
+                <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+                            <div class="relative w-full sm:max-w-xs">
+                                <i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500"></i>
+                                <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar por Nombre, RUT, Ticket, Serie..." class="pl-9 pr-4 py-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                            </div>
+                            
+                            <!-- Filtros por tipo de solicitud -->
+                            <div class="flex flex-wrap gap-2 items-center">
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1">Filtrar:</span>
+                                <button onclick="setFilterType('All')" id="filter-all" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-indigo-650 dark:bg-indigo-600 text-white shadow-sm">Todos</button>
+                                <button onclick="setFilterType('Asignacion')" id="filter-asignacion" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">Asignación</button>
+                                <button onclick="setFilterType('Traspaso')" id="filter-traspaso" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">Traspaso</button>
+                                <button onclick="setFilterType('Devolucion')" id="filter-devolucion" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">Devolución</button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            <span>Autoguardado en LocalStorage</span>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Tabla en Escritorio (Desktop: md y superior) -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 uppercase text-[11px] font-bold tracking-wider border-b border-slate-100 dark:border-slate-800/80">
+                                    <th class="py-4 px-6">Fecha</th>
+                                    <th class="py-4 px-6">N° Ticket</th>
+                                    <th class="py-4 px-6">Funcionario Asignado</th>
+                                    <th class="py-4 px-6">Tipo Solicitud</th>
+                                    <th class="py-4 px-6">Equipamiento</th>
+                                    <th class="py-4 px-6 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="submissions-list" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                                <!-- Filas dinámicas en PC -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Contenedor de Tarjetas Móviles Táctiles (Smartphones / Tablets: < md) -->
+                    <div id="submissions-mobile-cards" class="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+                        <!-- Tarjetas dinámicas en Móvil -->
+                    </div>
+
+                    <!-- Estado Vacío -->
+                    <div id="empty-state" class="hidden p-16 text-center">
+                        <div class="relative w-28 h-28 mx-auto mb-4 flex items-center justify-center">
+                            <svg class="w-full h-full text-slate-300 dark:text-slate-700" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h1.528c.3 0 .587.117.8.327l.888.888a1.5 1.5 0 001.06.44h4.474c.3 0 .587-.117.8-.327l.888-.888a1.5 1.5 0 011.06-.44h1.528c1.243 0 2.25 1.007 2.25 2.25v.75m-18 0v6.75a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25v-6.75m-18 0h18" />
+                            </svg>
+                            <div class="absolute inset-0 bg-indigo-500/10 rounded-full filter blur-xl scale-75 animate-pulse pointer-events-none"></div>
+                        </div>
+                        <h3 class="text-slate-700 dark:text-slate-300 font-bold text-lg">No se encontraron registros</h3>
+                        <p class="text-slate-400 dark:text-slate-500 text-sm mt-1 max-w-sm mx-auto">Comienza digitalizando tu primer traspaso, asignación o devolución de equipamiento.</p>
+                        <button onclick="openNewForm()" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-all">
+                            Crear primer registro
+                        </button>
+                    </div>
+
+                    <!-- Barra de Paginación del Dashboard -->
+                    <div id="dashboard-pagination-bar" class="p-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50 text-xs">
+                        <div class="flex items-center gap-3">
+                            <span class="text-slate-500 dark:text-slate-400">Mostrar:</span>
+                            <select id="dashboard-per-page" onchange="changeDashboardPerPage(this.value)" class="py-1 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="25" selected>25 por página</option>
+                                <option value="50">50 por página</option>
+                                <option value="100">100 por página</option>
+                                <option value="all">Ver Todos</option>
+                            </select>
+                            <span id="dashboard-count-summary" class="text-slate-400 dark:text-slate-500 font-medium">Mostrando 0 a 0 de 0 registros</span>
+                        </div>
+
+                        <!-- Botones de Navegación de Página -->
+                        <div class="flex items-center gap-1.5" id="dashboard-pagination-controls">
+                            <button type="button" id="dashboard-prev-btn" onclick="goToDashboardPage('prev')" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold inline-flex items-center gap-1">
+                                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> Anterior
+                            </button>
+                            <div id="dashboard-page-numbers" class="flex items-center gap-1">
+                                <!-- Números de página interactivos generados por JS -->
+                            </div>
+                            <button type="button" id="dashboard-next-btn" onclick="goToDashboardPage('next')" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold inline-flex items-center gap-1">
+                                Siguiente <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= PANEL DE MÉTRICAS ================= -->
+            <section id="tab-metrics" class="hidden space-y-6">
+                <!-- Header of Metrics Panel -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                            <i data-lucide="bar-chart-3" class="w-6 h-6 text-indigo-500"></i> Control de Avance de Catastro
+                        </h1>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Progreso general, estadísticas de equipamiento y control de catastro.</p>
+                    </div>
+                </div>
+
+                <!-- Metrics Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <!-- Card 1: Total Avance -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Progreso General</span>
+                            <div class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400">
+                                <i data-lucide="percent" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2 mt-4">
+                            <span id="metric-percent" class="text-3xl font-extrabold text-slate-800 dark:text-slate-100">0%</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-500">completado</span>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
+                            <div id="metric-percent-bar" class="bg-indigo-600 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: PC / Notebooks / AIOs -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Computadores</span>
+                            <div class="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-650 dark:text-blue-400">
+                                <i data-lucide="laptop" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2 mt-4">
+                            <span id="metric-comps-catastrados" class="text-3xl font-extrabold text-slate-800 dark:text-slate-100">0</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-500">de <span id="metric-comps-total">0</span> catastrados</span>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
+                            <div id="metric-comps-bar" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Impresoras y Scanners -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Impresoras / Scanners</span>
+                            <div class="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/40 text-violet-650 dark:text-violet-400">
+                                <i data-lucide="printer" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2 mt-4">
+                            <span id="metric-printers-catastrados" class="text-3xl font-extrabold text-slate-800 dark:text-slate-100">0</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-500">de <span id="metric-printers-total">0</span> catastrados</span>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
+                            <div id="metric-printers-bar" class="bg-violet-500 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Formularios Completados -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Formularios Firmados</span>
+                            <div class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-650 dark:text-emerald-450">
+                                <i data-lucide="pen-tool" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2 mt-4">
+                            <span id="metric-forms-total" class="text-3xl font-extrabold text-slate-800 dark:text-slate-100">0</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-500">con firmas registradas</span>
+                        </div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-5 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Listo para enviar por mail
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Two columns for charts/lists -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Left: Progress by Department -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
+                                <i data-lucide="building-2" class="w-5 h-5 text-indigo-500"></i> Avance por Unidad / Departamento
+                            </h3>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mb-4">Top departamentos con mayor cantidad de equipos registrados en el catastro.</p>
+                        </div>
+                        <div id="metric-dept-list" class="space-y-4">
+                            <div class="p-3 text-center text-slate-400">Cargando datos de departamentos...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Equipment Types Breakdown -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
+                                <i data-lucide="devices" class="w-5 h-5 text-indigo-500"></i> Distribución de Equipos Catastrados
+                            </h3>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mb-4">Cantidad de equipamientos por tipo y propiedad (Arriendo vs ISP).</p>
+                        </div>
+                        <div id="metric-types-list" class="space-y-4">
+                            <div class="p-3 text-center text-slate-400">Cargando distribución de tipos...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= INVENTARIO DE CATASTRO (+900 EQUIPOS) ================= -->
+            <section id="tab-inventory" class="hidden space-y-6">
+                <!-- Cabecera de Inventario con Métricas Rápidas -->
+                <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-indigo-900/40 relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+                        <div class="space-y-1.5">
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold">
+                                <i data-lucide="database" class="w-3.5 h-3.5"></i>
+                                <span>Base de Datos de Inventario ISP 2025</span>
+                            </div>
+                            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
+                                <i data-lucide="boxes" class="w-7 h-7 text-indigo-400"></i> Inventario Completo de Catastro
+                            </h2>
+                            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                                Visualice, filtre y gestione todos los equipos computacionales e impresoras precargados desde el archivo Excel institucional. Asigne cualquier equipo directamente al formulario oficial con 1 clic.
+                            </p>
+                        </div>
+
+                        <!-- Mini Contadores en Tarjeta -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                            <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                                <span class="text-[11px] text-slate-300 font-medium block">Total Equipos</span>
+                                <span id="inv-count-total" class="text-lg sm:text-xl font-extrabold text-white">0</span>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                                <span class="text-[11px] text-blue-200 font-medium block">Computadores</span>
+                                <span id="inv-count-comps" class="text-lg sm:text-xl font-extrabold text-blue-300">0</span>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                                <span class="text-[11px] text-violet-200 font-medium block">Impresoras</span>
+                                <span id="inv-count-printers" class="text-lg sm:text-xl font-extrabold text-violet-300">0</span>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                                <span class="text-[11px] text-emerald-200 font-medium block">Catastrados</span>
+                                <span id="inv-count-catastrados" class="text-lg sm:text-xl font-extrabold text-emerald-300">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel de Filtros y Búsqueda -->
+                <div class="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                        <!-- Barra de Búsqueda Reactiva -->
+                        <div class="md:col-span-4 relative">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" id="inventory-search-input" oninput="handleInventorySearch()" placeholder="Buscar por Serie, Funcionario, RUT, Depto, Modelo..." class="w-full pl-10 pr-9 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                            <button type="button" id="inventory-search-clear" onclick="clearInventorySearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <i data-lucide="x" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+
+                        <!-- Filtro Tipo de Equipo -->
+                        <div class="md:col-span-2">
+                            <select id="inventory-type-filter" onchange="handleInventoryFilterChange()" class="w-full py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="All">Todos los Tipos</option>
+                                <option value="Notebook">Notebook</option>
+                                <option value="AIO">All In One (AIO)</option>
+                                <option value="PC">PC / Desktop</option>
+                                <option value="Impresora">Impresora / MFP</option>
+                                <option value="Scanner">Scanner</option>
+                                <option value="Monitor">Monitor / Pantalla</option>
+                            </select>
+                        </div>
+
+                        <!-- Filtro por Departamento / Unidad -->
+                        <div class="md:col-span-3">
+                            <select id="inventory-dept-filter" onchange="handleInventoryFilterChange()" class="w-full py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="All">Todos los Departamentos</option>
+                            </select>
+                        </div>
+
+                        <!-- Filtro Estado Catastro -->
+                        <div class="md:col-span-2">
+                            <select id="inventory-status-filter" onchange="handleInventoryFilterChange()" class="w-full py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="All">Todos los Estados</option>
+                                <option value="Catastrado">Catastrado</option>
+                                <option value="Pendiente">Sin Registro / Pendiente</option>
+                                <option value="Operativo">Operativo</option>
+                            </select>
+                        </div>
+
+                        <!-- Botón Limpiar Filtros -->
+                        <div class="md:col-span-1 flex justify-end">
+                            <button type="button" onclick="resetInventoryFilters()" class="w-full p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 text-xs font-semibold" title="Restablecer todos los filtros">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Fila Secundaria de Filtros y Acciones Rápidas -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/60 text-xs">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">Origen:</span>
+                            <button type="button" onclick="setInventorySheetFilter('All')" id="btn-sheet-all" class="px-3 py-1 rounded-xl font-bold bg-indigo-600 text-white shadow-sm transition-all">Todos (<span id="count-chip-all">0</span>)</button>
+                            <button type="button" onclick="setInventorySheetFilter('Computadores')" id="btn-sheet-comps" class="px-3 py-1 rounded-xl font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">Computadores (<span id="count-chip-comps">0</span>)</button>
+                            <button type="button" onclick="setInventorySheetFilter('Impresoras-Scanner')" id="btn-sheet-printers" class="px-3 py-1 rounded-xl font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">Impresoras (<span id="count-chip-printers">0</span>)</button>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="exportFilteredInventory()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all">
+                                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                                <span>Exportar Filtrados (Excel)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenedor Principal de la Tabla de Inventario -->
+                <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-md overflow-hidden">
+                    <!-- Vista de Tabla para Escritorio / Pantallas Grandes -->
+                    <div class="hidden lg:block overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                                    <th class="py-3.5 px-4 w-12 text-center">N°</th>
+                                    <th class="py-3.5 px-4">Funcionario / Asignado</th>
+                                    <th class="py-3.5 px-4">Tipo & Modelo</th>
+                                    <th class="py-3.5 px-4">N° Serie</th>
+                                    <th class="py-3.5 px-4">Código / Inventario</th>
+                                    <th class="py-3.5 px-4">Contrato / Propiedad</th>
+                                    <th class="py-3.5 px-4 text-center">Estado</th>
+                                    <th class="py-3.5 px-4 text-center w-36">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                <!-- Las filas de inventario se generan dinámicamente con JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Vista de Tarjetas Táctiles para Móviles / Tablets -->
+                    <div id="inventory-mobile-cards" class="lg:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+                        <!-- Las tarjetas móviles se generan dinámicamente con JavaScript -->
+                    </div>
+
+                    <!-- Estado Vacío si no hay coincidencias -->
+                    <div id="inventory-empty-state" class="hidden p-12 text-center">
+                        <div class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                            <i data-lucide="search-x" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-slate-200">No se encontraron equipos</h3>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto mt-1">No hay equipos que coincidan con los criterios de búsqueda o filtros seleccionados.</p>
+                        <button type="button" onclick="resetInventoryFilters()" class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Restablecer Filtros
+                        </button>
+                    </div>
+
+                    <!-- Barra Inferior de Paginación -->
+                    <div id="inventory-pagination-bar" class="p-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50 text-xs">
+                        <div class="flex items-center gap-3">
+                            <span class="text-slate-500 dark:text-slate-400">Mostrar:</span>
+                            <select id="inventory-per-page" onchange="changeInventoryPerPage(this.value)" class="py-1 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="25" selected>25 por página</option>
+                                <option value="50">50 por página</option>
+                                <option value="100">100 por página</option>
+                                <option value="all">Ver Todos</option>
+                            </select>
+                            <span id="inventory-count-summary" class="text-slate-400 dark:text-slate-500 font-medium">Mostrando 0 a 0 de 0 equipos</span>
+                        </div>
+
+                        <!-- Botones de Navegación de Página -->
+                        <div class="flex items-center gap-1.5" id="inventory-pagination-controls">
+                            <button type="button" id="inventory-prev-btn" onclick="goToInventoryPage('prev')" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold inline-flex items-center gap-1">
+                                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> Anterior
+                            </button>
+                            <div id="inventory-page-numbers" class="flex items-center gap-1">
+                                <!-- Números de página interactivos generados por JS -->
+                            </div>
+                            <button type="button" id="inventory-next-btn" onclick="goToInventoryPage('next')" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold inline-flex items-center gap-1">
+                                Siguiente <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= FORMULARIO DE INGRESO / EDICIÓN ================= -->
+            <section id="tab-form-view" class="hidden">
+                <div class="max-w-4xl mx-auto">
+                    <!-- Botón de retorno al dashboard -->
+                    <button onclick="switchTab('dashboard')" class="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-750 text-sm font-medium mb-4 transition-colors">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i> Volver al panel de registros
+                    </button>
+
+                    <!-- Tarjeta Principal del Formulario -->
+                    <form id="equip-form" onsubmit="saveForm(event)" class="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-800/80 overflow-hidden">
+                        
+                        <!-- ENCABEZADO OFICIAL -->
+                        <div class="p-6 sm:p-8 bg-slate-900 dark:bg-slate-950 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 dark:border-slate-900">
+                            <div class="flex items-center gap-4">
+                                <div class="bg-white p-2 rounded-2xl shrink-0 hidden sm:flex items-center justify-center shadow-md">
+                                    <img src="img/logo-isp.svg" alt="ISP Logo" class="h-10 w-auto object-contain">
+                                </div>
+                                <div>
+                                    <span class="text-indigo-400 text-xs font-mono tracking-wider font-bold uppercase">Formulario Oficial</span>
+                                    <h2 class="text-xl sm:text-2xl font-bold tracking-tight mt-0.5">Asignación, Traspaso y Devolución de Equipamiento</h2>
+                                    <p class="text-xs text-slate-400 mt-0.5 font-mono">CÓDIGO: RG-02-IT-140.03-004_Asignacion_Traspaso_Devolucion_EQ_V5</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2 min-w-[180px]">
+                                <div>
+                                    <label class="block text-[10px] uppercase font-bold text-slate-400">Fecha Solicitud</label>
+                                    <input type="date" id="form-fecha" required class="bg-slate-800 dark:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm w-full focus:ring-2 focus:ring-indigo-500 border border-slate-700 dark:border-slate-800 font-medium">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] uppercase font-bold text-slate-400">N° Ticket</label>
+                                    <input type="text" id="form-ticket" placeholder="Ej: TIC-4859" class="bg-slate-800 dark:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm w-full focus:ring-2 focus:ring-indigo-500 border border-slate-700 dark:border-slate-800 font-mono">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-6 sm:p-8 space-y-8">
+                            
+                            <!-- SECCIÓN 1: Datos Funcionario Receptor -->
+                            <div class="space-y-4">
+                                <div class="border-b border-slate-200 dark:border-slate-800 pb-2">
+                                    <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 inline-flex items-center gap-2">
+                                        <span class="bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-400 w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">1</span>
+                                        Datos Funcionario a quien se le asignará el equipamiento:
+                                    </h3>
+                                </div>
+                                <!-- EXCEL AUTOCOMPLETE SEARCH BOX -->
+                                <div id="excel-search-container" class="hidden bg-slate-50 dark:bg-slate-850/40 p-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 mb-4 space-y-2">
+                                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Buscar y Auto-rellenar desde Catastro Excel:</label>
+                                    <div class="relative">
+                                        <i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500"></i>
+                                        <input type="text" id="excel-autocomplete-input" oninput="showExcelSuggestions(this.value)" placeholder="Escriba RUT, Nombre Funcionario, o N° Serie del equipo..." class="pl-9 pr-4 py-2.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all" autocomplete="off">
+                                        <div id="excel-suggestions-dropdown" class="hidden absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-50 divide-y divide-slate-100 dark:divide-slate-800 text-xs text-slate-700 dark:text-slate-200">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Nombre y Apellidos</label>
+                                        <input type="text" id="func-nombre" required placeholder="Juan Pérez González" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                                    </div>
+                                    <div class="relative">
+                                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">RUT</label>
+                                        <div class="relative">
+                                            <input type="text" id="func-rut" required placeholder="12.345.678-K" oninput="handleRutInput(this)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono transition-all">
+                                            <span id="rut-validation-icon" class="absolute right-3 top-3.5 hidden"></span>
+                                        </div>
+                                        <span id="rut-validation-msg" class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 hidden block"></span>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Cargo</label>
+                                        <input type="text" id="func-cargo" required placeholder="Analista de Soporte" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Departamento / Unidad</label>
+                                        <input type="text" id="func-depto" required placeholder="Subdepartamento de Informática" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SECCIÓN 2: Tipo de Solicitud y Equipamiento -->
+                            <div class="space-y-4">
+                                <div class="border-b border-slate-200 dark:border-slate-800 pb-2">
+                                    <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 inline-flex items-center gap-2">
+                                        <span class="bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-400 w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">2</span>
+                                        Tipo de Solicitud (Marcar una sola opción de solicitud)
+                                    </h3>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- Tipo Solicitud Radios -->
+                                    <div class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">TIPO SOLICITUD:</span>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                <input type="radio" name="solicitud_tipo" value="Asignacion" checked onchange="toggleTraspasoSection()" class="h-4.5 w-4.5 text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500">
+                                                Asignación (Entrega)
+                                            </label>
+                                            <label class="flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                <input type="radio" name="solicitud_tipo" value="Traspaso" onchange="toggleTraspasoSection()" class="h-4.5 w-4.5 text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500">
+                                                Traspaso *
+                                            </label>
+                                            <label class="flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                <input type="radio" name="solicitud_tipo" value="Devolucion" onchange="toggleTraspasoSection()" class="h-4.5 w-4.5 text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500">
+                                                Devolución
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Propiedad Equipamiento -->
+                                    <div class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">PROPIEDAD EQUIPAMIENTO:</span>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                <input type="radio" name="propiedad_tipo" value="En Arriendo" checked class="h-4.5 w-4.5 text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500">
+                                                En Arriendo
+                                            </label>
+                                            <label class="flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                <input type="radio" name="propiedad_tipo" value="Propiedad ISP" class="h-4.5 w-4.5 text-indigo-600 border-slate-300 dark:border-slate-700 focus:ring-indigo-500">
+                                                Propiedad ISP (Inventariado)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tipo de Equipamiento Checks -->
+                                <div class="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+                                    <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">TIPO DE EQUIPAMIENTO COMPROMETIDO:</span>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <!-- Computacional -->
+                                        <div class="space-y-2">
+                                            <span class="block text-xs font-semibold text-indigo-600 dark:text-indigo-400">Equipamiento Computacional:</span>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="PC" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> PC</label>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="Notebook" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> Notebook</label>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="All In One" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> All In One (AIO)</label>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="Monitor" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> Monitor</label>
+                                        </div>
+                                        <!-- Telefonía -->
+                                        <div class="space-y-2">
+                                            <span class="block text-xs font-semibold text-indigo-600 dark:text-indigo-400">Telefonía / Conectividad:</span>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="Celular" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> Celular</label>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="Telefono IP" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> Teléfono IP</label>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="SIMCARD" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> SIMCARD</label>
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer"><input type="checkbox" name="eq_cat" value="BAM" class="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-955 text-indigo-600 focus:ring-indigo-500"> BAM (Banda Ancha Móvil)</label>
+                                        </div>
+                                        <!-- Otros -->
+                                        <div class="space-y-2">
+                                            <span class="block text-xs font-semibold text-indigo-600 dark:text-indigo-400">Otros / Accesorios:</span>
+                                            <input type="text" id="eq_otros_detalles" placeholder="Detallar otros equipos..." class="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SECCIÓN 3: Exclusivo Traspaso (Condicional) -->
+                            <div id="section-traspaso" class="hidden space-y-4 bg-amber-50/50 dark:bg-amber-950/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-900/30">
+                                <div class="border-b border-amber-200 dark:border-amber-900/30 pb-2">
+                                    <h3 class="text-base font-bold text-amber-900 dark:text-amber-400 inline-flex items-center gap-2">
+                                        <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold">3</span>
+                                        * Datos Adicionales en caso de TRASPASO de Equipos:
+                                    </h3>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-amber-800 dark:text-amber-550 mb-1">Nombre Funcionario Emisor (Entrega)</label>
+                                        <input type="text" id="traspaso-emisor-nombre" placeholder="Nombre completo de quien entrega" class="w-full px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-850 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-amber-800 dark:text-amber-550 mb-1">Depto / Unidad (Emisor)</label>
+                                        <input type="text" id="traspaso-emisor-depto" placeholder="Unidad de procedencia" class="w-full px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-850 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-amber-800 dark:text-amber-550 mb-1">Nombre Funcionario Receptor (Recibe)</label>
+                                        <input type="text" id="traspaso-receptor-nombre" placeholder="Nombre completo de quien recibe" class="w-full px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-850 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-amber-800 dark:text-amber-550 mb-1">Depto / Unidad (Receptor)</label>
+                                        <input type="text" id="traspaso-receptor-depto" placeholder="Unidad de destino" class="w-full px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-850 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-xs font-semibold text-amber-800 dark:text-amber-550 mb-1">Observación de Traspaso</label>
+                                        <input type="text" id="traspaso-observacion" placeholder="Detalle o motivo del traspaso de inventario" class="w-full px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-850 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-550 text-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SECCIÓN 4: Completar Datos Solicitados (Tabla dinámica de equipos) -->
+                            <div class="space-y-4">
+                                <div class="border-b border-slate-200 dark:border-slate-800 pb-2 flex flex-wrap justify-between items-center gap-2">
+                                    <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 inline-flex items-center gap-2">
+                                        <span class="bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-400 w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">4</span>
+                                        Datos Específicos del Equipamiento Tecnológico
+                                    </h3>
+                                    <div class="flex items-center gap-2 no-print">
+                                        <!-- Selector de Kits Rápidos -->
+                                        <div class="relative inline-block text-left">
+                                            <button type="button" onclick="toggleKitDropdown(event)" id="kit-dropdown-btn" class="bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-colors">
+                                                <i data-lucide="package-plus" class="w-4 h-4"></i> Cargar Kit Rápido
+                                                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                            <div id="kit-dropdown-menu" class="hidden absolute right-0 mt-1 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-30 divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                                                <div class="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">Plantillas Estándar TIC</div>
+                                                <button type="button" onclick="insertEquipmentKit('notebook')" class="w-full text-left px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2">
+                                                    <i data-lucide="laptop" class="w-4 h-4 text-blue-500"></i> Kit Notebook Estándar
+                                                </button>
+                                                <button type="button" onclick="insertEquipmentKit('pc')" class="w-full text-left px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2">
+                                                    <i data-lucide="monitor" class="w-4 h-4 text-indigo-500"></i> Kit Computador (PC + Monitor)
+                                                </button>
+                                                <button type="button" onclick="insertEquipmentKit('aio')" class="w-full text-left px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2">
+                                                    <i data-lucide="tv" class="w-4 h-4 text-violet-500"></i> Kit All In One (AIO)
+                                                </button>
+                                                <button type="button" onclick="insertEquipmentKit('movil')" class="w-full text-left px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2">
+                                                    <i data-lucide="smartphone" class="w-4 h-4 text-emerald-500"></i> Kit Movilidad (Celular + SIM)
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <button type="button" onclick="addEquipmentRow()" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-xs font-semibold flex items-center gap-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg transition-colors">
+                                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Añadir Fila
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-sm border-collapse">
+                                        <thead>
+                                            <tr class="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                <th class="p-3">Tipo Equipamiento</th>
+                                                <th class="p-3">Marca</th>
+                                                <th class="p-3">Modelo</th>
+                                                <th class="p-3">N° Serie</th>
+                                                <th class="p-3">N° Inventario</th>
+                                                <th class="p-3">Observación</th>
+                                                <th class="p-3 text-center no-print w-12"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="equipment-rows" class="divide-y divide-slate-100 dark:divide-slate-850">
+                                            <!-- Filas dinámicas añadidas vía JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- SECCIÓN 5: Accesorios y Observaciones generales -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Accesorios Incluidos en la Solicitud:</label>
+                                    <textarea id="form-accesorios" rows="3" placeholder="Ej: Bolso de transporte, Cargador original, Cable HDMI..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Observaciones Generales / Comentarios:</label>
+                                    <textarea id="form-observaciones" rows="3" placeholder="Condiciones especiales de entrega o notas adicionales..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-955 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- SECCIÓN 6: Firmas Digitales -->
+                            <div class="space-y-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1">
+                                        <i data-lucide="pen-tool" class="w-5 h-5 text-indigo-600 dark:text-indigo-400"></i>
+                                        Registros de Firmas Digitales
+                                    </h3>
+                                    <p class="text-xs text-slate-400 dark:text-slate-500">Puedes firmar digitalmente arrastrando el mouse o con tu pantalla táctil, o seleccionar la firma en papel para el formato de impresión tradicional.</p>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <!-- Firma Profesional TIC -->
+                                    <div id="sig-card-tic" class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-1">Firma Profesional Oficina TIC</span>
+                                        <span class="block text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold text-center mb-2">Eduardo Wess (Jefe TIC)</span>
+                                        
+                                        <!-- Modalidad selector -->
+                                        <div class="flex gap-2 justify-center mb-3">
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_tic" value="oficial" checked onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Firma Oficial
+                                            </label>
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_tic" value="digital" onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Dibujar
+                                            </label>
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_tic" value="manual" onchange="toggleSigMode('tic')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Manual
+                                            </label>
+                                        </div>
+
+                                        <!-- Vista Previa Firma Oficial Eduardo Wess -->
+                                        <div id="sig-oficial-placeholder-tic" class="flex flex-col items-center justify-center border-2 border-indigo-200 dark:border-indigo-900/60 bg-white dark:bg-slate-950 w-full aspect-[4/3] max-w-xs mx-auto rounded-2xl p-3 text-center shadow-sm">
+                                            <div class="w-full h-20 flex items-center justify-center">
+                                                <img src="img/firma-eduardo-wess.png" alt="Firma Eduardo Wess" class="max-h-16 object-contain">
+                                            </div>
+                                            <div class="w-44 border-b border-slate-300 dark:border-slate-700 my-1"></div>
+                                            <span class="text-[11px] font-bold text-slate-800 dark:text-slate-200">Eduardo Wess</span>
+                                            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                                                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Firma Oficial Jefe TIC
+                                            </span>
+                                        </div>
+
+                                        <!-- Contenedor del Canvas para dibujar -->
+                                        <div id="sig-container-tic" class="hidden signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                            <!-- CSS Guide Line -->
+                                            <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
+                                            <canvas id="canvas-tic" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>
+                                            <button type="button" onclick="clearCanvas('tic')" class="sig-clear-btn absolute top-2 right-2 bg-white/80 hover:bg-slate-100 border border-slate-200 text-slate-550 p-1.5 rounded-lg text-xs shadow-sm flex items-center gap-1 transition-colors z-10">
+                                                <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Manual Placeholder -->
+                                        <div id="sig-manual-placeholder-tic" class="hidden flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955 w-full aspect-[4/3] max-w-xs mx-auto rounded-2xl p-4 text-center">
+                                            <i data-lucide="printer" class="w-8 h-8 text-slate-300 mb-2"></i>
+                                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Firma Manual (Impresa)</span>
+                                            <span class="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5">Se imprimirá un recuadro en blanco para firma física con lápiz</span>
+                                        </div>
+
+                                        <span class="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono">Oficina TIC - ISP Chile</span>
+                                    </div>
+
+                                    <!-- Firma Funcionario Emisor -->
+                                    <div id="sig-card-emisor" class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-2">Firma Funcionario Emisor</span>
+                                        
+                                        <!-- Modalidad selector -->
+                                        <div class="flex gap-2 justify-center mb-3">
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_emisor" value="digital" checked onchange="toggleSigMode('emisor')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Digital
+                                            </label>
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_emisor" value="manual" onchange="toggleSigMode('emisor')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Manual
+                                            </label>
+                                        </div>
+
+                                        <!-- Contenedor del Canvas -->
+                                        <div id="sig-container-emisor" class="signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                            <!-- CSS Guide Line -->
+                                            <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
+                                            <canvas id="canvas-emisor" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>
+                                            <button type="button" onclick="clearCanvas('emisor')" class="sig-clear-btn absolute top-2 right-2 bg-white/80 hover:bg-slate-100 border border-slate-200 text-slate-550 p-1.5 rounded-lg text-xs shadow-sm flex items-center gap-1 transition-colors z-10">
+                                                <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Manual Placeholder -->
+                                        <div id="sig-manual-placeholder-emisor" class="hidden flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955 w-full aspect-[4/3] max-w-xs mx-auto rounded-2xl p-4 text-center">
+                                            <i data-lucide="printer" class="w-8 h-8 text-slate-300 mb-2"></i>
+                                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Firma Manual (Impresa)</span>
+                                            <span class="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5">Se imprimirá un recuadro en blanco para firma física con lápiz</span>
+                                        </div>
+
+                                        <span class="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono">Solo requerido para Traspaso</span>
+                                    </div>
+
+                                    <!-- Firma Funcionario Receptor -->
+                                    <div id="sig-card-receptor" class="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                                        <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-center mb-2">Firma Funcionario Receptor</span>
+                                        
+                                        <!-- Modalidad selector -->
+                                        <div class="flex gap-2 justify-center mb-3">
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_receptor" value="digital" checked onchange="toggleSigMode('receptor')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Digital
+                                            </label>
+                                            <label class="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">
+                                                <input type="radio" name="sig_mode_receptor" value="manual" onchange="toggleSigMode('receptor')" class="text-indigo-600 focus:ring-indigo-500 w-3 h-3">
+                                                Manual
+                                            </label>
+                                        </div>
+
+                                        <!-- Contenedor del Canvas -->
+                                        <div id="sig-container-receptor" class="signature-container relative w-full aspect-[4/3] max-w-xs mx-auto border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-50 rounded-2xl overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                                            <!-- CSS Guide Line -->
+                                            <div class="absolute bottom-6 left-4 right-4 border-b border-dashed border-slate-300 dark:border-slate-400 pointer-events-none"></div>
+                                            <canvas id="canvas-receptor" class="signature-canvas absolute inset-0 w-full h-full cursor-crosshair touch-none bg-transparent"></canvas>
+                                            <button type="button" onclick="clearCanvas('receptor')" class="sig-clear-btn absolute top-2 right-2 bg-white/80 hover:bg-slate-100 border border-slate-200 text-slate-555 p-1.5 rounded-lg text-xs shadow-sm flex items-center gap-1 transition-colors z-10">
+                                                <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Manual Placeholder -->
+                                        <div id="sig-manual-placeholder-receptor" class="hidden flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955 w-full aspect-[4/3] max-w-xs mx-auto rounded-2xl p-4 text-center">
+                                            <i data-lucide="printer" class="w-8 h-8 text-slate-300 mb-2"></i>
+                                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Firma Manual (Impresa)</span>
+                                            <span class="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5">Se imprimirá un recuadro en blanco para firma física con lápiz</span>
+                                        </div>
+
+                                        <span class="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono">Al firmar asume uso y cuidado</span>
+                                    </div>
+                                </div>
+
+                                <div class="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-4 text-xs text-indigo-700 dark:text-indigo-400 space-y-1">
+                                    <p class="font-bold flex items-center gap-1.5"><i data-lucide="shield-alert" class="w-4 h-4"></i> Consideraciones Importantes:</p>
+                                    <p>Al firmar y recibir éste(os) equipamiento(s) el usuario se hace plenamente responsable de su correcto uso y cuidado.</p>
+                                    <p>En caso de pérdida, extravío o robo, se deberá proceder rigurosamente con lo estipulado en la directriz "IT Pérdida de Equipamiento".</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Control de Formulario -->
+                        <div class="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                            <button type="button" id="form-cancel-btn" onclick="switchTab('dashboard')" class="whitespace-nowrap shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                Volver al Panel
+                            </button>
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <button type="button" onclick="triggerPrintMode()" id="print-btn-form" class="hidden whitespace-nowrap shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0">
+                                    <i data-lucide="printer" class="w-4 h-4"></i>
+                                    <span>Imprimir / Guardar PDF</span>
+                                </button>
+                                <button type="submit" class="whitespace-nowrap shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:translate-y-[-1px] active:translate-y-0">
+                                    <i data-lucide="save" class="w-4 h-4"></i>
+                                    <span>Guardar Registro</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ================= MODALES VISUALES ================= -->
+
+        <!-- Modal de Acceso y Roles (Modo Admin / Modo Técnico / Modo Funcionario) -->
+        <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm transition-opacity duration-200">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 transform transition-all space-y-5 animate-in fade-in zoom-in-95 duration-150">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0">
+                            <i data-lucide="shield-check" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">Control de Acceso y Roles TIC</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Seleccione el modo de operación para el sistema.</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeAuthModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Opciones de Roles -->
+                <div class="grid grid-cols-1 gap-2.5">
+                    <!-- Opción 1: Administrador -->
+                    <div id="role-card-admin" onclick="selectAuthRoleOption('admin')" class="role-option-card relative flex items-start gap-3.5 p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-750 bg-white dark:bg-slate-950/60 cursor-pointer hover:border-indigo-500 transition-all select-none">
+                        <input type="radio" name="auth_role_select" id="role-radio-admin" value="admin" class="mt-1 text-indigo-600 focus:ring-indigo-500 pointer-events-none">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <strong class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <i data-lucide="shield" class="w-4 h-4 text-emerald-500"></i> Modo Administrador
+                                </strong>
+                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">Control Total</span>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Acceso a todos los registros, métricas de avance, catastro Excel, respaldos JSON y eliminación.</p>
+                        </div>
+                    </div>
+
+                    <!-- Opción 2: Técnico Soporte TIC -->
+                    <div id="role-card-tecnico" onclick="selectAuthRoleOption('tecnico')" class="role-option-card relative flex items-start gap-3.5 p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-750 bg-white dark:bg-slate-950/60 cursor-pointer hover:border-indigo-500 transition-all select-none">
+                        <input type="radio" name="auth_role_select" id="role-radio-tecnico" value="tecnico" checked class="mt-1 text-indigo-600 focus:ring-indigo-500 pointer-events-none">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <strong class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <i data-lucide="wrench" class="w-4 h-4 text-sky-500"></i> Modo Técnico TIC
+                                </strong>
+                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">Operativo</span>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Gestión de entregas, autocompletado desde Catastro, firmas TIC, clonado y generación de links.</p>
+                        </div>
+                    </div>
+
+                    <!-- Opción 3: Funcionario Público -->
+                    <div id="role-card-funcionario" onclick="selectAuthRoleOption('funcionario')" class="role-option-card relative flex items-start gap-3.5 p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-750 bg-white dark:bg-slate-950/60 cursor-pointer hover:border-indigo-500 transition-all select-none">
+                        <input type="radio" name="auth_role_select" id="role-radio-funcionario" value="funcionario" class="mt-1 text-indigo-600 focus:ring-indigo-500 pointer-events-none">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <strong class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <i data-lucide="user" class="w-4 h-4 text-amber-500"></i> Modo Funcionario / Solicitante
+                                </strong>
+                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">Público</span>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Vista restringida solo al formulario de solicitud y firma receptora (sin acceso al panel de otros).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Password Input (Conditional) -->
+                <div id="auth-password-container" class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        Contraseña o PIN de Acceso:
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400"></i>
+                        <input type="password" id="auth-password-input" placeholder="Ingrese contraseña o PIN..." class="w-full pl-10 pr-11 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm font-medium" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitAuthLogin()">
+                        <button type="button" onclick="toggleAuthPasswordVisibility()" class="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <i id="auth-pwd-eye" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center justify-between pt-1">
+                        <button type="button" onclick="toggleChangePasswordPanel()" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1">
+                            <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+                            <span id="change-pwd-btn-label">Personalizar / Cambiar Claves</span>
+                        </button>
+                    </div>
+
+                    <!-- Panel Expandible para Cambiar Contraseñas -->
+                    <div id="change-password-panel" class="hidden p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-3 mt-2">
+                        <span class="block text-xs font-bold text-slate-700 dark:text-slate-300">Configurar Nuevas Claves de Seguridad</span>
+                        <div>
+                            <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Clave Actual de Administrador (para autorizar cambio):</label>
+                            <input type="password" id="pwd-change-current-admin" placeholder="Clave actual de Admin..." class="w-full px-3 py-1.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Nueva Clave Admin:</label>
+                                <input type="password" id="pwd-change-new-admin" placeholder="Ej: MiClaveAdmin#2025" class="w-full px-3 py-1.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Nueva Clave Técnico:</label>
+                                <input type="password" id="pwd-change-new-tecnico" placeholder="Ej: MiClaveTecnico#2025" class="w-full px-3 py-1.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
+                            </div>
+                        </div>
+                        <div class="flex justify-end pt-1">
+                            <button type="button" onclick="saveCustomPasswords()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all">
+                                Guardar Claves
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" onclick="logoutToPublicRole()" class="px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors">
+                        Cerrar Sesión
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="closeAuthModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="button" onclick="submitAuthLogin()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md shadow-indigo-600/20 transition-all">
+                            Ingresar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal / Ventana Emergente de Acciones para Móviles y Tablets (Action Sheet) -->
+        <div id="mobile-action-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-sm transition-opacity duration-200">
+            <div class="bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 transform transition-all space-y-5 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+                <!-- Header con Datos Rápidos del Registro -->
+                <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span id="m-action-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">Asignación</span>
+                            <span id="m-action-ticket" class="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">TIC-4859</span>
+                        </div>
+                        <h3 id="m-action-nombre" class="text-base font-bold text-slate-900 dark:text-slate-100 mt-1 truncate">Nombre Funcionario</h3>
+                        <p id="m-action-rut" class="text-xs text-slate-400 font-mono">12.345.678-9</p>
+                    </div>
+                    <button type="button" onclick="closeMobileActions()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Resumen de Equipamiento -->
+                <div class="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Equipamiento Asignado:</span>
+                    <p id="m-action-equipos" class="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">Notebook HP ProBook 450 G8 (Serie: 5CD12345)</p>
+                </div>
+
+                <!-- Botones de Acción Táctiles Grandes -->
+                <div class="grid grid-cols-1 gap-2">
+                    <button type="button" id="m-btn-edit" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-sm transition-colors">
+                        <div class="p-2 rounded-xl bg-indigo-600 text-white shrink-0">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block">Ver / Editar Formulario</span>
+                            <span class="block text-[11px] font-normal text-indigo-500/80 dark:text-indigo-400/70">Revisar detalles, equipos y firmas</span>
+                        </div>
+                    </button>
+
+                    <button type="button" id="m-btn-link" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/50 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-bold text-sm transition-colors">
+                        <div class="p-2 rounded-xl bg-sky-600 text-white shrink-0">
+                            <i data-lucide="link" class="w-4 h-4"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block">Generar Link para Funcionario</span>
+                            <span class="block text-[11px] font-normal text-sky-500/80 dark:text-sky-400/70">Copiar enlace directo para firma/revisión</span>
+                        </div>
+                    </button>
+
+                    <button type="button" id="m-btn-clone" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold text-sm transition-colors">
+                        <div class="p-2 rounded-xl bg-emerald-600 text-white shrink-0">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block">Duplicar / Clonar en Nueva Solicitud</span>
+                            <span class="block text-[11px] font-normal text-emerald-500/80 dark:text-emerald-400/70">Crea una nueva solicitud con estos datos</span>
+                        </div>
+                    </button>
+
+                    <button type="button" id="m-btn-print" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-bold text-sm transition-colors">
+                        <div class="p-2 rounded-xl bg-slate-800 text-white dark:bg-slate-700 shrink-0">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block">Imprimir / Guardar PDF</span>
+                            <span class="block text-[11px] font-normal text-slate-500 dark:text-slate-400">Genera el documento oficial de 2 páginas</span>
+                        </div>
+                    </button>
+
+                    <button type="button" id="m-btn-delete" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 font-bold text-sm transition-colors">
+                        <div class="p-2 rounded-xl bg-rose-600 text-white shrink-0">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block">Eliminar Registro</span>
+                            <span class="block text-[11px] font-normal text-rose-500/80 dark:text-rose-400/70">Borra permanentemente este registro</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="pt-2">
+                    <button type="button" onclick="closeMobileActions()" class="w-full py-3 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors">
+                        Cerrar Menú
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Confirmación Universal (Reemplazo de window.confirm) -->
+        <div id="custom-confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-200">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 transform transition-all space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div class="flex items-start gap-3.5">
+                    <div id="confirm-modal-icon-container" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 shrink-0">
+                        <i id="confirm-modal-icon" data-lucide="alert-triangle" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 id="confirm-modal-title" class="text-base font-bold text-slate-900 dark:text-slate-100">¿Confirmar Acción?</h3>
+                        <p id="confirm-modal-message" class="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">¿Está seguro de realizar esta operación?</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" id="confirm-modal-cancel-btn" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" id="confirm-modal-confirm-btn" class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition-colors">
+                        Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Guía de Impresión y PDF -->
+        <div id="print-guide-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-200">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-2.5 rounded-xl text-indigo-600 dark:text-indigo-400">
+                            <i data-lucide="printer" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 dark:text-slate-100">Guía de Impresión Oficial</h3>
+                            <p class="text-xs text-slate-400 font-mono">Formulario RG-02-IT-140.03-004 V5 (2 Páginas)</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closePrintGuide()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3 text-xs text-slate-600 dark:text-slate-300">
+                    <p class="font-medium text-slate-700 dark:text-slate-200">Para asegurar que el PDF o impresión física coincida exactamente con las 2 páginas del formato oficial, verifique estos 3 ajustes en el panel de impresión:</p>
+                    
+                    <div class="grid grid-cols-1 gap-2.5 pt-1">
+                        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-750">
+                            <i data-lucide="file-text" class="w-5 h-5 text-indigo-500 shrink-0"></i>
+                            <div>
+                                <strong class="block text-slate-900 dark:text-slate-100">1. Tamaño de Papel:</strong>
+                                <span>Selecciona <strong>Oficio</strong> o <strong>Legal</strong> (216 mm × 330 mm).</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-750">
+                            <i data-lucide="palette" class="w-5 h-5 text-emerald-500 shrink-0"></i>
+                            <div>
+                                <strong class="block text-slate-900 dark:text-slate-100">2. Gráficos de Fondo:</strong>
+                                <span>Debe estar <span class="text-emerald-600 dark:text-emerald-400 font-bold">ACTIVADO</span> (en 'Más opciones') para mostrar encabezados.</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-750">
+                            <i data-lucide="minimize-2" class="w-5 h-5 text-amber-500 shrink-0"></i>
+                            <div>
+                                <strong class="block text-slate-900 dark:text-slate-100">3. Márgenes:</strong>
+                                <span>Configurar en <strong>Ninguno</strong> o <strong>Por defecto</strong>.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-800">
+                    <label class="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">
+                        <input type="checkbox" id="dont-show-print-guide" class="rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                        No volver a mostrar este aviso
+                    </label>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button type="button" onclick="closePrintGuide()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="button" onclick="proceedToPrint()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all">
+                            <i data-lucide="printer" class="w-4 h-4"></i> Continuar e Imprimir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Actualización del Sistema con Barra de Progreso -->
+        <div id="update-progress-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity duration-300">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative overflow-hidden transform transition-all">
+                <!-- Luces de fondo decorativas -->
+                <div class="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-20 -left-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="relative z-10 text-center space-y-4">
+                    <!-- Icono animado -->
+                    <div class="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/80 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
+                        <i data-lucide="refresh-cw" class="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400"></i>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2">
+                            <span>Actualizando Sistema TIC</span>
+                            <span id="update-modal-version" class="text-xs font-mono bg-indigo-100 dark:bg-indigo-900/70 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-700/50">v5.7.0</span>
+                        </h3>
+                        <p id="update-modal-status" class="text-xs text-slate-500 dark:text-slate-400 mt-2 min-h-[36px] flex items-center justify-center leading-relaxed">
+                            Cargando nueva versión y optimizando base de datos local...
+                        </p>
+                    </div>
+
+                    <!-- Barra de progreso interactiva -->
+                    <div class="space-y-2 pt-1">
+                        <div class="w-full h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-slate-700">
+                            <div id="update-modal-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 rounded-full transition-all duration-300 shadow-sm relative overflow-hidden" style="width: 0%;">
+                                <div class="absolute inset-0 bg-white/25 animate-[pulse_1.2s_infinite]"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-[11px] font-mono text-slate-400 dark:text-slate-500 px-1">
+                            <span id="update-modal-step" class="truncate max-w-[260px] text-left">Iniciando actualización...</span>
+                            <span id="update-modal-percent" class="font-bold text-indigo-600 dark:text-indigo-400">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500 italic">
+                            Por favor no cierre la aplicación mientras se aplican los cambios.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE PREVISUALIZACIÓN OFICIAL EN VIVO (2 PÁGINAS) -->
+        <div id="print-preview-modal" class="hidden fixed inset-0 z-50 flex flex-col bg-slate-950/95 backdrop-blur-md transition-all duration-300">
+            <!-- Header de la Vista Previa -->
+            <div class="h-16 bg-slate-900 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 text-white z-20">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shrink-0">
+                        <i data-lucide="file-check" class="w-5 h-5"></i>
+                    </div>
+                    <div class="truncate">
+                        <h3 class="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
+                            <span>Vista Previa del Documento Oficial</span>
+                            <span class="hidden sm:inline-block text-[10px] font-mono bg-indigo-950 text-indigo-300 border border-indigo-700/50 px-2 py-0.5 rounded-full">RG-02-IT-140.03-004 V5</span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400">Verifique los datos, formato Oficio y firma de Eduardo Wess antes de imprimir.</p>
+                    </div>
+                </div>
+
+                <!-- Controles de vista y acciones -->
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div class="hidden md:flex items-center bg-slate-800/90 border border-slate-700 rounded-xl p-0.5 text-xs">
+                        <button type="button" onclick="filterPreviewPage('all')" id="preview-btn-all" class="px-2.5 py-1 rounded-lg font-semibold bg-indigo-600 text-white transition-all">Todas (2 Págs)</button>
+                        <button type="button" onclick="filterPreviewPage(1)" id="preview-btn-p1" class="px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition-all">Pág 1</button>
+                        <button type="button" onclick="filterPreviewPage(2)" id="preview-btn-p2" class="px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition-all">Pág 2</button>
+                    </div>
+
+                    <!-- Botón Exportar PDF Directo (Nativo Electron) -->
+                    <button type="button" onclick="exportPdfFromPreview()" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 transition-all shadow-sm">
+                        <i data-lucide="download" class="w-4 h-4 text-sky-400"></i>
+                        <span>Guardar PDF</span>
+                    </button>
+
+                    <!-- Botón Imprimir -->
+                    <button type="button" onclick="confirmPrintFromPreview()" class="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        <span>Imprimir Acta</span>
+                    </button>
+
+                    <!-- Botón Cerrar / Volver a Editar -->
+                    <button type="button" onclick="closePrintPreview()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Volver a Editar">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenedor del visor con scroll y fondo oscuro -->
+            <div class="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 flex flex-col items-center bg-slate-950/95 space-y-6 select-none">
+                <!-- Banner de aviso superior dentro de la vista previa -->
+                <div class="max-w-3xl w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs text-slate-300">
+                    <div class="flex items-center gap-2.5">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                        <span>Formato configurado para hojas <strong>Oficio Chile (216 mm × 330 mm)</strong> con <strong>Firma Oficial de Eduardo Wess</strong>.</span>
+                    </div>
+                    <span class="hidden sm:inline-block font-mono text-[11px] text-slate-400">2 Páginas Oficiales</span>
+                </div>
+
+                <!-- Contenedor dinámico donde se inyectan las 2 páginas -->
+                <div id="print-preview-sheets-wrapper" class="w-full flex flex-col items-center space-y-8">
+                    <!-- Dynamic clone of Page 1 & Page 2 -->
+                </div>
+            </div>
+
+            <!-- Footer con atajos -->
+            <div class="h-12 bg-slate-900/90 border-t border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 text-xs text-slate-400">
+                <span class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Vista previa generada en tiempo real
+                </span>
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="closePrintPreview()" class="text-slate-300 hover:text-white underline">
+                        ← Volver a modificar datos
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE INFORMACIÓN DEL SISTEMA, VERSIÓN Y NOVEDADES -->
+        <div id="system-info-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity duration-300">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 relative overflow-hidden">
+                <!-- Luz decorativa -->
+                <div class="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+                <!-- Encabezado -->
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 shrink-0">
+                            <i data-lucide="info" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span>Sistema de Gestión TIC</span>
+                                <span class="text-xs font-mono font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700/50">v5.7.0</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Instituto de Salud Pública de Chile • Oficina TIC</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeSystemInfoModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Estado de Actualización -->
+                <div class="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <div>
+                            <strong class="block text-xs text-emerald-900 dark:text-emerald-200 font-bold">Sistema Actualizado y al Día</strong>
+                            <span class="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">Versión instalada: v5.7.0 (Compilación Local Electron)</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeSystemInfoModal(); clearCacheAndReload();" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm shrink-0 inline-flex items-center gap-1">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>Comprobar</span>
+                    </button>
+                </div>
+
+                <!-- Novedades de la Versión -->
+                <div class="space-y-2.5">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i> Novedades y Mejoras en v5.7.0:
+                    </h4>
+                    <ul class="space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Aplicación de Escritorio Offline:</strong> Ejecución nativa sin internet con guardado local ultrarrápido.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Formato Oficial Oficio / Circular:</strong> Impresión y exportación nativa a PDF en 216 mm × 330 mm (2 páginas exactas).</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Firma Oficial Precargada:</strong> Firma estampada por defecto de <em>Eduardo Wess (Jefe Oficina TIC)</em> e identificación en Página 2.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Visor de Previsualización en Vivo:</strong> Vista previa completa antes de mandar a imprimir o guardar PDF.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5"></i>
+                            <span><strong>Matriz de Permisos por Rol:</strong> Modo Administrador, Técnico TIC y Funcionario Solicitante.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Pie del Modal -->
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400 font-mono">Formulario RG-02-IT-140.03-004 V5</span>
+                    <button type="button" onclick="closeSystemInfoModal()" class="px-5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition-colors">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Pestañas Inferior para Móviles (Visible solo en smartphones cuando está en Modo Admin o Técnico) -->
+        <div id="mobile-tab-bar" class="hidden md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
+            <button onclick="switchTab('dashboard')" id="mobile-tab-dashboard" class="flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-bold text-indigo-400 bg-indigo-950/80 transition-all">
+                <i data-lucide="layout-dashboard" class="w-4.5 h-4.5"></i>
+                <span>Registros</span>
+            </button>
+            <button onclick="switchTab('inventory')" id="mobile-tab-inventory" class="flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-semibold text-slate-400 hover:text-white transition-all">
+                <i data-lucide="boxes" class="w-4.5 h-4.5"></i>
+                <span>Catastro</span>
+            </button>
+            <button onclick="switchTab('metrics')" id="mobile-tab-metrics" class="flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-semibold text-slate-400 hover:text-white transition-all">
+                <i data-lucide="bar-chart-2" class="w-4.5 h-4.5"></i>
+                <span>Métricas</span>
+            </button>
+            <button onclick="openNewForm()" id="mobile-tab-form" class="flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-[11px] font-semibold text-slate-400 hover:text-white transition-all">
+                <i data-lucide="file-plus" class="w-4.5 h-4.5"></i>
+                <span>Nuevo</span>
+            </button>
+        </div>
+
+    </div>
+
+
+    <!-- ================= CONTENEDOR EXCLUSIVO DE IMPRESIÓN (PDF) ================= -->
+    <div id="print-only-container" class="hidden print:block text-black bg-white select-none">
+        
+        <!-- ================= PAGINA 1 DE 2 ================= -->
+        <div class="print-page w-full" style="height: 330mm; min-height: 330mm; box-sizing: border-box; font-family: Arial, sans-serif; padding: 15mm; display: flex; flex-direction: column; justify-content: space-between;">
+            
+            <div class="w-full flex flex-col justify-start">
+                <!-- Header Table -->
+                <table class="w-full text-center border-collapse border border-black print-tnr-10" style="font-family: Arial, sans-serif;">
+                    <tr>
+                        <td class="border border-black p-0 w-[14.2%] align-middle" style="height: 100%; line-height: 0; overflow: hidden; vertical-align: middle;">
+                            <img src="img/logo-isp.svg" alt="ISP Logo" class="print-exact" style="display: block; width: 100%; height: 100%; object-fit: fill; margin: 0; padding: 0;">
+                        </td>
+                        <td class="border border-black p-2 w-[62.7%] align-middle font-bold">
+                            <div style="font-size: 11px; text-transform: uppercase;">Formulario de Asignación, Traspaso y/o Devolución de Equipamiento Tecnológico</div>
+                            <div class="mt-1 text-slate-700" style="font-size: 10px; font-weight: bold; font-family: monospace;">RG-02-IT-140.03-004</div>
+                        </td>
+                        <td class="border border-black w-[23.1%] text-left text-[9px] align-middle" style="padding: 0;">
+                            <table class="w-full border-collapse" style="margin: 0; padding: 0;">
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Versión:</td>
+                                    <td class="p-1 w-1/2 text-center font-bold">5</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Emisión:</td>
+                                    <td class="p-1 w-1/2 text-center font-mono">14/07/2017</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Actualización:</td>
+                                    <td class="p-1 w-1/2 text-center font-mono">08/05/2026</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Página:</td>
+                                    <td class="p-1 w-1/2 text-center font-bold">1 de 2</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Fecha y N° Ticket Box (Tabla nativa alineada, replicando Word 1:1) -->
+                <table class="w-full border-collapse my-2.5" style="font-family: Arial, sans-serif; border: none;">
+                    <tr>
+                        <td class="font-bold text-[10px] uppercase text-left w-[15.16%] print-tnr-10" style="border: none; padding: 0;">Fecha Solicitud</td>
+                        <td class="border border-black px-3 w-[28.12%] text-center align-middle bg-white print-calibri-12" style="height: 22px; padding: 0; line-height: 20px;">
+                            <span id="print-header-fecha">-</span>
+                        </td>
+                        <td class="font-bold text-[10px] uppercase text-right pr-4 w-[24.10%] print-tnr-10" style="border: none; padding: 0;">N° Ticket</td>
+                        <td class="border border-black px-3 w-[32.62%] text-center align-middle bg-white print-calibri-12" style="height: 22px; padding: 0; line-height: 20px;">
+                            <span id="print-header-ticket">-</span>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- SECCIÓN 1: Datos Funcionario (Caja independiente con borde completo, replicando Word 1:1) -->
+                <table class="w-full border-collapse border border-black text-xs mb-2.5" style="font-family: Arial, sans-serif;">
+                    <tr>
+                        <td class="bg-[#9cc2e5] text-black font-bold p-1 px-2 text-[10px] print-exact border-b border-black print-tnr-10" colspan="2">
+                            1.- Datos Funcionario a quien se le asignará el equipamiento solicitado:
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[43%] bg-white print-tnr-10">Nombre y Apellidos</td>
+                        <td id="print-func-nombre" class="border border-black p-1 w-[57%] font-medium bg-white print-calibri-12">-</td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[43%] bg-white print-tnr-10">Rut</td>
+                        <td id="print-func-rut" class="border border-black p-1 w-[57%] font-medium font-mono bg-white print-calibri-12">-</td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[43%] bg-white print-tnr-10">Cargo</td>
+                        <td id="print-func-cargo" class="border border-black p-1 w-[57%] font-medium bg-white print-calibri-12">-</td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[43%] bg-white print-tnr-10">Departamento</td>
+                        <td id="print-func-depto" class="border border-black p-1 w-[57%] font-medium bg-white print-calibri-12">-</td>
+                    </tr>
+                </table>
+
+                <!-- SECCIÓN 2: Tipo de Solicitud (Caja independiente con borde completo, replicando Word 1:1) -->
+                <table class="w-full border-collapse border border-black text-xs mb-2.5" style="font-family: Arial, sans-serif;">
+                    <tr>
+                        <td class="bg-[#9cc2e5] text-black font-bold p-1 px-2 text-[10px] print-exact border-b border-black print-tnr-10" colspan="3">
+                            2.- Tipo de Solicitud (Marcar una sola opción de solicitud por formulario)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[25.56%] bg-white print-tnr-10" style="border-right: none;">SOLICITUD:</td>
+                        <td class="border border-black p-1 w-[74.44%] text-left bg-white" colspan="2">
+                            <div class="flex space-x-6">
+                                <span id="print-solicitud-asignacion" class="inline-flex items-center gap-1.5 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[10px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Asignación (Entrega)</span>
+                                <span id="print-solicitud-traspaso" class="inline-flex items-center gap-1.5 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[10px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Traspaso *</span>
+                                <span id="print-solicitud-devolucion" class="inline-flex items-center gap-1.5 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[10px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Devolución</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[25.56%] bg-white print-tnr-10" style="border-right: none;">PROPIEDAD EQUIPAMIENTO:</td>
+                        <td class="border border-black p-1 w-[74.44%] text-left bg-white" colspan="2">
+                            <div class="flex space-x-6">
+                                <span id="print-propiedad-arriendo" class="inline-flex items-center gap-1.5 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[10px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> En Arriendo</span>
+                                <span id="print-propiedad-isp" class="inline-flex items-center gap-1.5 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[10px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Propiedad ISP (Inventariado)</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1 font-bold w-[25.56%] align-middle bg-white print-tnr-10" rowspan="4">TIPO DE EQUIPAMIENTO:</td>
+                        <td class="p-1 w-[22.84%] bg-white print-tnr-10" style="border: none;">Equipamiento computacional :</td>
+                        <td class="border border-black p-1 w-[51.6%] text-left bg-white">
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[9px]">
+                                <span id="print-eq-cat-pc" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> PC</span>
+                                <span id="print-eq-cat-notebook" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Notebook</span>
+                                <span id="print-eq-cat-aio" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> All In One (AIO)</span>
+                                <span id="print-eq-cat-monitor" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Monitor</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-1 w-[22.84%] bg-white print-tnr-10" style="border: none;">Telefonía :</td>
+                        <td class="border border-black p-1 w-[51.6%] text-left bg-white">
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[9px]">
+                                <span id="print-eq-cat-celular" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Celular</span>
+                                <span id="print-eq-cat-telefonoip" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> Teléfono IP</span>
+                                <span id="print-eq-cat-simcard" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> SIMCARD</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-1 w-[22.84%] bg-white print-tnr-10" style="border: none;">Internet :</td>
+                        <td class="border border-black p-1 w-[51.6%] text-left bg-white">
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[9px]">
+                                <span id="print-eq-cat-bam" class="inline-flex items-center gap-1 print-tnr-10"><span class="w-3.5 h-3.5 inline-block border border-black text-center text-[8px] font-bold bg-white print-calibri-12" style="line-height: 12px; font-family: monospace;"></span> BAM (Banda Ancha Móvil)</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-1 w-[22.84%] bg-white print-tnr-10" style="border: none;">Otros (detallar) :</td>
+                        <td class="border border-black p-1 w-[51.6%] text-left bg-white">
+                            <span id="print-eq-otros-val" class="font-medium inline-block underline decoration-dotted print-calibri-12 text-[9px]">-</span>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- SECCIÓN 3: Traspaso (Caja independiente con borde completo, replicando Word 1:1) -->
+                <table class="w-full border-collapse border border-black text-center text-[9px] mb-2.5" style="font-family: Arial, sans-serif;">
+                    <thead>
+                        <tr>
+                            <th class="bg-[#9cc2e5] text-black font-bold p-1 px-2 text-[10px] print-exact text-left border-b border-black print-tnr-10" colspan="5" style="border-bottom: 1px solid black;">
+                                3.- * En el caso de ser TRASPASO, se debe completar de ambos funcionarios:
+                            </th>
+                        </tr>
+                        <tr class="font-bold print-tnr-10">
+                            <th class="p-1 w-[20.70%] bg-white align-bottom" style="border: none;">Nombre y Apellido Usuario Emisor</th>
+                            <th class="p-1 w-[18.35%] bg-white align-bottom" style="border: none;">Nombre y Apellido Usuario Receptor</th>
+                            <th class="p-1 w-[20.51%] bg-white align-bottom" style="border: none;">Unidad/Depto/Sección Usuario Emisor</th>
+                            <th class="p-1 w-[20.51%] bg-white align-bottom" style="border: none;">Unidad/Depto/Sección Usuario Receptor</th>
+                            <th class="p-1 w-[19.91%] bg-white align-bottom" style="border: none;">Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="print-traspaso-emisor-nombre" class="border border-black p-1 h-7 font-medium bg-white print-calibri-12">-</td>
+                            <td id="print-traspaso-receptor-nombre" class="border border-black p-1 h-7 font-medium bg-white print-calibri-12">-</td>
+                            <td id="print-traspaso-emisor-depto" class="border border-black p-1 h-7 font-medium bg-white print-calibri-12">-</td>
+                            <td id="print-traspaso-receptor-depto" class="border border-black p-1 h-7 font-medium bg-white print-calibri-12">-</td>
+                            <td id="print-traspaso-obs" class="border border-black p-1 h-7 font-medium bg-white print-calibri-12">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- SECCIÓN 4: Completar Datos Solicitados (Caja independiente con borde completo, replicando Word 1:1) -->
+                <table class="w-full border-collapse border border-black text-center text-[9px] mb-2.5" style="font-family: Arial, sans-serif;">
+                    <thead>
+                        <tr>
+                            <th class="bg-[#9cc2e5] text-black font-bold p-1 px-2 text-[10px] print-exact text-left border-b border-black print-tnr-10" colspan="6" style="border-bottom: 1px solid black;">
+                                4.- Completar datos solicitados
+                            </th>
+                        </tr>
+                        <tr class="font-bold print-tnr-10">
+                            <th class="p-1 w-[20.63%] bg-white align-bottom" style="border: none;">Tipo Equipamiento</th>
+                            <th class="p-1 w-[14.98%] bg-white align-bottom" style="border: none;">Marca</th>
+                            <th class="p-1 w-[11.44%] bg-white align-bottom" style="border: none;">Modelo</th>
+                            <th class="p-1 w-[18.32%] bg-white align-bottom" style="border: none;">N° Serie</th>
+                            <th class="p-1 w-[17.91%] bg-white align-bottom" style="border: none;">N° Inventario</th>
+                            <th class="p-1 w-[16.72%] bg-white align-bottom" style="border: none;">Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="print-equipment-rows" class="bg-white">
+                        <!-- Dynamic rows matching standard page 1 height -->
+                    </tbody>
+                </table>
+
+                <!-- Accesorios Block (Borde solo en cuadro derecho, replicando Word 1:1) -->
+                <table class="w-full border-collapse text-[9px] mb-1.5" style="font-family: Arial, sans-serif; border: none;">
+                    <tr>
+                        <td class="font-bold w-[20.86%] uppercase align-middle text-left pr-4 print-tnr-10" style="border: none; font-size: 10px; line-height: 1.2;">
+                            ACCESORIOS INCLUIDOS EN LA SOLICITUD
+                        </td>
+                        <td id="print-accesorios" class="border border-black p-1.5 w-[79.14%] font-medium h-11 align-top text-left whitespace-pre-wrap bg-white print-calibri-12">-</td>
+                    </tr>
+                </table>
+
+                <!-- Observaciones Block (Borde solo en cuadro derecho, replicando Word 1:1) -->
+                <table class="w-full border-collapse text-[9px] mb-2.5" style="font-family: Arial, sans-serif; border: none;">
+                    <tr>
+                        <td class="font-bold w-[20.86%] uppercase align-middle text-left pr-4 print-tnr-10" style="border: none; font-size: 10px; line-height: 1.2;">
+                            OBSERVACIONES
+                        </td>
+                        <td id="print-observaciones" class="border border-black p-1.5 w-[79.14%] font-medium h-11 align-top text-left whitespace-pre-wrap bg-white print-calibri-12">-</td>
+                    </tr>
+                </table>
+
+                <!-- Signature area Oficina TIC (Página 1, Sin borde lateral) -->
+                <div class="w-full relative mb-1 flex justify-end pr-8" style="height: 95px; font-family: Arial, sans-serif;">
+                    <div class="w-64 text-center flex flex-col items-center justify-end">
+                        <div class="w-56 h-14 flex items-end justify-center mb-0.5">
+                            <img id="print-sig-tic-img" class="max-h-14 object-contain" src="img/firma-eduardo-wess.png" alt="Firma Eduardo Wess">
+                        </div>
+                        <div class="w-56 border-b border-black"></div>
+                        <div class="font-bold mt-1 text-[9px]" style="font-family: Arial, sans-serif;">Nombre y Firma Profesional Oficina TIC</div>
+                        <div id="print-sig-tic-name-label" class="font-medium text-[8.5px] text-slate-800" style="font-family: Arial, sans-serif;">Eduardo Wess • Jefe Oficina TIC</div>
+                        <div id="print-sig-tic-manual" class="hidden"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footnote Página 1 -->
+            <table class="w-full border-collapse text-slate-500 leading-normal bg-white print-tnr-8" style="border: none; font-family: 'Times New Roman', Times, serif; font-size: 8pt;">
+                <tr>
+                    <td class="p-2 w-1/3 text-left align-top" style="border: none;">
+                        <div>Revisado por:</div>
+                        <div class="font-bold">Jefe Oficina Tecnología y Comunicaciones</div>
+                    </td>
+                    <td class="p-2 w-1/3 text-center align-middle" style="border: none;">
+                        Este documento fuera de la intranet o impreso sin timbre de "documento controlado" se considera copia no controlada.
+                    </td>
+                    <td class="p-2 w-1/3 text-right align-top" style="border: none;">
+                        <div>Aprobado por:</div>
+                        <div class="font-bold">Jefatura Unidad Sistemas de Información</div>
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+
+        <!-- PAGE BREAK -->
+        <div class="page-break" style="page-break-before: always !important;"></div>
+
+        <!-- ================= PAGINA 2 DE 2 ================= -->
+        <div class="print-page w-full" style="height: 330mm; min-height: 330mm; box-sizing: border-box; font-family: Arial, sans-serif; padding: 15mm; display: flex; flex-direction: column; justify-content: space-between;">
+            
+            <div class="w-full flex flex-col justify-start">
+                <!-- Header Table Page 2 -->
+                <table class="w-full text-center border-collapse border border-black print-tnr-10" style="font-family: Arial, sans-serif;">
+                    <tr>
+                        <td class="border border-black p-0 w-[14.2%] align-middle" style="height: 100%; line-height: 0; overflow: hidden; vertical-align: middle;">
+                            <img src="img/logo-isp.svg" alt="ISP Logo" class="print-exact" style="display: block; width: 100%; height: 100%; object-fit: fill; margin: 0; padding: 0;">
+                        </td>
+                        <td class="border border-black p-2 w-[62.7%] align-middle font-bold">
+                            <div style="font-size: 11px; text-transform: uppercase;">Formulario de Asignación, Traspaso y/o Devolución de Equipamiento Tecnológico</div>
+                            <div class="mt-1 text-slate-700" style="font-size: 10px; font-weight: bold; font-family: monospace;">RG-02-IT-140.03-004</div>
+                        </td>
+                        <td class="border border-black w-[23.1%] text-left text-[9px] align-middle" style="padding: 0;">
+                            <table class="w-full border-collapse" style="margin: 0; padding: 0;">
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Versión:</td>
+                                    <td class="p-1 w-1/2 text-center font-bold">5</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Emisión:</td>
+                                    <td class="p-1 w-1/2 text-center font-mono">14/07/2017</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Actualización:</td>
+                                    <td class="p-1 w-1/2 text-center font-mono">08/05/2026</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-1 font-bold border-r border-black w-1/2">Página:</td>
+                                    <td class="p-1 w-1/2 text-center font-bold">2 de 2</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Divider instruction line (Sin borde, texto libre) -->
+                <div class="w-full text-center font-mono text-[9px] leading-relaxed my-4">
+                    **********************************************************************************<br>
+                    <strong style="font-family: Arial, sans-serif; font-size: 9.5px; text-transform: uppercase;">EN LOS SIGUIENTES RECUADROS DEBE FIRMAR QUIÉN TRASPASA EL EQUIPAMIENTO, ASÍ COMO QUIÉN LO RECIBE</strong>
+                </div>
+
+                <!-- Recuadro Firma Emisor (Caja de borde independiente, replicando Word 1:1) -->
+                <table class="w-full border-collapse border border-black text-xs mb-4">
+                    <tr>
+                        <td class="border border-black p-3 w-[50%] text-center align-middle" style="height: 140px; position: relative; background-color: white;">
+                            <div class="relative w-56 h-16 mx-auto flex items-end justify-center border-b border-black">
+                                <!-- Firma digital si existe -->
+                                <img id="print-sig-emisor-img" class="hidden h-full object-contain absolute bottom-0 max-h-[60px]" src="" alt="Firma Emisor">
+                            </div>
+                            <div id="print-sig-emisor-nombre-txt" class="font-bold text-[10px] mt-1 text-slate-900 font-mono">-</div>
+                            <div class="font-bold uppercase tracking-wide print-tnr-10" style="font-size: 8.5px;">NOMBRE, FIRMA Y RUT</div>
+                            <div class="font-medium print-tnr-10" style="font-size: 8.5px;">Funcionario(a) Responsable (Emisor)</div>
+                        </td>
+                        <td class="border border-black p-4 w-[50%] text-left align-middle text-[9px] leading-relaxed bg-white print-tnr-10">
+                            <p><strong>Consideraciones:</strong> Al firmar y recibir éste(os) equipamiento(s) me hago responsable de su uso y cuidado.</p>
+                            <p class="mt-3">En caso de pérdida, se debe seguir lo indicado en <strong>IT Pérdida de Equipamiento</strong>.</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Recuadro Firma Receptor (Caja de borde independiente, replicando Word 1:1) -->
+                <table class="w-full border-collapse border border-black text-xs mb-4">
+                    <tr>
+                        <td class="border border-black p-3 w-[50%] text-center align-middle" style="height: 140px; position: relative; background-color: white;">
+                            <div class="relative w-56 h-16 mx-auto flex items-end justify-center border-b border-black">
+                                <!-- Firma digital si existe -->
+                                <img id="print-sig-receptor-img" class="hidden h-full object-contain absolute bottom-0 max-h-[60px]" src="" alt="Firma Receptor">
+                            </div>
+                            <div id="print-sig-receptor-nombre-txt" class="font-bold text-[10px] mt-1 text-slate-900 font-mono">-</div>
+                            <div class="font-bold uppercase tracking-wide print-tnr-10" style="font-size: 8.5px;">NOMBRE, FIRMA Y RUT</div>
+                            <div class="font-medium print-tnr-10" style="font-size: 8.5px;">Funcionario(a) Responsable (Receptor)</div>
+                        </td>
+                        <td class="border border-black p-4 w-[50%] text-left align-middle text-[9px] leading-relaxed bg-white print-tnr-10">
+                            <p><strong>Consideraciones:</strong> Al firmar y recibir éste(os) equipamiento(s) me hago responsable de su uso y cuidado.</p>
+                            <p class="mt-3">En caso de pérdida, se debe seguir lo indicado en <strong>IT Pérdida de Equipamiento</strong>.</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Text bottom instruction (Sin borde, texto libre) -->
+                <div class="w-full text-center font-bold text-[11px] uppercase tracking-wider my-3" style="font-family: Arial, sans-serif;">
+                    ¡¡¡ POR FAVOR COMPLETAR NOMBRE, RUT Y FIRMA !!!
+                </div>
+            </div>
+
+            <!-- Footnote Página 2 -->
+            <table class="w-full border-collapse text-slate-500 leading-normal bg-white print-tnr-8" style="border: none; font-family: 'Times New Roman', Times, serif; font-size: 8pt;">
+                <tr>
+                    <td class="p-2 w-1/3 text-left align-top" style="border: none;">
+                        <div>Revisado por:</div>
+                        <div class="font-bold">Jefe Oficina Tecnología y Comunicaciones</div>
+                    </td>
+                    <td class="p-2 w-1/3 text-center align-middle" style="border: none;">
+                        Este documento fuera de la intranet o impreso sin timbre de "documento controlado" se considera copia no controlada.
+                    </td>
+                    <td class="p-2 w-1/3 text-right align-top" style="border: none;">
+                        <div>Aprobado por:</div>
+                        <div class="font-bold">Jefatura Unidad Sistemas de Información</div>
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+
+    </div>
+
+    <!-- External Scripts containing Libraries & Application Logic -->
+    <script src="js/xlsx.full.min.js"></script>
+    <script src="js/qrcode.min.js"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

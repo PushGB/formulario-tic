@@ -15,13 +15,13 @@ function initSupabase() {
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             isSupabaseReady = true;
             console.log('✅ Supabase Client inicializado exitosamente.');
-            
-            // Cargar datos remotos desde Supabase
+
+            // Cargar datos remotos desde Supabase Prueba modificacion Chris
             fetchSubmissionsFromSupabase();
-            
+
             // Suscribirse a cambios en tiempo real
             subscribeToSupabaseRealtime();
-            
+
             // Sincronizar actas pendientes que se hayan creado offline
             syncPendingOfflineSubmissions();
         } else {
@@ -64,7 +64,7 @@ async function fetchSubmissionsFromSupabase() {
 
 function mergeSubmissionsFromSupabase(cloudRows) {
     if (!cloudRows || !Array.isArray(cloudRows)) return;
-    
+
     // Mapear filas de Supabase a objetos de acta
     const cloudSubs = cloudRows.map(row => {
         if (row.data && typeof row.data === 'object') {
@@ -80,7 +80,7 @@ function mergeSubmissionsFromSupabase(cloudRows) {
 
     // Separar envíos locales manuales que aún no están en la nube
     const localManualNotSynced = submissions.filter(s => !s.id.startsWith('sub_excel_') && !cloudMap.has(s.id));
-    
+
     // Separar actas base del catastro Excel que no fueron sobrescritas en la nube
     const baseExcelSubs = submissions.filter(s => s.id.startsWith('sub_excel_') && !cloudMap.has(s.id));
 
@@ -237,7 +237,7 @@ function removePendingOfflineSubmission(id) {
         let pending = JSON.parse(localStorage.getItem('tic_pending_sync_subs') || '[]');
         pending = pending.filter(p => p.id !== id);
         localStorage.setItem('tic_pending_sync_subs', JSON.stringify(pending));
-    } catch (e) {}
+    } catch (e) { }
 }
 
 async function syncPendingOfflineSubmissions() {
@@ -349,13 +349,13 @@ window.addEventListener('load', () => {
 
     // Inicializar Iconos Lucide
     lucide.createIcons();
-    
+
     // Cargar datos guardados
     loadSubmissions();
-    
+
     // Renderizar la tabla principal
     renderTable();
-    
+
     // Configurar Listeners para las Firmas
     initSignaturePads();
 
@@ -405,7 +405,7 @@ function initServiceWorker() {
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredInstallPrompt = e;
-        
+
         const installBtn = document.getElementById('drawer-pwa-install-btn');
         if (installBtn) {
             installBtn.classList.remove('hidden');
@@ -444,7 +444,7 @@ function installPWA() {
 function initTheme() {
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
+
     if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
         document.documentElement.classList.add('dark');
     } else {
@@ -462,7 +462,7 @@ function toggleTheme() {
         localStorage.setItem('theme', 'dark');
     }
     updateThemeIcon();
-    
+
     // Redimensionar canvases para asegurar que la firma sea nítida tras refrescar el tema
     resizeAllCanvases();
 }
@@ -485,22 +485,22 @@ function showSystemUpdateModal(targetVersion = APP_VERSION, callback = null) {
     const barEl = document.getElementById('update-modal-progress-bar');
     const percentEl = document.getElementById('update-modal-percent');
     const stepEl = document.getElementById('update-modal-step');
-    
+
     if (!modal) {
         if (callback) callback();
         return;
     }
-    
+
     const cleanVersion = targetVersion.toString().replace(/^v/, '');
     if (versionEl) versionEl.innerText = `v${cleanVersion}`;
     if (barEl) barEl.style.width = '0%';
     if (percentEl) percentEl.innerText = '0%';
     if (stepEl) stepEl.innerText = 'Iniciando actualización...';
     if (statusEl) statusEl.innerText = 'Cargando nueva versión y optimizando base de datos local...';
-    
+
     modal.classList.remove('hidden');
     lucide.createIcons();
-    
+
     const steps = [
         { percent: 20, step: "Comprobando catálogo institucional...", status: "Sincronizando catastro de equipamiento TIC..." },
         { percent: 50, step: "Cargando nuevos módulos y componentes...", status: "Optimizando plantillas de actas y firmas oficiales..." },
@@ -508,9 +508,9 @@ function showSystemUpdateModal(targetVersion = APP_VERSION, callback = null) {
         { percent: 95, step: "Depurando memoria caché...", status: "Finalizando optimización del sistema..." },
         { percent: 100, step: "¡Actualización completada!", status: "El sistema está listo para su uso." }
     ];
-    
+
     let stepIndex = 0;
-    
+
     function proceedStep() {
         if (stepIndex < steps.length) {
             const current = steps[stepIndex];
@@ -518,7 +518,7 @@ function showSystemUpdateModal(targetVersion = APP_VERSION, callback = null) {
             if (percentEl) percentEl.innerText = `${current.percent}%`;
             if (stepEl) stepEl.innerText = current.step;
             if (statusEl) statusEl.innerText = current.status;
-            
+
             stepIndex++;
             const delay = stepIndex === steps.length ? 700 : 450;
             setTimeout(proceedStep, delay);
@@ -533,20 +533,20 @@ function showSystemUpdateModal(targetVersion = APP_VERSION, callback = null) {
             }, 600);
         }
     }
-    
+
     setTimeout(proceedStep, 200);
 }
 
 function checkAppVersion() {
     const lastVersion = localStorage.getItem('tic_installed_app_version');
-    
+
     // Si la versión guardada es diferente a la versión del código actual
     if (lastVersion && lastVersion !== APP_VERSION) {
         showSystemUpdateModal(APP_VERSION, () => {
             showToast(`Sistema actualizado a la versión v${APP_VERSION}.`, "success");
         });
     }
-    
+
     // Guardar versión actual en el almacenamiento local
     localStorage.setItem('tic_installed_app_version', APP_VERSION);
 }
@@ -561,21 +561,21 @@ function checkForRemoteUpdates() {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
     })
-    .then(response => {
-        if (!response.ok) return null;
-        return response.text();
-    })
-    .then(html => {
-        if (!html) return;
-        // Buscar si el HTML remoto tiene una versión distinta en sus scripts
-        const match = html.match(/app\.js\?v=([a-zA-Z0-9_.-]+)/) || html.match(/styles\.css\?v=([a-zA-Z0-9_.-]+)/);
-        if (match && match[1] && match[1] !== APP_VERSION) {
-            showUpdateBanner(match[1]);
-        }
-    })
-    .catch(() => {
-        // Silencioso en entornos offline o locales
-    });
+        .then(response => {
+            if (!response.ok) return null;
+            return response.text();
+        })
+        .then(html => {
+            if (!html) return;
+            // Buscar si el HTML remoto tiene una versión distinta en sus scripts
+            const match = html.match(/app\.js\?v=([a-zA-Z0-9_.-]+)/) || html.match(/styles\.css\?v=([a-zA-Z0-9_.-]+)/);
+            if (match && match[1] && match[1] !== APP_VERSION) {
+                showUpdateBanner(match[1]);
+            }
+        })
+        .catch(() => {
+            // Silencioso en entornos offline o locales
+        });
 }
 
 function showUpdateBanner(version) {
@@ -640,7 +640,7 @@ function initNetworkMonitoring() {
         const badge = document.getElementById('network-status-badge');
         const dot = document.getElementById('network-status-dot');
         const text = document.getElementById('network-status-text');
-        
+
         if (isOnline) {
             if (badge) {
                 badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/50 text-emerald-300 border border-emerald-500/30';
@@ -703,11 +703,11 @@ function saveSubmissionsToStorage() {
 // Actualizar estadísticas del Dashboard
 function updateStats() {
     document.getElementById('stat-total').innerText = submissions.length;
-    
+
     const asignaciones = submissions.filter(s => s.tipo_solicitud === 'Asignacion').length;
     const traspasos = submissions.filter(s => s.tipo_solicitud === 'Traspaso').length;
     const devoluciones = submissions.filter(s => s.tipo_solicitud === 'Devolucion').length;
-    
+
     document.getElementById('stat-asignaciones').innerText = asignaciones;
     document.getElementById('stat-traspasos').innerText = traspasos;
     document.getElementById('stat-devoluciones').innerText = devoluciones;
@@ -745,15 +745,15 @@ function getValidPasswords(role) {
 function openAuthModal() {
     const modal = document.getElementById('auth-modal');
     selectedAuthRole = currentUserRole || 'tecnico';
-    
+
     selectAuthRoleOption(selectedAuthRole);
     const pwdInput = document.getElementById('auth-password-input');
     if (pwdInput) pwdInput.value = '';
-    
+
     // Ocultar panel de cambio de contraseña al abrir
     const changePanel = document.getElementById('change-password-panel');
     if (changePanel) changePanel.classList.add('hidden');
-    
+
     if (modal) {
         modal.classList.remove('hidden');
         lucide.createIcons();
@@ -799,18 +799,18 @@ function saveCustomPasswords() {
     document.getElementById('pwd-change-current-admin').value = '';
     document.getElementById('pwd-change-new-admin').value = '';
     document.getElementById('pwd-change-new-tecnico').value = '';
-    
+
     toggleChangePasswordPanel();
     showToast("¡Nuevas contraseñas de acceso configuradas con éxito!", "success");
 }
 
 function selectAuthRoleOption(role) {
     selectedAuthRole = role;
-    
+
     // Marcar el radio input
     const radio = document.getElementById(`role-radio-${role}`);
     if (radio) radio.checked = true;
-    
+
     // Resaltar visualmente la tarjeta seleccionada
     ['admin', 'tecnico', 'funcionario'].forEach(r => {
         const card = document.getElementById(`role-card-${r}`);
@@ -826,7 +826,7 @@ function selectAuthRoleOption(role) {
     const pwdContainer = document.getElementById('auth-password-container');
     const pwdInput = document.getElementById('auth-password-input');
     if (!pwdContainer) return;
-    
+
     if (role === 'funcionario') {
         pwdContainer.classList.add('hidden');
     } else {
@@ -841,7 +841,7 @@ function toggleAuthPasswordVisibility() {
     const pwdInput = document.getElementById('auth-password-input');
     const eyeIcon = document.getElementById('auth-pwd-eye');
     if (!pwdInput) return;
-    
+
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
         if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
@@ -876,7 +876,7 @@ function submitAuthLogin() {
 
     const validPasswords = getValidPasswords(targetRole);
     const isValid = validPasswords.some(p => p.toLowerCase() === pwd.toLowerCase() || p === pwd);
-    
+
     if (!isValid) {
         showToast(`Contraseña incorrecta para el perfil ${targetRole === 'admin' ? 'Administrador' : 'Técnico'}.`, "error");
         if (pwdInput) pwdInput.focus();
@@ -888,7 +888,7 @@ function submitAuthLogin() {
     applyRolePermissions();
     closeAuthModal();
     showToast(`¡Acceso concedido como ${targetRole === 'admin' ? 'Administrador TIC (Control Total)' : 'Técnico Soporte TIC'}!`, "success");
-    
+
     // Cambiar inmediatamente al Panel de Registros (Dashboard) al loguearse con éxito
     switchTab('dashboard');
 }
@@ -1045,13 +1045,13 @@ function switchTab(tabId) {
     if (tabInv) tabInv.classList.add('hidden');
     if (tabForm) tabForm.classList.add('hidden');
     if (tabMet) tabMet.classList.add('hidden');
-    
+
     // Estilos de botones de navegación de escritorio
     const btnDash = document.getElementById('nav-dashboard');
     const btnInv = document.getElementById('nav-inventory');
     const btnForm = document.getElementById('nav-form');
     const btnMetrics = document.getElementById('nav-metrics');
-    
+
     const inactiveClass = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800";
     const activeClass = "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm shadow-indigo-600/30";
 
@@ -1121,7 +1121,7 @@ function switchTab(tabId) {
 function openNewForm() {
     activeSubmissionId = null;
     document.getElementById('equip-form').reset();
-    
+
     // Restablecer estilos de validación del RUT
     const rutElement = document.getElementById('func-rut');
     rutElement.classList.remove('border-emerald-500', 'dark:border-emerald-500', 'border-rose-500', 'dark:border-rose-500', 'focus:ring-emerald-500', 'focus:ring-rose-500');
@@ -1132,12 +1132,12 @@ function openNewForm() {
     // Fecha por defecto hoy
     const hoy = new Date().toISOString().split('T')[0];
     document.getElementById('form-fecha').value = hoy;
-    
+
     // Limpiar tabla de equipamiento y añadir primera fila vacía
     const eqContainer = document.getElementById('equipment-rows');
     eqContainer.innerHTML = '';
     addEquipmentRow();
-    
+
     // Establecer modos de firma por defecto: TIC oficial (Eduardo Wess), Emisor/Receptor digital
     const ticOficialRadio = document.querySelector('input[name="sig_mode_tic"][value="oficial"]');
     if (ticOficialRadio) ticOficialRadio.checked = true;
@@ -1145,22 +1145,22 @@ function openNewForm() {
     if (emisorDigRadio) emisorDigRadio.checked = true;
     const receptorDigRadio = document.querySelector('input[name="sig_mode_receptor"][value="digital"]');
     if (receptorDigRadio) receptorDigRadio.checked = true;
-    
+
     toggleSigMode('tic');
     toggleSigMode('emisor');
     toggleSigMode('receptor');
-    
+
     // Limpiar firmas
     clearCanvas('tic');
     clearCanvas('emisor');
     clearCanvas('receptor');
-    
+
     // Seccion traspaso oculta por defecto
     document.getElementById('section-traspaso').classList.add('hidden');
-    
+
     // Ocultar botón imprimir para nuevos registros hasta que se guarden
     document.getElementById('print-btn-form').classList.add('hidden');
-    
+
     switchTab('form-view');
 }
 
@@ -1170,7 +1170,7 @@ function formatRut(rut) {
     if (valor.length <= 1) return valor;
     let cuerpo = valor.slice(0, -1);
     let dv = valor.slice(-1).toUpperCase();
-    
+
     let formateado = '';
     while (cuerpo.length > 3) {
         formateado = '.' + cuerpo.slice(-3) + formateado;
@@ -1185,24 +1185,24 @@ function validateRut(rut) {
     if (!rut) return false;
     const clean = rut.replace(/\./g, '').replace(/-/g, '').trim().toUpperCase();
     if (clean.length < 2) return false;
-    
+
     const body = clean.slice(0, -1);
     const dv = clean.slice(-1);
-    
+
     if (!/^[0-9]+$/.test(body)) return false;
-    
+
     let sum = 0;
     let multiplier = 2;
     for (let i = body.length - 1; i >= 0; i--) {
         sum += parseInt(body.charAt(i)) * multiplier;
         multiplier = multiplier === 7 ? 2 : multiplier + 1;
     }
-    
+
     let expectedDv = 11 - (sum % 11);
     if (expectedDv === 11) expectedDv = '0';
     else if (expectedDv === 10) expectedDv = 'K';
     else expectedDv = expectedDv.toString();
-    
+
     return dv === expectedDv;
 }
 
@@ -1210,12 +1210,12 @@ function handleRutInput(element) {
     if (!element) return;
     const cleanRaw = element.value.replace(/[^0-9kK]/g, '');
     element.value = formatRut(cleanRaw);
-    
+
     const rut = element.value;
     const isValid = validateRut(rut);
     const icon = document.getElementById('rut-validation-icon');
     const msg = document.getElementById('rut-validation-msg');
-    
+
     if (rut.length >= 7) {
         icon.classList.remove('hidden');
         msg.classList.remove('hidden');
@@ -1247,7 +1247,7 @@ function toggleSigMode(id) {
     const container = document.getElementById(`sig-container-${id}`);
     const placeholder = document.getElementById(`sig-manual-placeholder-${id}`);
     const oficialPlaceholder = document.getElementById(`sig-oficial-placeholder-${id}`);
-    
+
     if (id === 'tic') {
         if (mode === 'oficial') {
             if (oficialPlaceholder) oficialPlaceholder.classList.remove('hidden');
@@ -1292,11 +1292,11 @@ function toggleTraspasoSection() {
 function addEquipmentRow(data = {}) {
     const container = document.getElementById('equipment-rows');
     const rowId = 'row_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-    
+
     const tr = document.createElement('tr');
     tr.id = rowId;
     tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100 dark:border-slate-850";
-    
+
     tr.innerHTML = `
         <td class="p-2">
             <input type="text" name="eq_tipo" value="${data.tipo || ''}" placeholder="Ej: Notebook" required oninput="syncEquipmentCategoriesFromRows()" class="w-full bg-transparent px-2 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-medium transition-all">
@@ -1352,14 +1352,14 @@ function syncEquipmentCategoriesFromRows() {
             types.push(input.value.trim().toLowerCase());
         }
     }
-    
+
     // Desmarcar todos los checkboxes de la sección 2 primero
     document.querySelectorAll('input[name="eq_cat"]').forEach(cb => cb.checked = false);
-    
+
     // Marcar dinámicamente según coincidencia
     types.forEach(tipo => {
         if (!tipo) return;
-        
+
         // Computacionales
         if (tipo === 'pc' || tipo.includes('desktop') || tipo.includes('computador')) {
             const cb = document.querySelector('input[name="eq_cat"][value="PC"]');
@@ -1377,7 +1377,7 @@ function syncEquipmentCategoriesFromRows() {
             const cb = document.querySelector('input[name="eq_cat"][value="Monitor"]');
             if (cb) cb.checked = true;
         }
-        
+
         // Telefonía / Conectividad
         if (tipo.includes('celular') || tipo.includes('movil') || tipo.includes('smartphone')) {
             const cb = document.querySelector('input[name="eq_cat"][value="Celular"]');
@@ -1401,16 +1401,16 @@ function syncEquipmentCategoriesFromRows() {
 // Control de los Lienzos de Firma (Signature Pads)
 function initSignaturePads() {
     const ids = ['tic', 'emisor', 'receptor'];
-    
+
     ids.forEach(id => {
         const canvas = document.getElementById(`canvas-${id}`);
-        
+
         // Eventos de Mouse
         canvas.addEventListener('mousedown', (e) => startDrawing(e, id));
         canvas.addEventListener('mousemove', (e) => draw(e, id));
         canvas.addEventListener('mouseup', () => stopDrawing(id));
         canvas.addEventListener('mouseleave', () => stopDrawing(id));
-        
+
         // Eventos Táctiles para móviles/tablets
         canvas.addEventListener('touchstart', (e) => startDrawing(e, id, true));
         canvas.addEventListener('touchmove', (e) => draw(e, id, true));
@@ -1425,29 +1425,29 @@ function resizeAllCanvases() {
     ids.forEach(id => {
         const canvas = document.getElementById(`canvas-${id}`);
         const container = canvas.parentElement;
-        
+
         // Si el canvas no está visible (modo manual), no lo redimensionamos
         if (canvas.offsetParent === null) return;
-        
+
         // Guardar contenido existente para que no se borre al redimensionar
         const tempImage = canvas.toDataURL();
-        
+
         // Dimensiones lógicas (CSS)
         const width = container.clientWidth;
         const height = container.clientHeight;
-        
+
         // Ajustar resolución física interna
         canvas.width = width * ratio;
         canvas.height = height * ratio;
-        
+
         const ctx = canvas.getContext('2d');
         // Escalar contexto para que no tengamos que multiplicar las coordenadas a mano
         ctx.scale(ratio, ratio);
-        
+
         // Restaurar contenido si ya había dibujado algo
         if (drawingStates[id].hasSigned) {
             const img = new Image();
-            img.onload = function() {
+            img.onload = function () {
                 ctx.drawImage(img, 0, 0, width, height);
             };
             img.src = tempImage;
@@ -1463,7 +1463,7 @@ function clearCanvas(id, resetState = true) {
     const canvas = document.getElementById(`canvas-${id}`);
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     if (resetState) {
         drawingStates[id].hasSigned = false;
         updateSignatureFeedback(id);
@@ -1474,12 +1474,12 @@ function updateSignatureFeedback(id) {
     const canvas = document.getElementById(`canvas-${id}`);
     const container = canvas.parentElement;
     const hasSigned = drawingStates[id].hasSigned;
-    
+
     let badge = container.querySelector('.sig-badge');
     if (hasSigned) {
         container.classList.remove('border-slate-200', 'dark:border-slate-700', 'hover:border-indigo-500');
         container.classList.add('border-emerald-500', 'dark:border-emerald-500');
-        
+
         if (!badge) {
             badge = document.createElement('div');
             badge.className = 'sig-badge absolute bottom-2 right-2 bg-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider no-print shadow-sm transition-all duration-300';
@@ -1497,7 +1497,7 @@ function startDrawing(e, id, isTouch = false) {
     const canvas = document.getElementById(`canvas-${id}`);
     const state = drawingStates[id];
     state.isDrawing = true;
-    
+
     const coords = getCoords(e, canvas, isTouch);
     state.lastX = coords.x;
     state.lastY = coords.y;
@@ -1506,13 +1506,13 @@ function startDrawing(e, id, isTouch = false) {
 function draw(e, id, isTouch = false) {
     const state = drawingStates[id];
     if (!state.isDrawing) return;
-    
+
     if (isTouch) e.preventDefault();
-    
+
     const canvas = document.getElementById(`canvas-${id}`);
     const ctx = canvas.getContext('2d');
     const coords = getCoords(e, canvas, isTouch);
-    
+
     ctx.beginPath();
     ctx.strokeStyle = '#0f172a'; // Tinta siempre oscura para impresión correcta
     ctx.lineWidth = 2.5;
@@ -1521,10 +1521,10 @@ function draw(e, id, isTouch = false) {
     ctx.moveTo(state.lastX, state.lastY);
     ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
-    
+
     state.lastX = coords.x;
     state.lastY = coords.y;
-    
+
     if (!state.hasSigned) {
         state.hasSigned = true;
         updateSignatureFeedback(id);
@@ -1554,10 +1554,10 @@ function getCoords(e, canvas, isTouch) {
 // Guardar/Crear Registro
 function saveForm(event) {
     event.preventDefault();
-    
+
     const tipo_solicitud = document.querySelector('input[name="solicitud_tipo"]:checked').value;
     const propiedad_tipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
-    
+
     // Validar RUT chileno antes de guardar
     const rut = document.getElementById('func-rut').value.trim();
     if (!validateRut(rut)) {
@@ -1583,7 +1583,7 @@ function saveForm(event) {
         const serie = tr.querySelector('[name="eq_serie"]').value.trim();
         const inventario = tr.querySelector('[name="eq_inventario"]').value.trim();
         const observacion = tr.querySelector('[name="eq_obs"]').value.trim();
-        
+
         if (tipo && marca && modelo && serie) {
             equipamiento.push({ tipo, marca, modelo, serie, inventario, observacion });
         }
@@ -1669,10 +1669,10 @@ function saveForm(event) {
     saveSubmissionsToStorage();
     syncSubmissionToSupabase(submissionData);
     activeSubmissionId = submissionData.id;
-    
+
     // Habilitar impresión tras guardar exitosamente
     document.getElementById('print-btn-form').classList.remove('hidden');
-    
+
     // Regresar al dashboard después de un corto retardo para visualización
     setTimeout(() => {
         switchTab('dashboard');
@@ -1684,24 +1684,24 @@ function syncPrintTemplate() {
     // Rellenar fecha y ticket
     document.getElementById('print-header-fecha').innerText = document.getElementById('form-fecha').value || '-';
     document.getElementById('print-header-ticket').innerText = document.getElementById('form-ticket').value.trim() || 'S/N';
-    
+
     // Rellenar datos funcionario
     document.getElementById('print-func-nombre').innerText = document.getElementById('func-nombre').value.trim() || '-';
     document.getElementById('print-func-rut').innerText = document.getElementById('func-rut').value.trim() || '-';
     document.getElementById('print-func-cargo').innerText = document.getElementById('func-cargo').value.trim() || '-';
     document.getElementById('print-func-depto').innerText = document.getElementById('func-depto').value.trim() || '-';
-    
+
     // Seccion 2 checkboxes
     const solicitudTipo = document.querySelector('input[name="solicitud_tipo"]:checked').value;
     const propiedadTipo = document.querySelector('input[name="propiedad_tipo"]:checked').value;
-    
+
     document.getElementById('print-solicitud-asignacion').querySelector('span').innerText = solicitudTipo === 'Asignacion' ? 'X' : '';
     document.getElementById('print-solicitud-traspaso').querySelector('span').innerText = solicitudTipo === 'Traspaso' ? 'X' : '';
     document.getElementById('print-solicitud-devolucion').querySelector('span').innerText = solicitudTipo === 'Devolucion' ? 'X' : '';
-    
+
     document.getElementById('print-propiedad-arriendo').querySelector('span').innerText = propiedadTipo === 'En Arriendo' ? 'X' : '';
     document.getElementById('print-propiedad-isp').querySelector('span').innerText = propiedadTipo === 'Propiedad ISP' ? 'X' : '';
-    
+
     // Checkboxes equipamiento
     const eqCats = Array.from(document.querySelectorAll('input[name="eq_cat"]:checked')).map(cb => cb.value);
     const allCats = ['pc', 'notebook', 'aio', 'monitor', 'celular', 'telefonoip', 'simcard', 'bam'];
@@ -1717,15 +1717,15 @@ function syncPrintTemplate() {
             else if (cat === 'telefonoip') valToMatch = 'Telefono IP';
             else if (cat === 'simcard') valToMatch = 'SIMCARD';
             else if (cat === 'bam') valToMatch = 'BAM';
-            
+
             const isChecked = eqCats.includes(valToMatch);
             el.querySelector('span').innerText = isChecked ? 'X' : '';
         }
     });
-    
+
     // Otros detalles
     document.getElementById('print-eq-otros-val').innerText = document.getElementById('eq_otros_detalles').value.trim() || '-';
-    
+
     // Seccion 3: Traspaso
     const isTraspaso = solicitudTipo === 'Traspaso';
     document.getElementById('print-traspaso-emisor-nombre').innerText = isTraspaso ? (document.getElementById('traspaso-emisor-nombre').value.trim() || '-') : '-';
@@ -1733,11 +1733,11 @@ function syncPrintTemplate() {
     document.getElementById('print-traspaso-emisor-depto').innerText = isTraspaso ? (document.getElementById('traspaso-emisor-depto').value.trim() || '-') : '-';
     document.getElementById('print-traspaso-receptor-depto').innerText = isTraspaso ? (document.getElementById('traspaso-receptor-depto').value.trim() || '-') : '-';
     document.getElementById('print-traspaso-obs').innerText = isTraspaso ? (document.getElementById('traspaso-observacion').value.trim() || '-') : '-';
-    
+
     // Seccion 4: Tabla de equipos
     const printEqTableBody = document.getElementById('print-equipment-rows');
     printEqTableBody.innerHTML = '';
-    
+
     const eqRows = document.getElementById('equipment-rows').children;
     const items = [];
     for (let tr of eqRows) {
@@ -1747,12 +1747,12 @@ function syncPrintTemplate() {
         const serie = tr.querySelector('[name="eq_serie"]').value.trim();
         const inventario = tr.querySelector('[name="eq_inventario"]').value.trim();
         const obs = tr.querySelector('[name="eq_obs"]').value.trim();
-        
+
         if (tipo || marca || modelo || serie) {
             items.push({ tipo, marca, modelo, serie, inventario, obs });
         }
     }
-    
+
     // Dibujar mínimo 3 filas para conservar la visualización oficial
     const rowsToDraw = Math.max(3, items.length);
     for (let i = 0; i < rowsToDraw; i++) {
@@ -1768,20 +1768,20 @@ function syncPrintTemplate() {
         `;
         printEqTableBody.appendChild(tr);
     }
-    
+
     // Accesorios y Observaciones
     document.getElementById('print-accesorios').innerText = document.getElementById('form-accesorios').value.trim() || 'Sin accesorios registrados.';
     document.getElementById('print-observaciones').innerText = document.getElementById('form-observaciones').value.trim() || 'Sin observaciones.';
-    
+
     // Renderizar firmas de acuerdo a la modalidad
     const sigModeTic = document.querySelector('input[name="sig_mode_tic"]:checked')?.value || 'oficial';
     const sigModeEmisor = document.querySelector('input[name="sig_mode_emisor"]:checked')?.value || 'digital';
     const sigModeReceptor = document.querySelector('input[name="sig_mode_receptor"]:checked')?.value || 'digital';
-    
+
     // ================= 1. FIRMA PROFESIONAL TIC (PÁGINA 1) =================
     const imgTic = document.getElementById('print-sig-tic-img');
     const labelTic = document.getElementById('print-sig-tic-name-label');
-    
+
     if (sigModeTic === 'manual') {
         if (imgTic) imgTic.classList.add('hidden');
         if (labelTic) labelTic.innerText = 'Profesional Oficina TIC';
@@ -1815,7 +1815,7 @@ function syncPrintTemplate() {
         }
         if (labelTic) labelTic.innerText = 'Eduardo Wess • Jefe Oficina TIC';
     }
-    
+
     // ================= 2. FIRMA EMISOR (PÁGINA 2) =================
     const imgEmisor = document.getElementById('print-sig-emisor-img');
     let dataUrlEmisor = (drawingStates.emisor && drawingStates.emisor.hasSigned) ? document.getElementById('canvas-emisor')?.toDataURL() : null;
@@ -1836,7 +1836,7 @@ function syncPrintTemplate() {
             imgEmisor.classList.add('hidden');
         }
     }
-    
+
     // ================= 3. FIRMA RECEPTOR (PÁGINA 2) =================
     const imgReceptor = document.getElementById('print-sig-receptor-img');
     let dataUrlReceptor = (drawingStates.receptor && drawingStates.receptor.hasSigned) ? document.getElementById('canvas-receptor')?.toDataURL() : null;
@@ -1896,7 +1896,7 @@ function generateDocumentIntegrityHash(dataStr) {
 // Filtro por tipo desde los botones del dashboard
 function setFilterType(type) {
     activeFilterType = type;
-    
+
     const types = ['All', 'Asignacion', 'Traspaso', 'Devolucion'];
     types.forEach(t => {
         const btn = document.getElementById(`filter-${t.toLowerCase()}`);
@@ -1906,7 +1906,7 @@ function setFilterType(type) {
             btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700";
         }
     });
-    
+
     renderTable();
 }
 
@@ -1935,27 +1935,27 @@ function renderDashboardPagination(totalPages) {
     const prevBtn = document.getElementById('dashboard-prev-btn');
     const nextBtn = document.getElementById('dashboard-next-btn');
     const numbersContainer = document.getElementById('dashboard-page-numbers');
-    
+
     if (prevBtn) prevBtn.disabled = dashboardCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = dashboardCurrentPage >= totalPages || totalPages === 0;
-    
+
     if (numbersContainer) {
         numbersContainer.innerHTML = '';
         if (totalPages <= 1) return;
-        
+
         let startPage = Math.max(1, dashboardCurrentPage - 2);
         let endPage = Math.min(totalPages, startPage + 4);
         if (endPage - startPage < 4) {
             startPage = Math.max(1, endPage - 4);
         }
-        
+
         if (startPage > 1) {
             const btn1 = document.createElement('button');
             btn1.className = 'w-8 h-8 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400';
             btn1.textContent = '1';
             btn1.onclick = () => goToDashboardPage(1);
             numbersContainer.appendChild(btn1);
-            
+
             if (startPage > 2) {
                 const dots = document.createElement('span');
                 dots.className = 'px-1 text-slate-400 text-xs';
@@ -1963,7 +1963,7 @@ function renderDashboardPagination(totalPages) {
                 numbersContainer.appendChild(dots);
             }
         }
-        
+
         for (let p = startPage; p <= endPage; p++) {
             const btn = document.createElement('button');
             if (p === dashboardCurrentPage) {
@@ -1975,7 +1975,7 @@ function renderDashboardPagination(totalPages) {
             btn.onclick = () => goToDashboardPage(p);
             numbersContainer.appendChild(btn);
         }
-        
+
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 const dots = document.createElement('span');
@@ -2000,10 +2000,10 @@ function renderTable() {
     const cardsContainer = document.getElementById('submissions-mobile-cards');
     const emptyState = document.getElementById('empty-state');
     const paginationBar = document.getElementById('dashboard-pagination-bar');
-    
+
     if (tbody) tbody.innerHTML = '';
     if (cardsContainer) cardsContainer.innerHTML = '';
-    
+
     const filtered = submissions.filter(s => {
         // Filtro por Tipo de Solicitud (Categoría de Botón)
         if (activeFilterType !== 'All' && s.tipo_solicitud !== activeFilterType) {
@@ -2027,15 +2027,15 @@ function renderTable() {
     } else {
         if (emptyState) emptyState.classList.add('hidden');
         if (paginationBar) paginationBar.classList.remove('hidden');
-        
+
         // Paginación
         const totalItems = filtered.length;
         let perPage = dashboardPerPage === 'all' ? totalItems : dashboardPerPage;
         const totalPages = Math.ceil(totalItems / perPage) || 1;
-        
+
         if (dashboardCurrentPage > totalPages) dashboardCurrentPage = totalPages;
         if (dashboardCurrentPage < 1) dashboardCurrentPage = 1;
-        
+
         const startIndex = (dashboardCurrentPage - 1) * perPage;
         const endIndex = dashboardPerPage === 'all' ? totalItems : Math.min(startIndex + perPage, totalItems);
         const paginated = filtered.slice(startIndex, endIndex);
@@ -2064,8 +2064,8 @@ function renderTable() {
             }
 
             // Formatear resumen de equipos
-            const eqSummary = s.equipamiento && s.equipamiento.length > 0 
-                ? s.equipamiento.map(e => `${e.tipo} (${e.marca || ''} ${e.modelo || ''})`).join(', ') 
+            const eqSummary = s.equipamiento && s.equipamiento.length > 0
+                ? s.equipamiento.map(e => `${e.tipo} (${e.marca || ''} ${e.modelo || ''})`).join(', ')
                 : 'Sin equipos especificados';
 
             // 1. RENDER PARA ESCRITORIO (Tabla)
@@ -2155,7 +2155,7 @@ function openMobileActions(id) {
     document.getElementById('m-action-nombre').innerText = sub.funcionario.nombre;
     document.getElementById('m-action-rut').innerText = `${sub.funcionario.rut} • ${sub.funcionario.depto || 'Sin Depto'}`;
     document.getElementById('m-action-ticket').innerText = sub.ticket;
-    
+
     const badgeEl = document.getElementById('m-action-badge');
     badgeEl.innerText = sub.tipo_solicitud;
     if (sub.tipo_solicitud === 'Asignacion') {
@@ -2290,11 +2290,11 @@ function viewAndEditForm(id) {
     if (!s) return;
 
     activeSubmissionId = s.id;
-    
+
     // Rellenar cabecera
     document.getElementById('form-fecha').value = s.fecha;
     document.getElementById('form-ticket').value = s.ticket === 'S/N' ? '' : s.ticket;
-    
+
     // Rellenar sección 1 y disparar validación visual de RUT
     const rutField = document.getElementById('func-rut');
     document.getElementById('func-nombre').value = s.funcionario.nombre;
@@ -2306,9 +2306,9 @@ function viewAndEditForm(id) {
     // Rellenar sección 2
     document.querySelector(`input[name="solicitud_tipo"][value="${s.tipo_solicitud}"]`).checked = true;
     toggleTraspasoSection();
-    
+
     document.querySelector(`input[name="propiedad_tipo"][value="${s.propiedad_equipamiento}"]`).checked = true;
-    
+
     // Checkboxes categorías
     document.querySelectorAll('input[name="eq_cat"]').forEach(cb => {
         cb.checked = (s.equipamiento_categorias || []).includes(cb.value);
@@ -2352,13 +2352,13 @@ function viewAndEditForm(id) {
 
     const ticRadio = document.querySelector(`input[name="sig_mode_tic"][value="${ticTargetMode}"]`) || document.querySelector('input[name="sig_mode_tic"][value="oficial"]');
     if (ticRadio) ticRadio.checked = true;
-    
+
     const emisorRadio = document.querySelector(`input[name="sig_mode_emisor"][value="${sigModes.emisor_mode || (sigModes.emisor ? 'digital' : 'manual')}"]`);
     if (emisorRadio) emisorRadio.checked = true;
-    
+
     const receptorRadio = document.querySelector(`input[name="sig_mode_receptor"][value="${sigModes.receptor_mode || (sigModes.receptor ? 'digital' : 'manual')}"]`);
     if (receptorRadio) receptorRadio.checked = true;
-    
+
     toggleSigMode('tic');
     toggleSigMode('emisor');
     toggleSigMode('receptor');
@@ -2368,7 +2368,7 @@ function viewAndEditForm(id) {
 
     // Renderizar firmas guardadas en canvas
     switchTab('form-view');
-    
+
     setTimeout(() => {
         resizeAllCanvases();
         setTimeout(() => {
@@ -2388,12 +2388,12 @@ function drawSavedSignature(id, dataUrl) {
     const canvas = document.getElementById(`canvas-${id}`);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (drawingStates[id]) drawingStates[id].hasSigned = true;
-    
+
     const img = new Image();
-    img.onload = function() {
+    img.onload = function () {
         const ratio = window.devicePixelRatio || 1;
         const width = canvas.width / ratio;
         const height = canvas.height / ratio;
@@ -2504,7 +2504,7 @@ function generateOfficerLink(id = null) {
     } else if (activeSubmissionId) {
         targetSub = submissions.find(s => s.id === activeSubmissionId);
     }
-    
+
     let shareUrl = window.location.origin + window.location.pathname;
     if (targetSub) {
         const payload = {
@@ -2574,7 +2574,7 @@ function checkUrlParameters() {
                 }
                 if (parsed.accesorios) document.getElementById('form-accesorios').value = parsed.accesorios;
                 if (parsed.observaciones_generales) document.getElementById('form-observaciones').value = parsed.observaciones_generales;
-                
+
                 showToast("Formulario cargado automáticamente desde el enlace recibido.", "info");
             }
         } catch (e) {
@@ -2622,7 +2622,7 @@ function importBackupJSON(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async function(e) {
+    reader.onload = async function (e) {
         try {
             const parsed = JSON.parse(e.target.result);
             let importedList = [];
@@ -2689,13 +2689,13 @@ function exportToCSV() {
     }
 
     let csvContent = "\uFEFF"; // Byte Order Mark (BOM) para acentos en Excel
-    
+
     // Encabezados
     csvContent += "ID,Fecha Solicitud,N° Ticket,Funcionario Receptor,RUT Receptor,Cargo,Depto Receptor,Tipo Solicitud,Propiedad Equipamiento,Categorías,Otros Detalles,Traspaso Emisor,Traspaso Emisor Depto,Traspaso Observación,Equipos Detalle,Accesorios Incluidos,Observaciones Generales\r\n";
 
     submissions.forEach(s => {
         const equiposDetalleStr = s.equipamiento.map(e => `${e.tipo} [Marca: ${e.marca} Mod: ${e.modelo} Serie: ${e.serie} Inv: ${e.inventario || 'S/N'} Obs: ${e.observacion || 'Ninguna'}]`).join(' | ');
-        
+
         const fila = [
             s.id,
             s.fecha,
@@ -2715,7 +2715,7 @@ function exportToCSV() {
             `"${(s.accesorios || '').replace(/"/g, '""')}"`,
             `"${(s.observaciones_generales || '').replace(/"/g, '""')}"`
         ];
-        
+
         csvContent += fila.join(",") + "\r\n";
     });
 
@@ -2727,7 +2727,7 @@ function exportToCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     showToast("Historial exportado correctamente para abrir en Microsoft Excel.", "success");
 }
 
@@ -2740,7 +2740,7 @@ function toggleKitDropdown(event) {
 
 function insertEquipmentKit(kitType) {
     const container = document.getElementById('equipment-rows');
-    
+
     // Si sólo hay una fila vacía, la reemplazamos
     const firstRow = container.querySelector('tr');
     if (firstRow && container.children.length === 1) {
@@ -2874,7 +2874,7 @@ function filterPreviewPage(page) {
     const wrapper = document.getElementById('print-preview-sheets-wrapper');
     if (!wrapper) return;
     const pages = wrapper.querySelectorAll('.print-page');
-    
+
     // Resetear botones
     ['all', 'p1', 'p2'].forEach(id => {
         const btn = document.getElementById(`preview-btn-${id}`);
@@ -2914,7 +2914,7 @@ async function exportPdfFromPreview() {
             const rut = document.getElementById('rut_receptor')?.value || 'ACTA';
             const folio = document.getElementById('ticket_ot')?.value || 'TIC';
             const defaultName = `Acta_TIC_${folio}_${rut}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-            
+
             showToast('Generando archivo PDF oficial...', 'info');
             const result = await window.electronAPI.savePdf(defaultName);
             if (result.success) {
@@ -2949,20 +2949,20 @@ function showToast(message, type = "success") {
     const toast = document.getElementById('toast');
     const iconSpan = document.getElementById('toast-icon');
     const msgSpan = document.getElementById('toast-message');
-    
+
     msgSpan.innerText = message;
-    
+
     if (type === 'success') {
         iconSpan.innerHTML = '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-450"></i>';
     } else {
         iconSpan.innerHTML = '<i data-lucide="x-circle" class="w-5 h-5 text-rose-400"></i>';
     }
-    
+
     lucide.createIcons();
-    
+
     toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
     toast.classList.add('translate-y-0', 'opacity-100');
-    
+
     setTimeout(() => {
         toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
         toast.classList.remove('translate-y-0', 'opacity-100');
@@ -2977,9 +2977,9 @@ let loadedAllEquipments = [];
 function normalizeKey(key) {
     if (typeof key !== 'string') return '';
     return key.toLowerCase()
-              .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quitar acentos
-              .replace(/[\s\r\n\t]+/g, '')                     // quitar espacios y saltos de línea
-              .replace(/[^a-z0-9]/g, '');                      // mantener solo caracteres alfanuméricos
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quitar acentos
+        .replace(/[\s\r\n\t]+/g, '')                     // quitar espacios y saltos de línea
+        .replace(/[^a-z0-9]/g, '');                      // mantener solo caracteres alfanuméricos
 }
 
 // Normalizar nombres de personas para evitar duplicidad de actas por tildes/espacios
@@ -3044,7 +3044,7 @@ function cleanRowData(row, sourceSheet) {
         observaciones: '',
         _originalRow: row // Referencia original
     };
-    
+
     for (let key in row) {
         const norm = normalizeKey(key);
         const val = String(row[key] || '').trim();
@@ -3092,7 +3092,7 @@ function setCellValue(sheet, rowIdx, colIdx, val) {
         sheet[cellRef] = { t: 's', v: '' };
     }
     const cell = sheet[cellRef];
-    
+
     if (typeof val === 'number') {
         cell.t = 'n';
         cell.v = val;
@@ -3120,7 +3120,7 @@ function updateEquipmentStatusInSheet(sheet, range, serialNumber, statusValue, o
     const startRow = 4; // Fila 5 es índice 4 (después de cabeceras)
     const endRow = range.e.r;
     let found = false;
-    
+
     for (let r = startRow; r <= endRow; r++) {
         const serialCellRef = XLSX.utils.encode_cell({ r: r, c: 2 }); // Columna C (N° Serie) es índice 2
         const serialCell = sheet[serialCellRef];
@@ -3142,15 +3142,15 @@ function handleExcelUpload(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         try {
             const data = new Uint8Array(e.target.result);
             uploadedWorkbook = XLSX.read(data, { type: 'array' });
-            
+
             processWorkbookData();
-            
+
             showToast("Planilla Excel cargada y depurada exitosamente.", "success");
-            
+
         } catch (error) {
             console.error("Error al procesar Excel:", error);
             showToast("Error al procesar el archivo Excel. Verifique que sea el formato correcto.", "error");
@@ -3171,7 +3171,7 @@ function preloadExcelData() {
             const comps = data.computers || [];
             const prints = data.printers || [];
             loadedAllEquipments = [...comps, ...prints];
-            
+
             // Si hay solicitudes en el JSON, sincronizarlas limpiamente preservando solicitudes manuales
             if (data.submissions && Array.isArray(data.submissions)) {
                 const manualSubs = submissions.filter(s => !s.id.startsWith('sub_excel_'));
@@ -3179,18 +3179,18 @@ function preloadExcelData() {
                 submissions = [...manualSubs, ...excelSubs];
                 saveSubmissionsToStorage();
             }
-            
+
             // Actualizar interfaz instantáneamente
             populateInventoryDeptFilter();
             renderInventoryTable();
             renderTable();
             updateStats();
-            
+
             // Sincronizar actas de la nube de Supabase sobre el catálogo cargado
             if (isSupabaseReady) {
                 fetchSubmissionsFromSupabase();
             }
-            
+
             const badge = document.getElementById('excel-status-badge');
             if (badge) {
                 badge.innerHTML = `
@@ -3238,7 +3238,7 @@ function processWorkbookData() {
             })
             .map(row => cleanRowData(row, 'Computadores'));
     }
-    
+
     // 2. Procesar Hoja de Impresoras-Scanner para auto-relleno
     const printerSheet = uploadedWorkbook.Sheets['Impresoras-Scanner'];
     let printers = [];
@@ -3251,9 +3251,9 @@ function processWorkbookData() {
             })
             .map(row => cleanRowData(row, 'Impresoras-Scanner'));
     }
-    
+
     loadedAllEquipments = [...computers, ...printers];
-    
+
     // 3. Procesar todas las hojas (Equipos, Computadores e Impresoras) agrupando por funcionario único
     const grouped = {};
 
@@ -3279,7 +3279,7 @@ function processWorkbookData() {
         }
         return grouped[key];
     }
-    
+
     // A. Primero incorporar datos de la hoja 'Equipos' (si contiene RUT, Cargo y Departamento)
     const equiposSheet = uploadedWorkbook.Sheets['Equipos'];
     if (equiposSheet) {
@@ -3431,10 +3431,10 @@ function processWorkbookData() {
     const manualSubs = submissions.filter(s => !s.id.startsWith('sub_excel_'));
     submissions = [...manualSubs, ...excelSubmissions];
     importedCount = excelSubmissions.length;
-    
+
     saveSubmissionsToStorage();
     renderTable();
-    
+
     // 4. Actualizar estado de interfaz
     const badge = document.getElementById('excel-status-badge');
     if (badge) {
@@ -3449,11 +3449,11 @@ function processWorkbookData() {
             </div>
         `;
     }
-    
+
     // Mostrar controles relacionados
     const searchContainer = document.getElementById('excel-search-container');
     if (searchContainer) searchContainer.classList.remove('hidden');
-    
+
     const exportBtn = document.getElementById('excel-export-btn');
     if (exportBtn) exportBtn.classList.remove('hidden');
 
@@ -3471,34 +3471,34 @@ function showExcelSuggestions(query) {
     const dropdown = document.getElementById('excel-suggestions-dropdown');
     dropdown.innerHTML = '';
     selectedSuggestionIndex = -1;
-    
+
     if (!query || query.trim().length < 2) {
         dropdown.classList.add('hidden');
         return;
     }
-    
+
     const term = query.toLowerCase().trim();
     const matches = [];
-    
+
     for (let i = 0; i < loadedAllEquipments.length; i++) {
         const item = loadedAllEquipments[i];
         const matchFunc = (item.funcionario || '').toLowerCase().includes(term);
         const matchSerie = (item.serie || '').toLowerCase().includes(term);
         const matchInv = (item.inventario || '').toLowerCase().includes(term);
         const matchMail = (item.mail || '').toLowerCase().includes(term);
-        
+
         if (matchFunc || matchSerie || matchInv || matchMail) {
             matches.push({ index: i, item: item });
         }
         if (matches.length >= 10) break; // Límite de 10 sugerencias
     }
-    
+
     if (matches.length === 0) {
         dropdown.innerHTML = '<div class="p-3 text-center text-slate-450">No se encontraron coincidencias en el catastro.</div>';
         dropdown.classList.remove('hidden');
         return;
     }
-    
+
     matches.forEach((match, matchIdx) => {
         const item = match.item;
         const div = document.createElement('div');
@@ -3506,11 +3506,11 @@ function showExcelSuggestions(query) {
         div.dataset.index = match.index;
         div.dataset.pos = matchIdx;
         div.onclick = () => selectExcelSuggestion(match.index);
-        
-        const badgeClass = item.sheet === 'Computadores' 
-            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' 
+
+        const badgeClass = item.sheet === 'Computadores'
+            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
             : 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400';
-            
+
         div.innerHTML = `
             <div>
                 <div class="font-bold text-slate-800 dark:text-slate-200">${item.funcionario || 'Sin Funcionario asignado'}</div>
@@ -3523,7 +3523,7 @@ function showExcelSuggestions(query) {
         `;
         dropdown.appendChild(div);
     });
-    
+
     dropdown.classList.remove('hidden');
 }
 
@@ -3531,7 +3531,7 @@ function showExcelSuggestions(query) {
 function selectExcelSuggestion(index) {
     const item = loadedAllEquipments[index];
     if (!item) return;
-    
+
     // 1. Rellenar datos funcionario
     if (item.funcionario) {
         document.getElementById('func-nombre').value = item.funcionario;
@@ -3539,7 +3539,7 @@ function selectExcelSuggestion(index) {
     if (item.depto) {
         document.getElementById('func-depto').value = item.depto;
     }
-    
+
     // 2. Establecer Tipo Propiedad
     const isArriendo = (item.propiedad || '').toLowerCase().includes('arriendo');
     if (isArriendo) {
@@ -3549,11 +3549,11 @@ function selectExcelSuggestion(index) {
         const rad = document.querySelector('input[name="propiedad_tipo"][value="Propiedad ISP"]');
         if (rad) rad.checked = true;
     }
-    
+
     // 3. Establecer Checkboxes Categoría
     document.querySelectorAll('input[name="eq_cat"]').forEach(cb => cb.checked = false);
     document.getElementById('eq_otros_detalles').value = '';
-    
+
     const tipoLower = (item.tipo || '').toLowerCase();
     if (tipoLower.includes('pc') || tipoLower === 'desktop') {
         const cb = document.querySelector('input[name="eq_cat"][value="PC"]');
@@ -3570,7 +3570,7 @@ function selectExcelSuggestion(index) {
     } else {
         document.getElementById('eq_otros_detalles').value = item.tipo;
     }
-    
+
     // 4. Agregar fila en Sección 4 (separando equipos combinados si corresponde)
     const container = document.getElementById('equipment-rows');
     container.innerHTML = '';
@@ -3585,11 +3585,11 @@ function selectExcelSuggestion(index) {
     splitItems.forEach(splitItem => {
         addEquipmentRow(splitItem);
     });
-    
+
     // Limpiar barra de búsqueda y ocultar dropdown
     document.getElementById('excel-autocomplete-input').value = '';
     document.getElementById('excel-suggestions-dropdown').classList.add('hidden');
-    
+
     showToast("Datos de funcionario y equipo auto-rellenados.", "success");
 }
 
@@ -3599,13 +3599,13 @@ function exportUpdatedExcel() {
         showToast("Debe cargar primero el Catastro Excel.", "error");
         return;
     }
-    
+
     const equiposSheet = uploadedWorkbook.Sheets['Equipos'];
     if (!equiposSheet) {
         showToast("No se encontró la hoja 'Equipos' en el Excel.", "error");
         return;
     }
-    
+
     // Listar todos los equipos recopilados de las solicitudes locales
     const flatEquipments = [];
     submissions.forEach(sub => {
@@ -3616,7 +3616,7 @@ function exportUpdatedExcel() {
             });
         });
     });
-    
+
     // Limpiar datos previos en la hoja 'Equipos' (columnas index 1 a 13)
     const rangeEquipos = XLSX.utils.decode_range(equiposSheet['!ref']);
     for (let r = 1; r <= rangeEquipos.e.r; r++) {
@@ -3628,13 +3628,13 @@ function exportUpdatedExcel() {
         }
         setCellValue(equiposSheet, r, 12, false); // Baseline EsInventario = false
     }
-    
+
     // Escribir los registros recopilados
     flatEquipments.forEach((record, index) => {
         const rowIdx = index + 1; // Fila 2 en adelante
         const sub = record.sub;
         const eq = record.eq;
-        
+
         setCellValue(equiposSheet, rowIdx, 0, index + 1); // Nº
         setCellValue(equiposSheet, rowIdx, 1, eq.tipo || ''); // Tipo (AIO Notebook o Pantalla)
         setCellValue(equiposSheet, rowIdx, 2, eq.serie || ''); // Serie
@@ -3646,64 +3646,64 @@ function exportUpdatedExcel() {
         setCellValue(equiposSheet, rowIdx, 8, sub.funcionario.cargo || ''); // Cargo
         setCellValue(equiposSheet, rowIdx, 9, sub.funcionario.depto || ''); // Departamento
         setCellValue(equiposSheet, rowIdx, 10, ''); // Ubicación
-        
+
         let obsText = eq.observacion || '';
         if (sub.ticket && sub.ticket !== 'S/N') {
             obsText = `Ticket ${sub.ticket}: ${obsText}`.trim();
         }
         setCellValue(equiposSheet, rowIdx, 11, obsText); // Observación
-        
+
         const isInventario = sub.propiedad_equipamiento === 'Propiedad ISP';
         setCellValue(equiposSheet, rowIdx, 12, isInventario); // EsInventario
         setCellValue(equiposSheet, rowIdx, 13, eq.inventario || ''); // Nº Inventario
     });
-    
+
     // Actualizar el ref de la hoja Equipos
     updateSheetRange(equiposSheet, flatEquipments.length);
-    
+
     // Actualizar estados "Catastrado" en las hojas 'Computadores' e 'Impresoras-Scanner'
     const compSheet = uploadedWorkbook.Sheets['Computadores'];
     const compRange = compSheet ? XLSX.utils.decode_range(compSheet['!ref']) : null;
-    
+
     const printSheet = uploadedWorkbook.Sheets['Impresoras-Scanner'];
     const printRange = printSheet ? XLSX.utils.decode_range(printSheet['!ref']) : null;
-    
+
     let updatedCount = 0;
-    
+
     flatEquipments.forEach(record => {
         const eq = record.eq;
         const sub = record.sub;
         if (!eq.serie) return;
-        
+
         const statusValue = 'Catastrado';
         const obsValue = `Catastrado el ${sub.fecha}${sub.ticket && sub.ticket !== 'S/N' ? ' (Ticket ' + sub.ticket + ')' : ''}`;
-        
+
         let found = false;
-        
+
         if (compSheet && compRange) {
             found = updateEquipmentStatusInSheet(compSheet, compRange, eq.serie, statusValue, obsValue, 21, 22);
         }
-        
+
         if (!found && printSheet && printRange) {
             found = updateEquipmentStatusInSheet(printSheet, printRange, eq.serie, statusValue, obsValue, 16, 17);
         }
-        
+
         if (found) {
             updatedCount++;
         }
     });
-    
+
     // Generar binario del libro y descargar
     try {
         const wbout = XLSX.write(uploadedWorkbook, { bookType: 'xlsx', type: 'binary' });
-        
+
         function s2ab(s) {
             const buf = new ArrayBuffer(s.length);
             const view = new Uint8Array(buf);
             for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
             return buf;
         }
-        
+
         const blob = new Blob([s2ab(wbout)], { type: "application/octet-stream" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -3712,7 +3712,7 @@ function exportUpdatedExcel() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         showToast(`Catastro actualizado exportado con éxito. Se marcaron ${updatedCount} equipos en las planillas de inventario y se registraron ${flatEquipments.length} asignaciones.`, "success");
     } catch (e) {
         console.error("Error al exportar Excel:", e);
@@ -3791,8 +3791,8 @@ function splitEquipmentIfCombined(rawEq) {
     const hasSlashTipo = tipo.includes('/') && !isNA;
     const hasSlashSerie = serie.includes('/') && !isNA;
 
-    const isCombined = hasSlashTipo || hasSlashSerie || 
-                       (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')));
+    const isCombined = hasSlashTipo || hasSlashSerie ||
+        (tipo.toLowerCase().includes('aio') && (tipo.toLowerCase().includes('monitor') || tipo.toLowerCase().includes('pantalla')));
 
     if (!isCombined) {
         return [rawEq];
@@ -3928,7 +3928,7 @@ function renderMetrics() {
     loadedAllEquipments.forEach(e => {
         let dept = String(e.depto || 'SIN DEPARTAMENTO').trim().toUpperCase();
         if (dept === 'UNDEFINED' || dept === '') dept = 'SIN DEPARTAMENTO';
-        
+
         if (!deptsMap[dept]) {
             deptsMap[dept] = { total: 0, catastrado: 0 };
         }
@@ -3972,7 +3972,7 @@ function renderMetrics() {
     loadedAllEquipments.forEach(e => {
         let t = String(e.tipo || 'OTRO').trim().toUpperCase();
         if (t === 'UNDEFINED' || t === '') t = 'OTRO';
-        
+
         if (t === 'PC' || t.includes('DESKTOP') || t.includes('TORRE')) t = 'PC';
         else if (t.includes('NOTEBOOK') || t.includes('LAPTOP')) t = 'NOTEBOOK';
         else if (t.includes('AIO') || t.includes('ALL IN ONE') || t.includes('ALL-IN-ONE')) t = 'ALL IN ONE';
@@ -3984,7 +3984,7 @@ function renderMetrics() {
             typesMap[t] = { total: 0, arriendo: 0, isp: 0, catastrado: 0 };
         }
         typesMap[t].total++;
-        
+
         const isArriendo = String(e.propiedad || '').toLowerCase().includes('arriendo');
         if (isArriendo) typesMap[t].arriendo++;
         else typesMap[t].isp++;
@@ -4037,24 +4037,24 @@ let inventoryPerPage = 25;
 function populateInventoryDeptFilter() {
     const deptSelect = document.getElementById('inventory-dept-filter');
     if (!deptSelect) return;
-    
+
     const currentVal = deptSelect.value;
     const deptsSet = new Set();
-    
+
     loadedAllEquipments.forEach(item => {
         if (item.depto && item.depto.trim().length > 0 && item.depto.trim().toUpperCase() !== 'UNDEFINED') {
             deptsSet.add(item.depto.trim());
         }
     });
-    
+
     const sortedDepts = Array.from(deptsSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-    
+
     let html = '<option value="All">Todos los Departamentos</option>';
     sortedDepts.forEach(d => {
         html += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
     });
     deptSelect.innerHTML = html;
-    
+
     if (sortedDepts.includes(currentVal)) {
         deptSelect.value = currentVal;
     }
@@ -4065,7 +4065,7 @@ function handleInventorySearch() {
     const input = document.getElementById('inventory-search-input');
     const clearBtn = document.getElementById('inventory-search-clear');
     if (!input) return;
-    
+
     inventoryFilterSearch = (input.value || '').trim().toLowerCase();
     if (clearBtn) {
         if (inventoryFilterSearch.length > 0) {
@@ -4089,11 +4089,11 @@ function handleInventoryFilterChange() {
     const typeSelect = document.getElementById('inventory-type-filter');
     const deptSelect = document.getElementById('inventory-dept-filter');
     const statusSelect = document.getElementById('inventory-status-filter');
-    
+
     if (typeSelect) inventoryFilterType = typeSelect.value;
     if (deptSelect) inventoryFilterDept = deptSelect.value;
     if (statusSelect) inventoryFilterStatus = statusSelect.value;
-    
+
     inventoryCurrentPage = 1;
     renderInventoryTable();
 }
@@ -4101,18 +4101,18 @@ function handleInventoryFilterChange() {
 // Filtrar por origen (Computadores vs Impresoras)
 function setInventorySheetFilter(sheetName) {
     inventoryFilterSheet = sheetName;
-    
+
     const btnAll = document.getElementById('btn-sheet-all');
     const btnComps = document.getElementById('btn-sheet-comps');
     const btnPrinters = document.getElementById('btn-sheet-printers');
-    
+
     const activeBtnClass = "px-3 py-1 rounded-xl font-bold bg-indigo-600 text-white shadow-sm transition-all";
     const inactiveBtnClass = "px-3 py-1 rounded-xl font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all";
-    
+
     if (btnAll) btnAll.className = sheetName === 'All' ? activeBtnClass : inactiveBtnClass;
     if (btnComps) btnComps.className = sheetName === 'Computadores' ? activeBtnClass : inactiveBtnClass;
     if (btnPrinters) btnPrinters.className = sheetName === 'Impresoras-Scanner' ? activeBtnClass : inactiveBtnClass;
-    
+
     inventoryCurrentPage = 1;
     renderInventoryTable();
 }
@@ -4125,19 +4125,19 @@ function resetInventoryFilters() {
     inventoryFilterStatus = 'All';
     inventoryFilterSheet = 'All';
     inventoryCurrentPage = 1;
-    
+
     const searchInput = document.getElementById('inventory-search-input');
     const typeSelect = document.getElementById('inventory-type-filter');
     const deptSelect = document.getElementById('inventory-dept-filter');
     const statusSelect = document.getElementById('inventory-status-filter');
     const clearBtn = document.getElementById('inventory-search-clear');
-    
+
     if (searchInput) searchInput.value = '';
     if (clearBtn) clearBtn.classList.add('hidden');
     if (typeSelect) typeSelect.value = 'All';
     if (deptSelect) deptSelect.value = 'All';
     if (statusSelect) statusSelect.value = 'All';
-    
+
     setInventorySheetFilter('All');
 }
 
@@ -4164,7 +4164,7 @@ function goToInventoryPage(target) {
 function assignEquipmentToForm(equipmentIndex) {
     const item = loadedAllEquipments[equipmentIndex];
     if (!item) return;
-    
+
     openNewForm();
     selectExcelSuggestion(equipmentIndex);
     switchTab('form-view');
@@ -4199,7 +4199,7 @@ function exportFilteredInventory() {
         showToast("No hay datos cargados en el inventario para exportar.", "warning");
         return;
     }
-    
+
     // Obtener los datos filtrados actuales
     const localCatastradosSet = new Set();
     submissions.forEach(sub => {
@@ -4209,17 +4209,17 @@ function exportFilteredInventory() {
             });
         }
     });
-    
+
     const isEqCatastrado = (e) => {
         const estadoLower = String(e.estado || '').toLowerCase();
         const isCatExcel = estadoLower.includes('catastrado');
         const isCatLocal = e.serie && localCatastradosSet.has(String(e.serie).trim().toLowerCase());
         return isCatExcel || isCatLocal;
     };
-    
+
     const filtered = loadedAllEquipments.filter(e => {
         if (inventoryFilterSheet !== 'All' && e.sheet !== inventoryFilterSheet) return false;
-        
+
         if (inventoryFilterType !== 'All') {
             const tLower = (e.tipo || '').toLowerCase();
             const filterLower = inventoryFilterType.toLowerCase();
@@ -4230,18 +4230,18 @@ function exportFilteredInventory() {
             else if (filterLower === 'scanner' && !tLower.includes('scanner')) return false;
             else if (filterLower === 'monitor' && !tLower.includes('monitor') && !tLower.includes('pantalla')) return false;
         }
-        
+
         if (inventoryFilterDept !== 'All') {
             if ((e.depto || '').toLowerCase() !== inventoryFilterDept.toLowerCase()) return false;
         }
-        
+
         if (inventoryFilterStatus !== 'All') {
             const isCat = isEqCatastrado(e);
             if (inventoryFilterStatus === 'Catastrado' && !isCat) return false;
             if (inventoryFilterStatus === 'Pendiente' && isCat) return false;
             if (inventoryFilterStatus === 'Operativo' && !(e.estado || '').toLowerCase().includes('operativo')) return false;
         }
-        
+
         if (inventoryFilterSearch) {
             const search = inventoryFilterSearch;
             const matchFunc = (e.funcionario || '').toLowerCase().includes(search);
@@ -4262,12 +4262,12 @@ function exportFilteredInventory() {
         }
         return true;
     });
-    
+
     if (filtered.length === 0) {
         showToast("No hay registros que coincidan con los filtros para exportar.", "warning");
         return;
     }
-    
+
     const rows = filtered.map((e, idx) => {
         const isCat = isEqCatastrado(e);
         return {
@@ -4287,7 +4287,7 @@ function exportFilteredInventory() {
             'Observaciones': e.observaciones || ''
         };
     });
-    
+
     try {
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
@@ -4306,9 +4306,9 @@ function renderInventoryTable() {
     const mobileContainer = document.getElementById('inventory-mobile-cards');
     const emptyState = document.getElementById('inventory-empty-state');
     const paginationBar = document.getElementById('inventory-pagination-bar');
-    
+
     if (!tbody && !mobileContainer) return;
-    
+
     // 1. Obtener conjunto de series catastradas localmente
     const localCatastradosSet = new Set();
     submissions.forEach(sub => {
@@ -4318,46 +4318,46 @@ function renderInventoryTable() {
             });
         }
     });
-    
+
     const isEqCatastrado = (e) => {
         const estadoLower = String(e.estado || '').toLowerCase();
         const isCatExcel = estadoLower.includes('catastrado');
         const isCatLocal = e.serie && localCatastradosSet.has(String(e.serie).trim().toLowerCase());
         return isCatExcel || isCatLocal;
     };
-    
+
     // 2. Actualizar contadores superiores de KPI
     const totalComps = loadedAllEquipments.filter(e => e.sheet === 'Computadores').length;
     const totalPrinters = loadedAllEquipments.filter(e => e.sheet === 'Impresoras-Scanner').length;
     const totalCatastrados = loadedAllEquipments.filter(e => isEqCatastrado(e)).length;
-    
+
     const elCountTotal = document.getElementById('inv-count-total');
     const elCountComps = document.getElementById('inv-count-comps');
     const elCountPrinters = document.getElementById('inv-count-printers');
     const elCountCat = document.getElementById('inv-count-catastrados');
-    
+
     if (elCountTotal) elCountTotal.innerText = loadedAllEquipments.length;
     if (elCountComps) elCountComps.innerText = totalComps;
     if (elCountPrinters) elCountPrinters.innerText = totalPrinters;
     if (elCountCat) elCountCat.innerText = totalCatastrados;
-    
+
     const chipAll = document.getElementById('count-chip-all');
     const chipComps = document.getElementById('count-chip-comps');
     const chipPrinters = document.getElementById('count-chip-printers');
     if (chipAll) chipAll.innerText = loadedAllEquipments.length;
     if (chipComps) chipComps.innerText = totalComps;
     if (chipPrinters) chipPrinters.innerText = totalPrinters;
-    
+
     // 3. Aplicar filtros a loadedAllEquipments
     const filteredWithIndex = [];
     for (let i = 0; i < loadedAllEquipments.length; i++) {
         const e = loadedAllEquipments[i];
-        
+
         // Filtro por hoja de origen
         if (inventoryFilterSheet !== 'All' && e.sheet !== inventoryFilterSheet) {
             continue;
         }
-        
+
         // Filtro por tipo de equipo
         if (inventoryFilterType !== 'All') {
             const tLower = (e.tipo || '').toLowerCase();
@@ -4369,14 +4369,14 @@ function renderInventoryTable() {
             else if (filterLower === 'scanner' && !tLower.includes('scanner')) continue;
             else if (filterLower === 'monitor' && !tLower.includes('monitor') && !tLower.includes('pantalla')) continue;
         }
-        
+
         // Filtro por departamento
         if (inventoryFilterDept !== 'All') {
             if ((e.depto || '').toLowerCase() !== inventoryFilterDept.toLowerCase()) {
                 continue;
             }
         }
-        
+
         // Filtro por estado
         if (inventoryFilterStatus !== 'All') {
             const isCat = isEqCatastrado(e);
@@ -4384,7 +4384,7 @@ function renderInventoryTable() {
             if (inventoryFilterStatus === 'Pendiente' && isCat) continue;
             if (inventoryFilterStatus === 'Operativo' && !(e.estado || '').toLowerCase().includes('operativo')) continue;
         }
-        
+
         // Filtro por búsqueda de texto
         if (inventoryFilterSearch) {
             const search = inventoryFilterSearch;
@@ -4404,10 +4404,10 @@ function renderInventoryTable() {
                 continue;
             }
         }
-        
+
         filteredWithIndex.push({ originalIndex: i, item: e });
     }
-    
+
     // 4. Manejo de estado vacío
     if (filteredWithIndex.length === 0) {
         if (tbody) tbody.innerHTML = '';
@@ -4416,22 +4416,22 @@ function renderInventoryTable() {
         if (paginationBar) paginationBar.classList.add('hidden');
         return;
     }
-    
+
     if (emptyState) emptyState.classList.add('hidden');
     if (paginationBar) paginationBar.classList.remove('hidden');
-    
+
     // 5. Calcular paginación
     const totalItems = filteredWithIndex.length;
     const pageSize = inventoryPerPage === 'all' ? totalItems : inventoryPerPage;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    
+
     if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
     if (inventoryCurrentPage < 1) inventoryCurrentPage = 1;
-    
+
     const startIndex = (inventoryCurrentPage - 1) * pageSize;
     const endIndex = Math.min(totalItems, startIndex + pageSize);
     const currentPageItems = filteredWithIndex.slice(startIndex, endIndex);
-    
+
     // 6. Renderizar tabla de escritorio
     if (tbody) {
         tbody.innerHTML = '';
@@ -4440,7 +4440,7 @@ function renderInventoryTable() {
             const origIdx = entry.originalIndex;
             const globalNumber = startIndex + rowIdx + 1;
             const isCat = isEqCatastrado(item);
-            
+
             // Badge Tipo
             const tLower = (item.tipo || '').toLowerCase();
             let typeBadgeClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
@@ -4457,7 +4457,7 @@ function renderInventoryTable() {
             } else if (tLower.includes('pantalla') || tLower.includes('monitor')) {
                 typeBadgeClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/50';
             }
-            
+
             // Badge Estado
             let statusBadge = '';
             if (isCat) {
@@ -4467,7 +4467,7 @@ function renderInventoryTable() {
             } else {
                 statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/50"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pendiente</span>';
             }
-            
+
             const codigoInv = item.inventario || (item._originalRow && item._originalRow['Código Arriendo']) || '—';
             const contratoInfo = (item._originalRow && item._originalRow['Contrato Arriendo']) || item.propiedad || 'Arriendo';
             const tr = document.createElement('tr');
@@ -4506,7 +4506,7 @@ function renderInventoryTable() {
             tbody.appendChild(tr);
         });
     }
-    
+
     // 7. Renderizar tarjetas móviles
     if (mobileContainer) {
         mobileContainer.innerHTML = '';
@@ -4515,7 +4515,7 @@ function renderInventoryTable() {
             const origIdx = entry.originalIndex;
             const globalNumber = startIndex + rowIdx + 1;
             const isCat = isEqCatastrado(item);
-            
+
             const card = document.createElement('div');
             card.className = "p-4 space-y-2.5 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors border-b border-slate-100 dark:border-slate-800/60";
             card.innerHTML = `
@@ -4524,10 +4524,10 @@ function renderInventoryTable() {
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <span class="text-[10px] font-mono text-slate-400">#${globalNumber}</span>
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300">${escapeHtml(item.tipo || 'Equipo')}</span>
-                            ${isCat 
-                                ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400">Catastrado</span>'
-                                : '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">Pendiente</span>'
-                            }
+                            ${isCat
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400">Catastrado</span>'
+                    : '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">Pendiente</span>'
+                }
                         </div>
                         <h4 class="font-bold text-slate-900 dark:text-slate-100 text-sm leading-tight truncate mt-1">${escapeHtml(item.funcionario || 'Sin Funcionario')}</h4>
                         <p class="text-[11px] text-slate-400 dark:text-slate-500 truncate">${escapeHtml(item.depto || 'Sin Departamento')} ${item.mail ? `• ${escapeHtml(item.mail)}` : ''}</p>
@@ -4545,38 +4545,38 @@ function renderInventoryTable() {
             mobileContainer.appendChild(card);
         });
     }
-    
+
     // 8. Actualizar barra de paginación
     const countSummary = document.getElementById('inventory-count-summary');
     if (countSummary) {
         countSummary.innerText = `Mostrando ${startIndex + 1} - ${endIndex} de ${totalItems} equipos`;
     }
-    
+
     const prevBtn = document.getElementById('inventory-prev-btn');
     const nextBtn = document.getElementById('inventory-next-btn');
     if (prevBtn) prevBtn.disabled = inventoryCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = inventoryCurrentPage >= totalPages;
-    
+
     const pageNumbersContainer = document.getElementById('inventory-page-numbers');
     if (pageNumbersContainer) {
         pageNumbersContainer.innerHTML = '';
-        
+
         // Generar botones de páginas numéricas inteligentes (con elipsis)
         const maxButtons = 5;
         let startPage = Math.max(1, inventoryCurrentPage - Math.floor(maxButtons / 2));
         let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-        
+
         if (endPage - startPage < maxButtons - 1) {
             startPage = Math.max(1, endPage - maxButtons + 1);
         }
-        
+
         if (startPage > 1) {
             const btn1 = document.createElement('button');
             btn1.className = "w-8 h-8 rounded-xl font-semibold text-xs transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800";
             btn1.innerText = "1";
             btn1.onclick = () => goToInventoryPage(1);
             pageNumbersContainer.appendChild(btn1);
-            
+
             if (startPage > 2) {
                 const dots = document.createElement('span');
                 dots.className = "px-1 text-slate-400";
@@ -4584,7 +4584,7 @@ function renderInventoryTable() {
                 pageNumbersContainer.appendChild(dots);
             }
         }
-        
+
         for (let p = startPage; p <= endPage; p++) {
             const btn = document.createElement('button');
             if (p === inventoryCurrentPage) {
@@ -4596,7 +4596,7 @@ function renderInventoryTable() {
             btn.onclick = () => goToInventoryPage(p);
             pageNumbersContainer.appendChild(btn);
         }
-        
+
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 const dots = document.createElement('span');
@@ -4611,14 +4611,14 @@ function renderInventoryTable() {
             pageNumbersContainer.appendChild(btnLast);
         }
     }
-    
+
     lucide.createIcons();
 }
 
 // ================= INTEGRACIÓN NATIVA CON ELECTRON =================
 if (window.electronAPI) {
     console.log('⚡ Entorno de escritorio Electron detectado.');
-    
+
     // Escuchar atajo de teclado o menú nativo para Imprimir
     window.electronAPI.onTriggerPrint(() => {
         triggerPrintMode();
@@ -4631,7 +4631,7 @@ if (window.electronAPI) {
             const rut = document.getElementById('rut_receptor')?.value || 'ACTA';
             const folio = document.getElementById('ticket_ot')?.value || 'TIC';
             const defaultName = `Acta_TIC_${folio}_${rut}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-            
+
             showToast('Generando archivo PDF nativo...', 'info');
             const result = await window.electronAPI.savePdf(defaultName);
             if (result.success) {
